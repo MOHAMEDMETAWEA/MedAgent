@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException, Request, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, Dict
 
 from agents.orchestrator import MedAgentOrchestrator
@@ -39,11 +39,26 @@ def check_admin_auth(api_key: str = Depends(api_key_header)):
 
 app = FastAPI(title="MedAgent Global API", version="5.0.0-SELF-IMPROVING")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_tokens=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/")
 async def root():
     return {"status": "Online", "version": "5.0.0"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "version": "5.0.0"}
+
+@app.get("/ready")
+async def ready():
+    try:
+        orch = get_orchestrator()
+        if orch:
+            return {"status": "ready", "version": "5.0.0"}
+    except Exception:
+        pass
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=503, content={"status": "not_ready", "version": "5.0.0"})
 
 # Global Singletons
 _orchestrator = None
@@ -79,19 +94,19 @@ def get_developer_agent(): # Added developer agent getter
     return _developer_agent
 
 # --- DEVELOPER/SYSTEM ROUTES ---
-@app.get("/system/health", dependencies=[Depends(get_current_admin)])
+@app.get("/system/health", dependencies=[Depends(check_admin_auth)])
 async def system_health():
     """Get aggregated system health metrics."""
     developer_agent = get_developer_agent()
     return developer_agent.get_system_health()
 
-@app.post("/system/register-dev", dependencies=[Depends(get_current_admin)])
+@app.post("/system/register-dev", dependencies=[Depends(check_admin_auth)])
 async def register_dev(username: str):
     """Register a new developer (simulated)."""
     developer_agent = get_developer_agent()
     return developer_agent.register_developer(username=username)
 
-@app.get("/system/test", dependencies=[Depends(get_current_admin)])
+@app.get("/system/test", dependencies=[Depends(check_admin_auth)])
 async def trigger_tests():
     """Run full system test suite."""
     developer_agent = get_developer_agent()
@@ -102,10 +117,29 @@ class PatientRequest(BaseModel):
     symptoms: str
     patient_id: str = "GUEST"
 
+    @field_validator('symptoms')
+    @classmethod
+    def symptoms_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Symptoms must not be empty')
+        return v
+
 class FeedbackRequest(BaseModel):
     session_id: str
     rating: int
     comment: Optional[str] = None
+
+class AgentResponse(BaseModel):
+    summary: Optional[str] = None
+    diagnosis: Optional[str] = None
+    appointment: Optional[str] = None
+    doctor_review: Optional[str] = None
+    is_emergency: bool = False
+    medical_report: Optional[str] = None
+    doctor_summary: Optional[str] = None
+    patient_instructions: Optional[str] = None
+    language: str = "en"
+    requires_human_review: bool = False
 
 class AdminReviewAction(BaseModel):
     interaction_id: int
