@@ -6,7 +6,7 @@ Updated to use Governance Agent for Encryption.
 import uuid
 import logging
 from sqlalchemy.orm import Session
-from database.models import SessionLocal, UserSession, Interaction, SystemLog
+from database.models import SessionLocal, UserSession, Interaction, SystemLog, PatientProfile, MedicalReport
 from agents.governance_agent import GovernanceAgent
 
 logger = logging.getLogger(__name__)
@@ -104,6 +104,99 @@ class PersistenceAgent:
         except Exception as e:
              logger.error(f"Failed to get session details: {e}")
              return []
+
+    
+    # -----------------------------------------------------
+    # Patient Profile & Reporting Methods
+    # -----------------------------------------------------
+    
+    def get_patient_profile(self, user_id: str):
+        """Retrieve decrypted patient profile."""
+        try:
+            profile = self.db.query(PatientProfile).filter(PatientProfile.id == user_id).first()
+            if not profile:
+                return None
+            
+            # Decrypt fields
+            decrypted_name = self.governance.decrypt(profile.name_encrypted) if profile.name_encrypted else ""
+            decrypted_history = self.governance.decrypt(profile.medical_history_encrypted) if profile.medical_history_encrypted else ""
+            
+            return {
+                "id": profile.id,
+                "name": decrypted_name,
+                "age": profile.age,
+                "gender": profile.gender,
+                "medical_history": decrypted_history, # Expect JSON
+                "created_at": profile.created_at
+            }
+        except Exception as e:
+            logger.error(f"Failed to fetch patient profile: {e}")
+            return None
+
+    def upsert_patient_profile(self, user_id: str, name: str, age: int, gender: str, history_json: str):
+        """Create or Update patient profile securely."""
+        try:
+            profile = self.db.query(PatientProfile).filter(PatientProfile.id == user_id).first()
+            enc_name = self.governance.encrypt(name)
+            enc_history = self.governance.encrypt(history_json)
+            
+            if not profile:
+                profile = PatientProfile(
+                    id=user_id,
+                    name_encrypted=enc_name,
+                    age=age,
+                    gender=gender,
+                    medical_history_encrypted=enc_history
+                )
+                self.db.add(profile)
+            else:
+                profile.name_encrypted = enc_name
+                profile.age = age
+                profile.gender = gender
+                profile.medical_history_encrypted = enc_history
+            
+            self.db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to upsert profile: {e}")
+            self.db.rollback()
+            return False
+
+    def save_medical_report(self, session_id: str, patient_id: str, content_json: str, report_type: str = "comprehensive", lang: str = "en", status: str = "pending"):
+        """Save a new version of a generated medical report."""
+        try:
+            # Check if profile exists; if not, create a placeholder? Best logic: ensure profile created by PatientAgent first.
+            # Assuming profile exists or we handle FK error.
+            if not self.db.query(PatientProfile).filter(PatientProfile.id == patient_id).first():
+                # Auto-create minimal profile if missing (Guest)
+                self.upsert_patient_profile(patient_id, "Guest Patient", 0, "Unknown", "{}")
+            
+            # Encrypt report content
+            enc_content = self.governance.encrypt(content_json)
+            
+            # Get latest version
+            last_report = self.db.query(MedicalReport).filter(
+                MedicalReport.patient_id == patient_id
+            ).order_by(MedicalReport.version.desc()).first()
+            
+            new_version = (last_report.version + 1) if last_report else 1
+            
+            new_report = MedicalReport(
+                patient_id=patient_id,
+                session_id=session_id,
+                report_content_encrypted=enc_content,
+                report_type=report_type,
+                language=lang,
+                version=new_version,
+                status=status # pending review or approved
+            )
+            self.db.add(new_report)
+            self.db.commit()
+            return new_report.id
+        except Exception as e:
+            logger.error(f"Failed to save medical report: {e}")
+            self.db.rollback()
+            return None
 
     def close(self):
         self.db.close()

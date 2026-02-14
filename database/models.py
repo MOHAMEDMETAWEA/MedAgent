@@ -101,6 +101,39 @@ class SystemLog(Base):
     
     session = relationship("UserSession", back_populates="logs")
 
+class PatientProfile(Base):
+    __tablename__ = "patient_profiles"
+    
+    id = Column(String, primary_key=True) # user_id
+    name_encrypted = Column(Text, nullable=True)
+    age = Column(Integer, nullable=True)
+    gender = Column(String, nullable=True)
+    medical_history_encrypted = Column(Text, nullable=True) # JSON list of conditions/meds
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    reports = relationship("MedicalReport", back_populates="patient")
+
+class MedicalReport(Base):
+    __tablename__ = "medical_reports"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id = Column(String, ForeignKey("patient_profiles.id"))
+    session_id = Column(String, ForeignKey("user_sessions.id"))
+    
+    # Content Columns
+    report_content_encrypted = Column(Text) # The full JSON/Text report
+    report_type = Column(String, default="comprehensive")
+    language = Column(String, default="en")
+    
+    # Versioning & Status
+    version = Column(Integer, default=1)
+    status = Column(Enum(ReviewStatus), default=ReviewStatus.PENDING)
+    generated_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    patient = relationship("PatientProfile", back_populates="reports")
+    session = relationship("UserSession")
+
 class SystemConfig(Base):
     __tablename__ = "system_config"
     key = Column(String, primary_key=True)

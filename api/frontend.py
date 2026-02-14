@@ -69,26 +69,27 @@ with st.container():
                         
                         with col1:
                             st.success("🤖 Patient Intake Summary")
-                            st.write(data.get("summary", ""))
+                            summary = data.get("patient_info", {}).get("summary") if data.get("patient_info") else ""
+                            st.write(summary)
                             
                             st.warning("🧠 Preliminary AI Differential")
-                            st.write(data.get("diagnosis", ""))
+                            st.write(data.get("preliminary_diagnosis", ""))
                         
                         with col2:
                             st.info("📅 Next Steps / Appointment Guidance")
-                            st.write(data.get("appointment", ""))
+                            st.write(data.get("appointment_details", "") or "See Final Response")
                             
                             st.info("🩺 Clinical Note (SOAP-style)")
-                            st.write(data.get("doctor_review", ""))
+                            st.write(data.get("doctor_notes", "") or "See Final Response")
                         
                         # Generative Report
-                        if data.get("medical_report") or data.get("doctor_summary") or data.get("patient_instructions"):
+                        if data.get("report_medical") or data.get("report_doctor_summary") or data.get("report_patient_instructions"):
                             st.markdown("---")
                             st.subheader("📝 Generative Report (RAG)")
                             if data.get("final_response"): # Unified Response
                                 st.write(data.get("final_response"))
                         
-                        if data.get("is_emergency"):
+                        if data.get("critical_alert"):
                             st.error("⚠️ EMERGENCY INDICATORS DETECTED. SEEK IMMEDIATE HELP.")
                     else:
                         err = response.json().get("detail", "Unknown error")

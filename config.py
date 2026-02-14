@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     
     # LLM Configuration
     LLM_TEMPERATURE_DIAGNOSIS: float = 0.0  # Strict for reasoning
+    LLM_TEMPERATURE_REASONING: float = 0.2  # Balanced for CoT
     LLM_TEMPERATURE_PATIENT: float = 0.3
     LLM_TEMPERATURE_DOCTOR: float = 0.1
     LLM_MAX_RETRIES: int = 3

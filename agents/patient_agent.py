@@ -6,14 +6,18 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from .state import AgentState
 from config import settings, get_prompt_path
 from utils.safety import sanitize_input, validate_medical_input, detect_prompt_injection
+from agents.persistence_agent import PersistenceAgent
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
 class PatientAgent:
     """
-    Inquisitive Patient Agent that ensures high-quality input for the diagnosis engine.
-    Enhanced with safety checks and global usability.
+    Patient Agent: Personalized Assistant & Intake Manager.
+    - Loads patient profile/history from persistence.
+    - Validates new symptom input.
+    - Updates context for downstream agents.
     """
     def __init__(self, model=None):
         model = model or settings.OPENAI_MODEL
@@ -22,88 +26,90 @@ class PatientAgent:
             temperature=settings.LLM_TEMPERATURE_PATIENT,
             api_key=settings.OPENAI_API_KEY
         )
+        self.persistence = PersistenceAgent()
 
     def _load_prompt(self, filename: str) -> str:
-        """Load prompt file using configurable path."""
         try:
             prompt_path = get_prompt_path(filename)
             with open(prompt_path, 'r', encoding='utf-8') as f:
                 return f.read()
-        except FileNotFoundError:
-            logger.error(f"Prompt file not found: {filename}")
-            return ""
         except Exception as e:
             logger.error(f"Error loading prompt {filename}: {e}")
             return ""
 
     def process(self, state: AgentState):
-        print("--- PATIENT AGENT: VALIDATING INTAKE ---")
+        print("--- PATIENT AGENT: LOADING PROFILE & VALIDATING INTAKE ---")
+        
+        user_id = state.get('user_id', 'GUEST')
         messages = state.get('messages', [])
+        
+        # 1. Load Profile
+        profile = self.persistence.get_patient_profile(user_id)
+        history_context = ""
+        if profile:
+            history_context = f"Patient Name: {profile.get('name')}, Age: {profile.get('age')}, History: {profile.get('medical_history')}"
+        else:
+            history_context = "New Patient (Guest)"
+            # Auto-create guest profile if needed, or wait for explicit registration
         
         if not messages:
             return {
                 "patient_info": {
-                    "summary": "No patient input provided. Please describe your symptoms.",
-                    "status": "incomplete"
+                    "summary": "No patient input provided.",
+                    "status": "incomplete",
+                    "history": history_context
                 },
-                "next_step": "diagnosis"
+                "next_step": "triage" # Determine next step
             }
         
-        # Extract and validate user input
-        user_input = ""
-        for msg in messages:
-            if hasattr(msg, 'content'):
-                user_input += str(msg.content) + " "
+        # 2. Extract and Validate Input
+        user_input = messages[-1].content if messages else ""
         
-        # Sanitize and validate input
         user_input = sanitize_input(user_input)
         is_valid, error_msg = validate_medical_input(user_input)
         
         if not is_valid:
             return {
                 "patient_info": {
-                    "summary": f"Input validation failed: {error_msg}. Please provide valid symptom information.",
-                    "status": "error"
+                    "summary": f"Input validation failed: {error_msg}.",
+                    "status": "error",
+                    "history": history_context
                 },
-                "next_step": "diagnosis"
+                "next_step": "end"
             }
         
-        # Check for prompt injection
-        is_injection, patterns = detect_prompt_injection(user_input)
-        if is_injection:
-            logger.warning(f"Potential prompt injection detected: {patterns}")
-            # Continue but log the issue
-        
-        # Load prompt template
+        # 3. Contextual Analysis (LLM)
+        # We use strict prompt to summarize symptoms, now including history context
         prompt_template = self._load_prompt('patient_agent.txt')
         if not prompt_template:
-            return {
-                "patient_info": {
-                    "summary": "System configuration error. Please contact support.",
-                    "status": "error"
-                },
-                "next_step": "diagnosis"
-            }
+             # Fallback
+             prompt_template = "Summarize the patient symptoms from the following input: {input}\nContext: {context}"
+             
+        full_prompt = f"Patient History Context: {history_context}\n\n" + prompt_template
         
         try:
-            system_msg = SystemMessage(content=prompt_template)
-            response = self.llm.invoke([system_msg] + list(messages))
+            system_msg = SystemMessage(content=full_prompt)
+            # Pass only the last message to avoid context window bloat, 
+            # or pass all if this is a conversation. System uses single-turn usually.
+            response = self.llm.invoke([system_msg, HumanMessage(content=user_input)])
             
             is_sufficient = "PATIENT SUMMARY:" in response.content
+            
+            # If profile existed, we might update it? 
+            # For now, we just pass the info downstream.
             
             return {
                 "patient_info": {
                     "summary": response.content, 
-                    "status": "complete" if is_sufficient else "incomplete"
+                    "status": "complete" if is_sufficient else "incomplete",
+                    "history_context": history_context,
+                    "profile_id": user_id
                 },
-                "next_step": "diagnosis"
+                "next_step": "triage" 
             }
         except Exception as e:
             logger.error(f"Error in patient agent: {e}")
             return {
-                "patient_info": {
-                    "summary": f"Error processing patient intake: {str(e)}. Please try again.",
-                    "status": "error"
-                },
-                "next_step": "diagnosis"
+                "patient_info": {"status": "error", "summary": str(e)},
+                "next_step": "end"
             }

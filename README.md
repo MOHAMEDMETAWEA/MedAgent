@@ -1,6 +1,6 @@
 # 🏥 MedAgent: A Multi-Agent Smart Hospital System
 
-### Leveraging Generative AI, Agentic AI, and RAG for Healthcare Excellence
+> **Leveraging Generative AI, Agentic AI, and RAG for Healthcare Excellence**
 
 ---
 
@@ -24,9 +24,13 @@ MedAgent is designed to work **for any user, any country, and any healthcare env
 3. **Run:**  
    - Start the backend: `uvicorn api.main:app --host 0.0.0.0 --port 8000`  
    - In a new terminal, start the UI: `streamlit run api/frontend.py --server.port 8501`  
-   - Open **http://localhost:8501** in your browser.
+   - Open **<http://localhost:8501>** in your browser.
 
-**Easier:** Use the run scripts from the project root: **`run_backend.bat`** then **`run_frontend.bat`** (Windows), or **`run_backend.sh`** then **`run_frontend.sh`** (Mac/Linux). Full step-by-step and troubleshooting: **[README_RUN.md](README_RUN.md)**.
+**EASIEST:** Use the unified launcher script:
+
+- `python run_system.py`
+
+Alternatively, use the scripts: **`run_backend.bat`** then **`run_frontend.bat`** (Windows), or **`run_backend.sh`** then **`run_frontend.sh`** (Mac/Linux).
 
 **AI engineers / developers:** Run tests, RAG checks, and full pipeline simulation: **[DEVELOPER.md](DEVELOPER.md)**.
 
@@ -60,18 +64,19 @@ To ensure compliance with the **Digital Egypt Pioneers Initiative (DEPI)** gradu
 
 The system utilizes a specialized workforce of agents, coordinated via **LangGraph**:
 
-1. **Patient Agent**: Handles symptom intake, registration, and natural language interaction.
-2. **Diagnosis Agent**: Performs differential diagnosis using **Chain-of-Thought (CoT)** reasoning and RAG.
-3. **Scheduling Agent**: Optimizes doctor allocation based on specialty, availability, and emergency priority.
-4. **Doctor Agent**: Provides expert oversight, validates AI findings, and finalizes treatment plans.
-5. **Generative Report Agent (📝)**: Produces a **medical report** (تقرير طبي), **doctor summary** (Summary للطبيب), and **patient instructions in simple language** (تعليمات للمريض بلغة بسيطة), all **RAG-grounded** from the medical guidelines.
-6. **Monitoring Agent**: Tracks patient status, generates critical alerts, and schedules follow-ups.
+1. **Triage Agent**: Analyzes urgency (Emergency/High/Low) and structured symptom extraction.
+2. **Knowledge Agent**: Retrieves verified medical guidelines (RAG) relevant to the case.
+3. **Reasoning Agent**: Performs detailed Chain-of-Thought (CoT) differential diagnosis.
+4. **Validation Agent**: Cross-checks the diagnosis against retrieved evidence for consistency.
+5. **Safety Agent**: Final guardrail scanning for harmful content or policy violations.
+6. **Response Agent**: Generates the **Medical Report**, **Doctor Summary**, and **Patient Instructions** (in simple language). Handles bilingual support (English/Arabic).
+7. **Calendar Agent**: Manages appointment scheduling and availability checks.
 
 ---
 
 ## 💡 Innovation & Added Value
 
-*Grading Criterion: 10/100 Points*
+> **Grading Criterion:** 10/100 Points
 
 - **Agentic Orchestration**: Moving beyond linear chatbots to cyclic, state-aware agent workflows using **LangGraph**.
 - **Clinical Reasoning**: Implementation of **Chain-of-Thought (CoT)** to provide human-readable, logical diagnostic paths.
@@ -140,7 +145,7 @@ The system utilizes a specialized workforce of agents, coordinated via **LangGra
 
 ## 👥 Task Division & Team Roles
 
-*Grading Criterion: 5/100 Points*
+> **Grading Criterion:** 5/100 Points
 
 - **AI Reasoning Engineer**: Responsible for agent logic, prompt engineering (CoT), and report generation.
 - **Data & RAG Architect**: Responsible for the vector database, medical knowledge base, and embedding pipelines.

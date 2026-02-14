@@ -9,6 +9,10 @@ class AgentState(TypedDict):
     # Messaging history
     messages: Annotated[Sequence[BaseMessage], operator.add]
     
+    # Context
+    user_id: str
+    session_id: str
+    
     # Core Data
     patient_info: dict
     preliminary_diagnosis: str

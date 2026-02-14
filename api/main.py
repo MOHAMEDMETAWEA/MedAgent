@@ -23,6 +23,7 @@ from agents.orchestrator import MedAgentOrchestrator
 from agents.persistence_agent import PersistenceAgent
 from agents.governance_agent import GovernanceAgent
 from agents.self_improvement_agent import SelfImprovementAgent
+from agents.developer_agent import DeveloperControlAgent
 from config import settings
 from utils.safety import validate_medical_input, sanitize_input
 
@@ -40,11 +41,16 @@ app = FastAPI(title="MedAgent Global API", version="5.0.0-SELF-IMPROVING")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_tokens=True, allow_methods=["*"], allow_headers=["*"])
 
+@app.get("/")
+async def root():
+    return {"status": "Online", "version": "5.0.0"}
+
 # Global Singletons
 _orchestrator = None
 _persistence = None
 _governance = None
 _improver = None
+_developer_agent = None
 
 def get_orchestrator():
     global _orchestrator
@@ -66,6 +72,30 @@ def get_improver():
     global _improver
     if _improver is None: _improver = SelfImprovementAgent()
     return _improver
+
+def get_developer_agent(): # Added developer agent getter
+    global _developer_agent
+    if _developer_agent is None: _developer_agent = DeveloperControlAgent()
+    return _developer_agent
+
+# --- DEVELOPER/SYSTEM ROUTES ---
+@app.get("/system/health", dependencies=[Depends(get_current_admin)])
+async def system_health():
+    """Get aggregated system health metrics."""
+    developer_agent = get_developer_agent()
+    return developer_agent.get_system_health()
+
+@app.post("/system/register-dev", dependencies=[Depends(get_current_admin)])
+async def register_dev(username: str):
+    """Register a new developer (simulated)."""
+    developer_agent = get_developer_agent()
+    return developer_agent.register_developer(username=username)
+
+@app.get("/system/test", dependencies=[Depends(get_current_admin)])
+async def trigger_tests():
+    """Run full system test suite."""
+    developer_agent = get_developer_agent()
+    return developer_agent.trigger_system_test()
 
 # --- MODELS ---
 class PatientRequest(BaseModel):
