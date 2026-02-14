@@ -1,177 +1,192 @@
-# 🏥 MedAgent
-### A Multi-Agent Smart Hospital System Using Generative and Agentic AI
+# 🏥 MedAgent: A Multi-Agent Smart Hospital System
+
+### Leveraging Generative AI, Agentic AI, and RAG for Healthcare Excellence
 
 ---
 
 ## 📌 Overview
-**MedAgent** is a **Multi-Agent Smart Hospital System** designed as a graduation project for the **Generative & Agentic AI** course. The system simulates real hospital workflows using **autonomous AI agents**, **Large Language Models (LLMs)**, and **Retrieval-Augmented Generation (RAG)** to improve efficiency, decision-making, and patient experience.
 
-MedAgent automates key hospital operations such as:
-- Patient appointment booking
-- Preliminary medical diagnosis
-- Doctor and resource allocation
-- Patient monitoring and follow-up
-- AI-generated medical reports
+**MedAgent** is an intelligent healthcare management platform designed as a graduation project for the **Generative & Agentic AI** course. The system simulates a sophisticated hospital environment where autonomous AI agents collaborate in real-time to optimize clinical workflows, improve diagnostic accuracy, and enhance the overall patient experience.
+
+By integrating **Large Language Models (LLMs)**, **Multi-Agent Systems**, and **Retrieval-Augmented Generation (RAG)**, MedAgent moves beyond simple chatbots to provide a production-grade simulation of modern, AI-integrated healthcare.
+
+### 🌍 Global / Generic Design
+
+MedAgent is designed to work **for any user, any country, and any healthcare environment**. It is not tied to a specific hospital, provider, database, or region. Configuration is environment-based; the frontend can point to any API URL. See **[DEPLOYMENT.md](DEPLOYMENT.md)** for deployment options and **[AUDIT_AND_IMPROVEMENTS.md](AUDIT_AND_IMPROVEMENTS.md)** for the full audit and safety improvements.
+
+### 🏃 Quick start (run as a user)
+
+1. **Requirements:** Python 3.9+, [OpenAI API key](https://platform.openai.com/api-keys).
+2. **Setup:** From the project root folder:
+   - `pip install -r requirements.txt`
+   - Copy `.env.example` to `.env` and set `OPENAI_API_KEY=your_key`
+   - `python data/generate_data.py` (first time only)
+3. **Run:**  
+   - Start the backend: `uvicorn api.main:app --host 0.0.0.0 --port 8000`  
+   - In a new terminal, start the UI: `streamlit run api/frontend.py --server.port 8501`  
+   - Open **http://localhost:8501** in your browser.
+
+**Easier:** Use the run scripts from the project root: **`run_backend.bat`** then **`run_frontend.bat`** (Windows), or **`run_backend.sh`** then **`run_frontend.sh`** (Mac/Linux). Full step-by-step and troubleshooting: **[README_RUN.md](README_RUN.md)**.
+
+**AI engineers / developers:** Run tests, RAG checks, and full pipeline simulation: **[DEVELOPER.md](DEVELOPER.md)**.
+
+---
+
+## 🏛️ DEPI Project Alignment
+
+To ensure compliance with the **Digital Egypt Pioneers Initiative (DEPI)** graduation standards, this project explicitly maps to the official Generative AI curriculum milestones:
+
+| DEPI Standard Milestone | MedAgent Project Milestone |
+| :--- | :--- |
+| **M1: Data Collection & Preprocessing** | Milestone 2: Data & RAG Pipeline Setup |
+| **M2: Model Development & Training** | Milestone 3: Agent Development & M4: Report Gen |
+| **M3: Advanced Techniques & Integration** | Milestone 5: Memory & Agent Coordination |
+| **M4: MLOps & Model Management** | Milestone 6: Deployment & Monitoring |
+| **M5: Final Report & Demonstration** | Milestone 1: Design & M7: Final Delivery |
 
 ---
 
 ## 🎯 Project Objectives
-- Design and implement a **multi-agent healthcare system**
-- Apply **Generative AI** for medical text generation
-- Use **Agentic AI** for autonomous decision-making
-- Implement **RAG** for medical guideline retrieval
-- Simulate real-world hospital workflows
-- Deploy and monitor an AI-powered system
+
+- **Autonomous Orchestration**: Implement a decentralized multi-agent system for complex medical workflows.
+- **Evidence-Based Diagnosis**: Use RAG to ground AI reasoning in verified clinical protocols (WHO, NIH, CDC).
+- **Proactive Monitoring**: Track patient vitals and treatment adherence through specialized agents.
+- **Structured Documentation**: Automate the generation of SOAP notes and clinical reports.
+- **Ethical AI**: Implement human-in-the-loop protocols and bias detection.
 
 ---
 
-## 🧠 System Architecture
-MedAgent is built on a **Multi-Agent Architecture**, where each agent has a specific role and collaborates with others to achieve system goals.
+## 🤖 Multi-Agent Architecture
 
-### 🤖 Agents
-- **Patient Agent**: Collects symptoms, manages patient profiles, and handles follow-ups
-- **Diagnosis Agent**: Performs preliminary diagnosis using LLM reasoning + RAG
-- **Scheduling Agent**: Manages appointments, doctor availability, and resource allocation
-- **Doctor Agent**: Reviews AI recommendations and patient cases
-- **Monitoring Agent**: Tracks patient status and triggers alerts
+The system utilizes a specialized workforce of agents, coordinated via **LangGraph**:
 
----
-
-## 🔍 Core Technologies
-
-### Generative AI
-- Medical report generation
-- Diagnosis summaries
-- Follow-up instructions
-
-### Agentic AI
-- Autonomous agents
-- Planning & reasoning
-- Tool usage and decision-making
-
-### RAG (Retrieval-Augmented Generation)
-- Medical guidelines (WHO, NIH, clinical protocols)
-- Semantic search over medical documents
-
-### Memory Systems
-- Short-term conversational memory
-- Long-term patient history storage
+1. **Patient Agent**: Handles symptom intake, registration, and natural language interaction.
+2. **Diagnosis Agent**: Performs differential diagnosis using **Chain-of-Thought (CoT)** reasoning and RAG.
+3. **Scheduling Agent**: Optimizes doctor allocation based on specialty, availability, and emergency priority.
+4. **Doctor Agent**: Provides expert oversight, validates AI findings, and finalizes treatment plans.
+5. **Generative Report Agent (📝)**: Produces a **medical report** (تقرير طبي), **doctor summary** (Summary للطبيب), and **patient instructions in simple language** (تعليمات للمريض بلغة بسيطة), all **RAG-grounded** from the medical guidelines.
+6. **Monitoring Agent**: Tracks patient status, generates critical alerts, and schedules follow-ups.
 
 ---
 
-## 🛠️ Tech Stack
+## 💡 Innovation & Added Value
 
-### Programming & Frameworks
-- Python
-- FastAPI
-- LangChain / CrewAI / AutoGen
+*Grading Criterion: 10/100 Points*
 
-### LLMs & AI Models
-- OpenAI GPT Models / Open-source LLMs
-- Hugging Face Transformers
+- **Agentic Orchestration**: Moving beyond linear chatbots to cyclic, state-aware agent workflows using **LangGraph**.
+- **Clinical Reasoning**: Implementation of **Chain-of-Thought (CoT)** to provide human-readable, logical diagnostic paths.
+- **Deterministic RAG**: Grounded responses that eliminate hallucinations by citing verified medical guidelines. **Generative Report Agent** uses RAG to produce medical reports, doctor summaries, and simple-language patient instructions.
+- **Contextual Memory**: A hybrid memory system (Short-term Redis + Long-term ChromaDB) for seamless patient history retention.
 
-### RAG & Memory
-- FAISS / ChromaDB / Pinecone
-- Vector embeddings
+---
 
-### Deployment & MLOps
-- Docker
-- MLflow
-- REST APIs
+## 🛠️ Technology Stack
+
+### AI & Orchestration
+
+- **LLMs**: OpenAI GPT-4o / GPT-4-turbo (Primary), Llama 3 (Fallback).
+- **Agent Framework**: **LangGraph** (Orchestration), CrewAI (Evaluation).
+- **RAG System**: LangChain / LlamaIndex with semantic search.
+
+### Data & Memory
+
+- **Vector Database**: **FAISS** (Local) / **Pinecone** (Production).
+- **Memory**: **Redis** (Short-term context) & **ChromaDB** (Long-term patient history).
+- **Embeddings**: `text-embedding-3-small`.
+
+### Infrastructure & MLOps
+
+- **Backend**: Python **FastAPI**.
+- **Frontend**: **Streamlit** / Gradio Dashboard.
+- **Monitoring**: **LangSmith** (LLM tracing), Prometheus & Grafana.
+- **Version Control**: MLflow for experiment tracking and model versioning.
+- **Deployment**: Docker & Docker Compose.
+
+---
+
+## 🚀 Key Features & Scenarios
+
+- **Multi-Turn Symptom Intake**: Dynamic clarification questions to refine diagnostic data.
+- **Chain-of-Thought Reasoning**: Transparent diagnostic steps showing *how* the AI reached a conclusion.
+- **Resource Collision Handling**: Automatic rescheduling and priority-based doctor allocation.
+- **Emergency Escalation**: Detection of "Red Flag" symptoms leading to immediate priority scheduling.
+- **Autonomous Report Generation**: Production of structured medical documentation in standard formats (SOAP).
+
+---
+
+## 📊 Success Criteria & Evaluation
+
+| Metric | Target |
+| :--- | :--- |
+| **Diagnosis Accuracy** | ≥ 85% compared to ground truth test cases |
+| **Response Latency** | < 3 seconds for 95% of requests |
+| **RAG Precision** | ≥ 0.8 for top-3 retrieval results |
+| **Cost Efficiency** | < $0.50 average per patient interaction |
+| **Code Coverage** | ≥ 80% unit test coverage |
+
+---
+
+## 📅 Project Milestones
+
+1. **M1: Design & Ethics**: Architecture mapping and safety framework establishment.
+2. **M2: Knowledge & RAG**: Building the medical knowledge base (Notebook-based preprocessing).
+3. **M3: Agent Development**: Designing specialized reasoning workflows in LangGraph.
+4. **M4: Generative Excellence**: Fine-tuning prompts and structured SOAP report templates.
+5. **M5: Memory & Coordination**: Implementing long-term history and complex patient simulations.
+6. **M6: Deployment & MLOps**: FastAPI, MLflow tracking, Docker, and monitoring dashboards.
+7. **M7: Final Presentation**: Performance benchmarking and live demonstration.
+
+---
+
+## 👥 Task Division & Team Roles
+
+*Grading Criterion: 5/100 Points*
+
+- **AI Reasoning Engineer**: Responsible for agent logic, prompt engineering (CoT), and report generation.
+- **Data & RAG Architect**: Responsible for the vector database, medical knowledge base, and embedding pipelines.
+- **System Integrator**: Responsible for FastAPI development, Redis memory management, and agent state persistence.
+- **MLOps & DevOps Lead**: Responsible for Docker containerization, MLflow tracking, and monitoring dashboards.
+- **Quality & Documentation Lead**: Responsible for the ethical framework, technical reports, and final presentation.
 
 ---
 
 ## 📂 Project Structure
+
 ```text
 medagent-smart-hospital/
 │
-├── agents/
-│   ├── patient_agent.py
-│   ├── diagnosis_agent.py
-│   ├── scheduling_agent.py
-│   ├── doctor_agent.py
-│   └── monitoring_agent.py
-│
-├── rag/
-│   ├── data/
-│   ├── embeddings.py
-│   └── retriever.py
-│
-├── memory/
-│   └── patient_memory.py
-│
-├── api/
-│   └── main.py
-│
-├── prompts/
-│   └── medical_prompts.py
-│
-├── deployment/
-│   ├── Dockerfile
-│   └── docker-compose.yml
-│
-├── notebooks/
-│   └── experiments.ipynb
-│
-├── requirements.txt
-└── README.md
+├── agents/             # Agent logic (LangGraph workflows)
+├── rag/                # Knowledge base, embeddings, and retrievers
+├── memory/             # Persistent state and patient history
+├── api/                # FastAPI endpoints & authentication
+├── prompts/            # Sophisticated prompt library & templates
+├── data/               # Synthetic patient data & medical guidelines
+├── deployment/         # Docker, CI/CD, and MLOps config
+├── notebooks/          # R&D and performance experiments
+└── evaluation/         # RAG metrics and agent behavior logs
 ```
 
 ---
 
-## 🚀 Features
-- Multi-agent collaboration
-- Chain-of-thought medical reasoning
-- RAG-based evidence-backed diagnosis
-- Automated medical report generation
-- Scalable API-based deployment
+## ⚠️ Ethical Considerations & Safety
+
+- **Human-in-the-Loop**: All AI-generated diagnoses require validation by the "Doctor Agent" (simulating a clinician).
+- **Transparency**: Every recommendation cites its source from the medical knowledge base.
+- **Disclaimer**: This system is for **educational simulation only** and is not a medical device.
+- **Bias Mitigation**: Active monitoring for gender or socioeconomic bias in treatment recommendations.
 
 ---
 
-## ⚠️ Ethical Considerations
-- The system provides **preliminary diagnosis only**
-- Not a replacement for licensed medical professionals
-- Designed with **AI safety and responsible AI principles**
+## 👨‍💻 Author
 
----
-
-## 📊 Evaluation
-- Quality of generated medical reports
-- Accuracy of retrieved medical guidelines
-- Agent coordination efficiency
-- Response time and cost monitoring
-
----
-
-## 🎓 Academic Context
-- Course: **Generative & Agentic AI**
-- Track: AI & Data Science
-- Project Type: Graduation / Capstone Project
-
----
-
-## 📽️ Demo
-> Demo video and screenshots will be added.
-
----
-
-## 👨‍💻 Team
-- **Mohamed Mostafa Metawea**
+**Mohamed Mostafa Metawea**  
+*Graduation Project - Generative & Agentic AI Track*
 
 ---
 
 ## 📜 License
-This project is for **educational and research purposes only**.
+
+This project is for educational and research purposes only.
 
 ---
-
-## ⭐ Acknowledgments
-- OpenAI
-- Hugging Face
-- LangChain / CrewAI Community
-- Medical open-source datasets
-
----
-
-> 💡 *MedAgent demonstrates how Generative AI, Agentic AI, and Multi-Agent Systems can be combined to build intelligent, real-world healthcare solutions.*
-
+> 💡 *MedAgent demonstrates the future of "Autonomous Healthcare" where AI serves as a tireless collaborator for medical professionals.*
