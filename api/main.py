@@ -106,6 +106,7 @@ _auth_agent = None
 _review_agent = None
 _medication_agent = None
 _report_agent = None
+_calendar_agent = None
 
 def get_orchestrator():
     global _orchestrator
@@ -152,6 +153,11 @@ def get_report_agent():
     global _report_agent
     if _report_agent is None: _report_agent = ReportAgent()
     return _report_agent
+
+def get_calendar_agent():
+    global _calendar_agent
+    if _calendar_agent is None: _calendar_agent = CalendarAgent()
+    return _calendar_agent
 
 # --- DEVELOPER/SYSTEM ROUTES ---
 @app.get("/system/health", dependencies=[Depends(check_admin_auth)])
@@ -273,7 +279,7 @@ async def get_reports(user: dict = Depends(get_current_user)):
     return agent.get_user_reports(user["sub"])
 
 @app.get("/reports/{report_id}/export")
-async def export_report(report_id: int, user: dict = Depends(get_current_user)):
+async def export_report(report_id: int, format: str = "pdf", user: dict = Depends(get_current_user)):
     pers = get_persistence()
     agent = get_report_agent()
     
@@ -285,18 +291,36 @@ async def export_report(report_id: int, user: dict = Depends(get_current_user)):
         
     data = json.loads(pers.governance.decrypt(report.report_content_encrypted))
     
+    # Add metadata for professional look
+    data["patient_id"] = report.patient_id
+    data["date"] = report.generated_at.strftime("%Y-%m-%d %H:%M")
+    data["lang"] = report.language
+    
     # Generate local path
     import os
-    filename = f"report_{report_id}.pdf"
+    format = format.lower()
+    if format == "pdf":
+        filename = f"report_{report_id}.pdf"
+        media_type = "application/pdf"
+        success = agent.generate_pdf(data, os.path.join(settings.DATA_DIR, "uploads", filename))
+    elif format == "image" or format == "png":
+        filename = f"report_{report_id}.png"
+        media_type = "image/png"
+        success = agent.generate_image(data, os.path.join(settings.DATA_DIR, "uploads", filename))
+    elif format == "text" or format == "txt":
+        filename = f"report_{report_id}.txt"
+        media_type = "text/plain"
+        success = agent.generate_text(data, os.path.join(settings.DATA_DIR, "uploads", filename))
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported format. Use pdf, image, or text.")
+
     path = os.path.join(settings.DATA_DIR, "uploads", filename)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
     
-    success = agent.generate_pdf(data, path)
     if not success:
-        raise HTTPException(status_code=500, detail="PDF generation failed")
+        raise HTTPException(status_code=500, detail=f"{format.upper()} generation failed")
         
     from fastapi.responses import FileResponse
-    return FileResponse(path, filename=filename, media_type='application/pdf')
+    return FileResponse(path, filename=filename, media_type=media_type)
 
 @app.get("/admin/improvement-report", dependencies=[Depends(check_admin_auth)])
 async def get_improvement_report():
@@ -369,6 +393,11 @@ async def add_medication(req: MedicationRequest, user: dict = Depends(get_curren
 async def get_medications(user: dict = Depends(get_current_user)):
     agent = get_medication_agent()
     return agent.get_medications(user["sub"])
+
+@app.get("/appointments")
+async def get_appointments(user: dict = Depends(get_current_user)):
+    agent = get_calendar_agent()
+    return agent.list_upcoming_events()
 
 @app.post("/reminders")
 async def add_reminder(req: ReminderRequest, user: dict = Depends(get_current_user)):

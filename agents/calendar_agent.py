@@ -136,3 +136,18 @@ class CalendarAgent:
                 "final_response": "Failed to access Google Calendar API.",
                 "next_step": "end"
             }
+
+    def list_upcoming_events(self, max_results: int = 10):
+        """Fetch upcoming events from the primary calendar."""
+        if not self.service:
+            return []
+        try:
+            now = datetime.datetime.utcnow().isoformat() + 'Z'
+            events_result = self.service.events().list(calendarId='primary', timeMin=now,
+                                                    maxResults=max_results, singleEvents=True,
+                                                    orderBy='startTime').execute()
+            events = events_result.get('items', [])
+            return events
+        except Exception as e:
+            logger.error(f"Failed to list events: {e}")
+            return []

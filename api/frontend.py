@@ -112,17 +112,32 @@ with st.sidebar:
 # --- MAIN INTERFACE ---
 if not st.session_state["auth_token"]:
     st.markdown("""
-    ## Welcome to the MedAgent Production Environment
-    This system uses a workforce of **10 specialized AI agents** to manage clinical workflows.
-    - **Intelligent Triage**
-    - **Tree-of-Thought Reasoning**
-    - **Multimodal Visual Analysis**
-    - **Long-term Medical Memory**
-    """)
-    st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=120)
-    st.image("https://images.pexels.com/photos/4173251/pexels-photo-4173251.jpeg?auto=compress&cs=tinysrgb&w=1200", caption="Our AI-Driven Medical Team is here to help.", width=800)
+    <div style="text-align: center; padding: 20px;">
+        <h1 style="color: #2e7d32; font-size: 3rem;">MedAgent Global Medical Hub</h1>
+        <p style="font-size: 1.2rem; color: #666;">A state-of-the-art Multi-Agent workforce powered by Generative & Agentic AI.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.markdown("""
+        ### 👨‍⚕️ Advanced Clinical Intelligence
+        Our production environment orchestrates **12 specialized AI agents** to provide 24/7 medical guidance:
+        - **Intelligent Triage Agent**: Real-time risk assessment and clinical prioritization.
+        - **Knowledge Retrieval Agent**: RAG-grounded insights from up-to-date medical literature.
+        - **Multimodal Vision Agent**: Advanced analysis of X-rays, skin conditions, and clinical photos.
+        - **Tree-of-Thought Reasoning**: Deep differential analysis for complex cases.
+        - **Bilingual Support (AR/EN)**: Native-level medical support in Arabic and English.
+        - **Clinical Persistence Agent**: Secure, AES-256 encrypted longitudinal medical memory.
+        - **Automated Report Generation**: Professional PDF/Image exports following SOAP standards.
+        - **Governance & Safety Agents**: Active monitoring for medical accuracy and patient safety.
+        - **Self-Improvement Agent**: System that learns from human feedback and reviews.
+        """)
+    with col2:
+        st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=250)
+        st.info("🔒 **Secure & Private**: All data is encrypted and stored according to global health authority standards.")
 else:
-    t1, t2, t3, t4, t5 = st.tabs(["💬 Consult", "💊 Meds & Reminders", "📜 History", "🛡️ Privacy & Support", "🔑 Admin"])
+    t1, t2, t3, t4, t5, t6 = st.tabs(["💬 Consult", "📅 Appointments", "💊 Meds", "📜 History", "🛡️ Privacy", "🔑 Admin"])
     
     # --- TAB 1: CONSULTATION ---
     with t1:
@@ -159,13 +174,20 @@ else:
             if "last_result" in st.session_state:
                 res = st.session_state["last_result"]
                 
-                # Add Doctor Avatar to results
                 c1, c2 = st.columns([1, 4])
                 with c1:
                     st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=60)
                 with c2:
                     st.markdown("### Medical Specialist Analysis")
                     st.caption(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+                # Vision Findings
+                if res.get("visual_findings") and res["visual_findings"].get("status") != "skipped":
+                    with st.expander("👁️ Visual Analysis Results"):
+                        vf = res["visual_findings"]
+                        st.write(f"**Findings:** {vf.get('visual_findings')}")
+                        st.write(f"**Confidence:** {vf.get('confidence')}")
+                        st.write(f"**Severity:** {vf.get('severity_level')}")
 
                 st.info("🧠 REASONING OUTPUT")
                 st.write(res.get("preliminary_diagnosis", "No diagnosis generated."))
@@ -176,11 +198,45 @@ else:
                 if res.get("critical_alert"):
                     st.error("🚨 EMERGENCY ESCALATION DETECTED")
                 
-                if st.button("⬇️ Export results to Clinical Dashboard"):
-                    st.download_button("Download Report JSON", data=json.dumps(res, indent=2), file_name="medical_report.json")
+                if res.get("report_id"):
+                    st.write("### ⬇️ Export Clinical Report")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.markdown(f"[📄 PDF]({API_BASE}/reports/{res['report_id']}/export?format=pdf)")
+                    with c2:
+                        st.markdown(f"[🖼️ Image]({API_BASE}/reports/{res['report_id']}/export?format=image)")
+                    with c3:
+                        st.markdown(f"[📝 Text]({API_BASE}/reports/{res['report_id']}/export?format=text)")
+                
+                with st.expander("🛠️ Advanced Export"):
+                    st.download_button("Download Raw JSON", data=json.dumps(res, indent=2), file_name="medical_report.json")
 
-    # --- TAB 2: MEDICATION ---
+    # --- TAB 2: APPOINTMENTS ---
     with t2:
+        st.subheader("Clinical Appointments & Scheduling")
+        st.write("Manage your upcoming sessions with specialized agents or human doctors.")
+        
+        r = api_call("GET", "/appointments")
+        if r and r.ok:
+            events = r.json()
+            if not events:
+                st.info("No upcoming appointments found. You can request one via the Consult tab.")
+            else:
+                for ev in events:
+                    with st.container():
+                        st.markdown(f"""
+                        <div class="report-card">
+                            <h4>📅 {ev.get('summary')}</h4>
+                            <p><b>Time:</b> {ev.get('start', {}).get('dateTime', 'N/A')}</p>
+                            <p><b>Location:</b> {ev.get('location', 'Global Hub')}</p>
+                            <a href="{ev.get('htmlLink')}" target="_blank">View in Google Calendar</a>
+                        </div>
+                        """, unsafe_allow_html=True)
+        
+        st.info("💡 **Tip:** To book a new appointment, simply type 'Book an appointment for tomorrow at 10am' in the consultation symptoms box.")
+
+    # --- TAB 3: MEDICATION ---
+    with t3:
         st.subheader("Medication Tracker & Digital Reminders")
         mc1, mc2 = st.columns(2)
         
@@ -210,8 +266,8 @@ else:
                 api_call("POST", "/reminders", {"title": r_title, "time": r_time})
                 st.success("Reminder set!")
 
-    # --- TAB 3: HISTORY ---
-    with t3:
+    # --- TAB 4: HISTORY ---
+    with t4:
         st.subheader("Long-Term Medical Memory & Reports")
         r = api_call("GET", "/reports")
         if r and r.ok:
@@ -220,11 +276,17 @@ else:
             for rep in reports:
                 with st.expander(f"Report ID #{rep['id']} - {rep['generated_at'][:10]} ({rep['report_type']})"):
                     st.json(rep["content"])
-                    # Export PDF Link
-                    st.markdown(f"[[Download PDF Export]({API_BASE}/reports/{rep['id']}/export)]")
+                    # Export Options
+                    c_pdf, c_img, c_txt = st.columns(3)
+                    with c_pdf:
+                        st.markdown(f"[📄 PDF]({API_BASE}/reports/{rep['id']}/export?format=pdf)")
+                    with c_img:
+                        st.markdown(f"[🖼️ Image]({API_BASE}/reports/{rep['id']}/export?format=image)")
+                    with c_txt:
+                        st.markdown(f"[📝 Text]({API_BASE}/reports/{rep['id']}/export?format=text)")
 
-    # --- TAB 4: PRIVACY & SUPPORT ---
-    with t4:
+    # --- TAB 5: PRIVACY ---
+    with t5:
         st.subheader("Data Rights & System Support")
         st.write("#### 🛡️ Your Privacy")
         st.write("We implement AES-256 encryption at rest. All reasoning is local or via secure API tunnels.")
@@ -239,8 +301,8 @@ else:
         st.text_area("Message Support")
         if st.button("Send to Support Hub"): st.success("Message queued.")
 
-    # --- TAB 5: ADMIN ---
-    with t5:
+    # --- TAB 6: ADMIN ---
+    with t6:
         if st.session_state["user_info"]["role"] != "admin":
             st.warning("Admin Clearance Required.")
         else:
@@ -262,9 +324,11 @@ else:
             
             st.write("#### 📈 Self-Improvement Analysis")
             if st.button("Generate Improvement Insights"):
-                # In main.py, should add a route for this too.
-                st.info("Self-Improvement Agent is scanning feedback patterns...")
-                st.write("Insight: Arabic language detection for respiratory symptoms has 98% accuracy.")
+                r_si = api_call("GET", "/admin/improvement-report")
+                if r_si and r_si.ok:
+                    st.text_area("Live Improvement Report", r_si.json().get("report", "No data"), height=300)
+                else:
+                    st.error("Failed to fetch improvement report.")
 
 # --- FOOTER ---
 st.markdown("---")
