@@ -60,6 +60,9 @@ with st.sidebar:
     st.title("MedAgent Hub")
     
     if st.session_state["auth_token"]:
+        # Professional Doctor Portrait in Sidebar
+        st.image("https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=400&q=80", caption="Active Medical Agent", width=150)
+        
         st.success(f"Hello, {st.session_state['user_info']['full_name']}")
         st.caption(f"Role: {st.session_state['user_info']['role']}")
         
@@ -116,7 +119,7 @@ if not st.session_state["auth_token"]:
     - **Multimodal Visual Analysis**
     - **Long-term Medical Memory**
     """)
-    st.image("https://images.unsplash.com/photo-1576091160550-2173dad99901?auto=format&fit=crop&w=1200&q=80", use_container_width=True)
+    st.image("https://images.unsplash.com/photo-1559839734-2b71f1536783?auto=format&fit=crop&w=1200&q=80", caption="Our AI-Driven Medical Team is here to help.", use_container_width=True)
 else:
     t1, t2, t3, t4, t5 = st.tabs(["💬 Consult", "💊 Meds & Reminders", "📜 History", "🛡️ Privacy & Support", "🔑 Admin"])
     
@@ -154,6 +157,15 @@ else:
         with col_out:
             if "last_result" in st.session_state:
                 res = st.session_state["last_result"]
+                
+                # Add Doctor Avatar to results
+                c1, c2 = st.columns([1, 4])
+                with c1:
+                    st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=60)
+                with c2:
+                    st.markdown("### Medical Specialist Analysis")
+                    st.caption(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
                 st.info("🧠 REASONING OUTPUT")
                 st.write(res.get("preliminary_diagnosis", "No diagnosis generated."))
                 
