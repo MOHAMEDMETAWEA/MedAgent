@@ -37,6 +37,7 @@ if "user_info" not in st.session_state: st.session_state["user_info"] = None
 if "session_id" not in st.session_state: st.session_state["session_id"] = None
 if "language" not in st.session_state: st.session_state["language"] = "en"
 if "auth_mode" not in st.session_state: st.session_state["auth_mode"] = "login"
+if "second_opinion_req" not in st.session_state: st.session_state["second_opinion_req"] = False
 
 # --- HELPER FUNCTIONS ---
 def get_headers():
@@ -115,7 +116,7 @@ if not st.session_state["auth_token"]:
     - **Multimodal Visual Analysis**
     - **Long-term Medical Memory**
     """)
-    st.image("https://images.unsplash.com/photo-1576091160550-2173dad99901?auto=format&fit=crop&w=1200&q=80", use_column_width=True)
+    st.image("https://images.unsplash.com/photo-1576091160550-2173dad99901?auto=format&fit=crop&w=1200&q=80", use_container_width=True)
 else:
     t1, t2, t3, t4, t5 = st.tabs(["💬 Consult", "💊 Meds & Reminders", "📜 History", "🛡️ Privacy & Support", "🔑 Admin"])
     
@@ -126,6 +127,7 @@ else:
         
         with col_in:
             symptoms = st.text_area("Describe symptoms", placeholder="e.g. Sharp chest pain after exercise...", height=150)
+            st.session_state["second_opinion_req"] = st.checkbox("🔍 Request specialized Second Opinion (More thorough analysis)")
             uploaded_file = st.file_uploader("Upload Medical Image (Optional)", type=["jpg", "png", "jpeg"])
             
             if st.button("⚡ ANALYZE SYSTEM-WIDE"):
@@ -136,7 +138,13 @@ else:
                     if u_resp and u_resp.ok: img_path = u_resp.json().get("image_path")
                 
                 with st.spinner("Agents are collaborating..."):
-                    payload = {"symptoms": symptoms, "image_path": img_path, "patient_id": st.session_state["user_info"]["id"], "language": st.session_state["language"]}
+                    payload = {
+                        "symptoms": symptoms, 
+                        "image_path": img_path, 
+                        "patient_id": st.session_state["user_info"]["id"], 
+                        "language": st.session_state["language"],
+                        "request_second_opinion": st.session_state["second_opinion_req"]
+                    }
                     r = api_call("POST", "/consult", data=payload)
                     if r and r.ok:
                         st.session_state["last_result"] = r.json()
@@ -207,8 +215,11 @@ else:
         st.subheader("Data Rights & System Support")
         st.write("#### 🛡️ Your Privacy")
         st.write("We implement AES-256 encryption at rest. All reasoning is local or via secure API tunnels.")
-        if st.button("Export All Personal Data (JSON)"):
-            st.toast("Preparing data archive...")
+        if st.button("Export All My Data (CSV - Portability)"):
+            r = api_call("GET", "/auth/export-data")
+            if r and r.ok:
+                st.download_button("Download My Data", data=r.content, file_name="my_health_data.csv")
+            else: st.error("Export failed.")
             
         st.write("#### 📞 Clinical Support")
         st.write("Need technical help? Contact our support agents.")

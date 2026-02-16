@@ -1,31 +1,30 @@
-# Use official Python runtime as a parent image
-FROM python:3.10-slim
+# MEDAgent Multi-Agent Smart Hospital System
+# Production Dockerfile
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONPATH /app
+FROM python:3.11-slim
 
-# Set work directory
-WORKDIR /app
-
-# Install system dependencies
+# Install system dependencies for PDF generation and FAISS
 RUN apt-get update && apt-get install -y \
     build-essential \
-    curl \
-    software-properties-common \
+    libsqlite3-dev \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+WORKDIR /app
+
+# Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files
 COPY . .
 
+# Create directory for medical data and uploads
+RUN mkdir -p data/uploads
+
 # Expose ports for FastAPI (8000) and Streamlit (8501)
 EXPOSE 8000
 EXPOSE 8501
 
-# Default command (overwritten by docker-compose)
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Entrypoint script to run both services
+CMD ["python", "run_system.py"]

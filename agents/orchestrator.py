@@ -13,6 +13,10 @@ from .reasoning_agent import ReasoningAgent
 from .validation_agent import ValidationAgent
 from .safety_agent import SafetyAgent
 from .report_agent import ReportAgent
+from .response_agent import ResponseAgent
+from .doctor_agent import DoctorAgent
+from .diagnosis_agent import DiagnosisAgent
+from .scheduling_agent import SchedulingAgent
 from .patient_agent import PatientAgent
 from .vision_agent import VisionAnalysisAgent
 from .calendar_agent import CalendarAgent
@@ -22,6 +26,7 @@ from .self_improvement_agent import SelfImprovementAgent
 from .human_review_agent import HumanReviewAgent
 from .authentication_agent import AuthenticationAgent
 from .medication_agent import MedicationAgent
+from .second_opinion_agent import SecondOpinionAgent
 from config import settings
 from utils.safety import sanitize_input, validate_medical_input
 import logging
@@ -37,7 +42,11 @@ class MedAgentOrchestrator:
             self.reasoning_agent = ReasoningAgent()
             self.validation_agent = ValidationAgent()
             self.safety_agent = SafetyAgent()
-            self.report_agent = ReportAgent() # Replaces ResponseAgent
+            self.report_agent = ReportAgent() 
+            self.response_agent = ResponseAgent()
+            self.doctor_agent = DoctorAgent()
+            self.diagnosis_agent = DiagnosisAgent()
+            self.scheduling_agent = SchedulingAgent()
             self.vision_agent = VisionAnalysisAgent()
             self.calendar_agent = CalendarAgent()
             self.persistence = PersistenceAgent()
@@ -46,6 +55,7 @@ class MedAgentOrchestrator:
             self.reviewer_agent = HumanReviewAgent()
             self.auth_agent = AuthenticationAgent()
             self.medication_agent = MedicationAgent()
+            self.second_opinion_agent = SecondOpinionAgent()
             
             self.graph = self._build_graph()
             
@@ -70,12 +80,15 @@ class MedAgentOrchestrator:
         workflow.add_node("triage", wrap_node("triage", self.triage_agent.process))
         workflow.add_node("knowledge", wrap_node("knowledge", self.knowledge_agent.process))
         workflow.add_node("reasoning", wrap_node("reasoning", self.reasoning_agent.process))
-        workflow.add_node("validation", wrap_node("validation", self.validation_agent.process))
-        workflow.add_node("safety", wrap_node("safety", self.safety_agent.process))
         workflow.add_node("report", wrap_node("report", self.report_agent.process))
+        workflow.add_node("response", wrap_node("response", self.response_agent.process))
+        workflow.add_node("doctor", wrap_node("doctor", self.doctor_agent.process))
+        workflow.add_node("diagnosis", wrap_node("diagnosis", self.diagnosis_agent.process))
+        workflow.add_node("scheduling", wrap_node("scheduling", self.scheduling_agent.process))
         workflow.add_node("calendar", wrap_node("calendar", self.calendar_agent.process))
         workflow.add_node("vision", wrap_node("vision", self.vision_agent.process))
         workflow.add_node("medication", wrap_node("medication", self.medication_agent.process))
+        workflow.add_node("second_opinion", wrap_node("second_opinion", self.second_opinion_agent.process))
 
         # Entry Point is now Patient Agent to load Context
         workflow.set_entry_point("patient")
@@ -86,7 +99,7 @@ class MedAgentOrchestrator:
             if state.get("image_path"):
                 return "vision"
             if "book" in user_input or "schedule" in user_input or "appointment" in user_input or "احجز" in user_input or "موعد" in user_input:
-                return "calendar"
+                return "scheduling"
             if any(kw in user_input for kw in ["medication", "medicine", "pill", "dose", "drug", "دواء", "حبوب", "جرعة"]):
                 return "medication"
             return "triage"
@@ -94,7 +107,7 @@ class MedAgentOrchestrator:
         # Conditional Edge after Patient loading
         workflow.add_conditional_edges("patient", route_intent, {
             "triage": "triage", 
-            "calendar": "calendar", 
+            "scheduling": "scheduling", 
             "vision": "vision",
             "medication": "medication"
         })
@@ -104,11 +117,16 @@ class MedAgentOrchestrator:
         # Conditional Edge after Triage: if insufficient docs -> knowledge -> reasoning, elser -> END or LOOP
         # For simplicity in this launch, we follow the best-case path but with safety.
         workflow.add_edge("triage", "knowledge")
-        workflow.add_edge("knowledge", "reasoning")
+        workflow.add_edge("knowledge", "diagnosis")
+        workflow.add_edge("diagnosis", "reasoning")
         workflow.add_edge("reasoning", "validation")
-        workflow.add_edge("validation", "safety")
-        workflow.add_edge("safety", "report")
-        workflow.add_edge("report", END)
+        workflow.add_edge("validation", "doctor")
+        workflow.add_edge("doctor", "safety")
+        workflow.add_edge("safety", "second_opinion")
+        workflow.add_edge("second_opinion", "report")
+        workflow.add_edge("report", "response")
+        workflow.add_edge("response", END)
+        workflow.add_edge("scheduling", "calendar")
         workflow.add_edge("calendar", END)
         workflow.add_edge("medication", END)
 
@@ -121,7 +139,7 @@ class MedAgentOrchestrator:
         except:
             return "en"
 
-    def run(self, initial_input: str, user_id: str = "guest", image_path: str = None):
+    def run(self, initial_input: str, user_id: str = "guest", image_path: str = None, request_second_opinion: bool = False):
         # 1. Validation & Persistence Setup
         is_valid, error_msg = validate_medical_input(sanitize_input(initial_input))
         if not is_valid:
@@ -153,6 +171,7 @@ class MedAgentOrchestrator:
                 "requires_human_review": False,
                 "status": "Initializing...",
                 "image_path": image_path,
+                "request_second_opinion": request_second_opinion,
                 "visual_findings": {},
                 "long_term_memory": "",
                 "conversation_state": {"active_case_id": None, "risk_level": "unknown", "pending_actions": []}

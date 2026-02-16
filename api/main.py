@@ -14,7 +14,7 @@ _root = Path(__file__).resolve().parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
-from fastapi import FastAPI, HTTPException, Request, Depends, status, File, UploadFile
+from fastapi import FastAPI, HTTPException, Request, Depends, status, File, UploadFile, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
@@ -305,6 +305,33 @@ async def get_improvement_report():
     agent = SelfImprovementAgent()
     return {"report": agent.generate_improvement_report()}
 
+@app.get("/auth/export-data")
+async def export_user_data(user: dict = Depends(get_current_user)):
+    """Export all user records as CSV (Portability)."""
+    pers = get_persistence()
+    user_id = user["sub"]
+    
+    # Collect data
+    reports = pers.get_reports_by_patient(user_id)
+    meds = pers.get_medications(user_id)
+    
+    import pandas as pd
+    import io
+    
+    # Combine into a simple manifest for CSV
+    data = []
+    for r in reports:
+        data.append({"type": "Medical Report", "date": str(r['generated_at']), "content": str(r['content'])})
+    for m in meds:
+        data.append({"type": "Medication", "date": "Active", "content": f"{m['name']} {m['dosage']} {m['frequency']}"})
+        
+    df = pd.DataFrame(data)
+    stream = io.StringIO()
+    df.to_csv(stream, index=False)
+    
+    from fastapi.responses import Response
+    return Response(content=stream.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=my_health_data.csv"})
+
 @app.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
     return user
@@ -356,6 +383,7 @@ class PatientRequest(BaseModel):
     symptoms: str
     patient_id: str = "GUEST"
     image_path: Optional[str] = None
+    request_second_opinion: bool = False
 
     @field_validator('symptoms')
     @classmethod
@@ -386,16 +414,34 @@ class AdminReviewAction(BaseModel):
     action: str # APPROVE, REJECT
     comment: Optional[str] = None
 
+# --- BACKGROUND TASKS ---
+async def send_health_alerts(user_id: str, message: str):
+    """Simulate push notifications or email alerts."""
+    logger.info(f"ALERTS QUEUED for {user_id}: {message}")
+    # In a real system, integrate with Twilio/SendGrid here.
+
 # --- PUBLIC ROUTES ---
 @app.post("/consult")
-async def consult(request: PatientRequest):
+async def consult(request: PatientRequest, background_tasks: BackgroundTasks):
     try:
         orch = get_orchestrator()
-        result = orch.run(request.symptoms, user_id=request.patient_id, image_path=request.image_path)
+        result = orch.run(
+            request.symptoms, 
+            user_id=request.patient_id, 
+            image_path=request.image_path,
+            request_second_opinion=request.request_second_opinion
+        )
+        
         if result.get("status") == "error":
             raise HTTPException(status_code=400, detail=result.get("final_response"))
+            
+        # Trigger background logic if priority is high
+        if result.get("critical_alert"):
+            background_tasks.add_task(send_health_alerts, request.patient_id, "EMERGENCY: High risk detected in your consultation.")
+            
         return result
     except Exception as e:
+        logger.error(f"Consultation failure: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/feedback")
