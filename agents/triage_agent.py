@@ -40,6 +40,12 @@ class TriageAgent:
             if hasattr(msg, 'content'):
                 user_input += str(msg.content) + " "
         
+        # Multimodal Integration: Add visual findings to triage context
+        visual_findings = state.get("visual_findings", {})
+        if visual_findings:
+            user_input += f"\n[VISUAL FINDINGS]: {visual_findings.get('visual_findings', '')}\n"
+            user_input += f"Confidence: {visual_findings.get('confidence', 0.5)}, Severity: {visual_findings.get('severity_level', 'unknown')}"
+        
         # Validation
         user_input = sanitize_input(user_input)
         is_valid, error = validate_medical_input(user_input)

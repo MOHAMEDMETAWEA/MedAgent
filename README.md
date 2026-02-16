@@ -21,10 +21,10 @@ MedAgent is designed to work **for any user, any country, and any healthcare env
    - `pip install -r requirements.txt`
    - Copy `.env.example` to `.env` and set `OPENAI_API_KEY=your_key`
    - `python data/generate_data.py` (first time only)
-3. **Run:**  
-   - Start the backend: `uvicorn api.main:app --host 0.0.0.0 --port 8000`  
-   - In a new terminal, start the UI: `streamlit run api/frontend.py --server.port 8501`  
-   - Open **<http://localhost:8501>** in your browser.
+3. **Run:**
+   - Start the backend: `uvicorn api.main:app --host 0.0.0.0 --port 8000`
+   - In a new terminal, start the UI: `streamlit run api/frontend.py --server.port 8501`
+   - Open **[http://localhost:8501](http://localhost:8501)** in your browser.
 
 **EASIEST:** Use the unified launcher script:
 
@@ -40,13 +40,13 @@ Alternatively, use the scripts: **`run_backend.bat`** then **`run_frontend.bat`*
 
 To ensure compliance with the **Digital Egypt Pioneers Initiative (DEPI)** graduation standards, this project explicitly maps to the official Generative AI curriculum milestones:
 
-| DEPI Standard Milestone | MedAgent Project Milestone |
-| :--- | :--- |
-| **M1: Data Collection & Preprocessing** | Milestone 2: Data & RAG Pipeline Setup |
-| **M2: Model Development & Training** | Milestone 3: Agent Development & M4: Report Gen |
-| **M3: Advanced Techniques & Integration** | Milestone 5: Memory & Agent Coordination |
-| **M4: MLOps & Model Management** | Milestone 6: Deployment & Monitoring |
-| **M5: Final Report & Demonstration** | Milestone 1: Design & M7: Final Delivery |
+| DEPI Standard Milestone                         | MedAgent Project Milestone                      |
+| :---------------------------------------------- | :---------------------------------------------- |
+| **M1: Data Collection & Preprocessing**   | Milestone 2: Data & RAG Pipeline Setup          |
+| **M2: Model Development & Training**      | Milestone 3: Agent Development & M4: Report Gen |
+| **M3: Advanced Techniques & Integration** | Milestone 5: Memory & Agent Coordination        |
+| **M4: MLOps & Model Management**          | Milestone 6: Deployment & Monitoring            |
+| **M5: Final Report & Demonstration**      | Milestone 1: Design & M7: Final Delivery        |
 
 ---
 
@@ -66,17 +66,18 @@ The system utilizes a specialized workforce of agents, coordinated via **LangGra
 
 1. **Triage Agent**: Analyzes urgency (Emergency/High/Low) and structured symptom extraction.
 2. **Knowledge Agent**: Retrieves verified medical guidelines (RAG) relevant to the case.
-3. **Reasoning Agent**: Performs detailed Chain-of-Thought (CoT) differential diagnosis.
+3. **Reasoning Agent**: Performs detailed **Tree-of-Thought (ToT)** differential diagnosis.
 4. **Validation Agent**: Cross-checks the diagnosis against retrieved evidence for consistency.
 5. **Safety Agent**: Final guardrail scanning for harmful content or policy violations.
-6. **Response Agent**: Generates the **Medical Report**, **Doctor Summary**, and **Patient Instructions** (in simple language). Handles bilingual support (English/Arabic).
-7. **Calendar Agent**: Manages appointment scheduling and availability checks.
+6. **Report Agent**: Generates medical reports, doctor summaries, and patient instructions.
+7. **Vision Analysis Agent**: Analyzes medical images (X-rays, dermoscopy, etc.) using GPT-4o.
+8. **Authentication Agent**: Manages secure access, tokenization, and user registration.
+9. **Patient Agent**: Maintains case continuity and long-term memory graph.
+10. **Human Review Agent**: Facilitates manual audit of high-risk cases.
 
 ---
 
 ## 💡 Innovation & Added Value
-
-> **Grading Criterion:** 10/100 Points
 
 - **Agentic Orchestration**: Moving beyond linear chatbots to cyclic, state-aware agent workflows using **LangGraph**.
 - **Clinical Reasoning**: Implementation of **Chain-of-Thought (CoT)** to provide human-readable, logical diagnostic paths.
@@ -121,13 +122,13 @@ The system utilizes a specialized workforce of agents, coordinated via **LangGra
 
 ## 📊 Success Criteria & Evaluation
 
-| Metric | Target |
-| :--- | :--- |
+| Metric                       | Target                                     |
+| :--------------------------- | :----------------------------------------- |
 | **Diagnosis Accuracy** | ≥ 85% compared to ground truth test cases |
-| **Response Latency** | < 3 seconds for 95% of requests |
-| **RAG Precision** | ≥ 0.8 for top-3 retrieval results |
-| **Cost Efficiency** | < $0.50 average per patient interaction |
-| **Code Coverage** | ≥ 80% unit test coverage |
+| **Response Latency**   | < 3 seconds for 95% of requests            |
+| **RAG Precision**      | ≥ 0.8 for top-3 retrieval results         |
+| **Cost Efficiency**    | < $0.50 average per patient interaction    |
+| **Code Coverage**      | ≥ 80% unit test coverage                  |
 
 ---
 
@@ -145,8 +146,6 @@ The system utilizes a specialized workforce of agents, coordinated via **LangGra
 
 ## 👥 Task Division & Team Roles
 
-> **Grading Criterion:** 5/100 Points
-
 - **AI Reasoning Engineer**: Responsible for agent logic, prompt engineering (CoT), and report generation.
 - **Data & RAG Architect**: Responsible for the vector database, medical knowledge base, and embedding pipelines.
 - **System Integrator**: Responsible for FastAPI development, Redis memory management, and agent state persistence.
@@ -160,15 +159,16 @@ The system utilizes a specialized workforce of agents, coordinated via **LangGra
 ```text
 medagent-smart-hospital/
 │
-├── agents/             # Agent logic (LangGraph workflows)
-├── rag/                # Knowledge base, embeddings, and retrievers
-├── memory/             # Persistent state and patient history
-├── api/                # FastAPI endpoints & authentication
-├── prompts/            # Sophisticated prompt library & templates
-├── data/               # Synthetic patient data & medical guidelines
-├── deployment/         # Docker, CI/CD, and MLOps config
-├── notebooks/          # R&D and performance experiments
-└── evaluation/         # RAG metrics and agent behavior logs
+├── agents/             # 20+ specialized agents (LangGraph workflows)
+├── api/                # FastAPI backend & Streamlit frontend
+├── database/           # SQLite schema, SQLAlchemy models, and Migrations
+├── docs/               # Detailed reports, manifests, and DEPI alignment docs
+├── data/               # Medical guidelines (JSON) and data generators
+├── prompts/            # Agent personality library & dynamic templates
+├── rag/                # FAISS vector store & retrieval logic
+├── scripts/            # Management tools (Supervisor, Diagnostics)
+├── tests/              # Comprehensive audit & launch validation suite
+└── utils/              # Safety guardrails, encryption, and rate limiting
 ```
 
 ---
@@ -184,7 +184,7 @@ medagent-smart-hospital/
 
 ## 👨‍💻 Author
 
-**Mohamed Mostafa Metawea**  
+**Mohamed Mostafa Metawea**
 *Graduation Project - Generative & Agentic AI Track*
 
 ---
@@ -194,4 +194,5 @@ medagent-smart-hospital/
 This project is for educational and research purposes only.
 
 ---
+
 > 💡 *MedAgent demonstrates the future of "Autonomous Healthcare" where AI serves as a tireless collaborator for medical professionals.*

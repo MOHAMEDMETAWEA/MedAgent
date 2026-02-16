@@ -6,10 +6,12 @@ import os
 import json
 import base64
 import logging
+import jwt
 from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-from database.models import SessionLocal, AuditLog, SystemConfig, UserSession, Interaction, UserRole
+from database.models import SessionLocal, AuditLog, SystemConfig, UserSession, Interaction, UserRole, UserAccount, UserActivity
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,14 @@ class GovernanceAgent:
             self._key = Fernet.generate_key().decode()
             logger.warning("DATA_ENCRYPTION_KEY not set. Using temporary key. DATA WILL BE UNREADABLE AFTER RESTART.")
         self.cipher = Fernet(self._key.encode())
+        
+        # Password Hashing
+        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        # JWT Config
+        self.jwt_secret = os.getenv("JWT_SECRET_KEY", "medagent-super-secret-jwt-key")
+        self.jwt_algorithm = "HS256"
+        self.token_expire_minutes = 60 * 24 # 24 hours
 
     # --- ENCRYPTION ---
     def encrypt(self, data: str) -> str:
@@ -39,6 +49,28 @@ class GovernanceAgent:
             return self.cipher.decrypt(token.encode()).decode()
         except:
             return "[ENCRYPTED_DATA_ERROR]"
+
+    # --- AUTHENTICATION ---
+    def hash_password(self, password: str) -> str:
+        return self.pwd_context.hash(password)
+
+    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
+        return self.pwd_context.verify(plain_password, hashed_password)
+
+    def create_access_token(self, data: dict):
+        to_encode = data.copy()
+        expire = datetime.utcnow() + timedelta(minutes=self.token_expire_minutes)
+        to_encode.update({"exp": expire})
+        return jwt.encode(to_encode, self.jwt_secret, algorithm=self.jwt_algorithm)
+
+    def verify_token(self, token: str):
+        try:
+            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+            return payload # user_id, role, etc.
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.InvalidTokenError:
+            return None
 
     # --- AUDIT LOGGING ---
     def log_action(self, actor_id: str, role: str, action: str, target: str, status: str = "SUCCESS", ip: str = None):

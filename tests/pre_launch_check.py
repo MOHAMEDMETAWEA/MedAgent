@@ -99,8 +99,7 @@ def test_configuration():
            str(settings.MEDICAL_GUIDELINES_PATH), critical=True)
 
     # Prompt files
-    expected_prompts = ["triage_agent.txt", "diagnosis_agent.txt", "doctor_agent.txt",
-                        "report_agent.txt", "patient_agent.txt", "audit_reflection.txt"]
+    expected_prompts = ["triage_agent.txt", "report_agent.txt", "patient_agent.txt", "audit_reflection.txt"]
     for pf in expected_prompts:
         p = settings.PROMPTS_DIR / pf
         record(f"Prompt file: {pf}", p.exists(), str(p))
@@ -137,10 +136,8 @@ def test_agent_loading():
         ("GenerativeEngineAgent","agents.generative_engine_agent","GenerativeEngineAgent"),
         ("GovernanceAgent",      "agents.governance_agent",      "GovernanceAgent"),
         ("DeveloperControlAgent","agents.developer_agent",       "DeveloperControlAgent"),
-        ("DoctorAgent",          "agents.doctor_agent",          "DoctorAgent"),
-        ("ResponseAgent",        "agents.response_agent",        "ResponseAgent"),
-        ("DiagnosisAgent",       "agents.diagnosis_agent",       "DiagnosisAgent"),
-        ("SchedulingAgent",      "agents.scheduling_agent",      "SchedulingAgent"),
+        ("AuthenticationAgent",  "agents.authentication_agent",  "AuthenticationAgent"),
+        ("HumanReviewAgent",     "agents.human_review_agent",     "HumanReviewAgent"),
     ]
 
     for label, module_path, class_name in agent_specs:

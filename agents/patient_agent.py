@@ -43,11 +43,15 @@ class PatientAgent:
         user_id = state.get('user_id', 'GUEST')
         messages = state.get('messages', [])
         
-        # 1. Load Profile
+        # 1. Load Profile, Memory & Case
         profile = self.persistence.get_patient_profile(user_id)
+        long_term_memory = self.persistence.get_long_term_memory(user_id) if user_id != "GUEST" else "First-time Guest"
+        memory_graph = self.persistence.get_memory_graph_context(user_id)
+        case_id = self.persistence.get_or_create_case(user_id)
+        
         history_context = ""
         if profile:
-            history_context = f"Patient Name: {profile.get('name')}, Age: {profile.get('age')}, History: {profile.get('medical_history')}"
+            history_context = f"Patient Name: {profile.get('name')}, Age: {profile.get('age')}, Profile History: {profile.get('medical_history')}"
         else:
             history_context = "New Patient (Guest)"
             # Auto-create guest profile if needed, or wait for explicit registration
@@ -85,7 +89,15 @@ class PatientAgent:
              # Fallback
              prompt_template = "Summarize the patient symptoms from the following input: {input}\nContext: {context}"
              
-        full_prompt = f"Patient History Context: {history_context}\n\n" + prompt_template
+        lang = state.get('language', 'en')
+        lang_instruction = "IMPORTANT: Respond in English." if lang == "en" else "IMPORTANT: Respond in Arabic (اللغة العربية). Keep 'PATIENT SUMMARY:' tag in English for parsing."
+        
+        full_prompt = f"Patient History Context: {history_context}\n"
+        full_prompt += f"Long-Term Conversation Memory:\n{long_term_memory}\n"
+        full_prompt += f"Memory Graph Analysis (Nodes):\n{memory_graph}\n"
+        full_prompt += f"Active Case ID: {case_id}\n\n"
+        full_prompt += f"{lang_instruction}\n\n"
+        full_prompt += prompt_template
         
         try:
             system_msg = SystemMessage(content=full_prompt)
@@ -105,6 +117,13 @@ class PatientAgent:
                     "history_context": history_context,
                     "profile_id": user_id
                 },
+                "long_term_memory": long_term_memory,
+                "conversation_state": {
+                    "active_case_id": case_id,
+                    "risk_level": "unknown",
+                    "pending_actions": ["triage"]
+                },
+                "retrieved_docs": f"{memory_graph}\n--- Knowledge Base ---\nSearching...",
                 "next_step": "triage" 
             }
         except Exception as e:

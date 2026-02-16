@@ -53,10 +53,20 @@ class Settings(BaseSettings):
     ENABLE_PROVIDER_INTEGRATION: bool = False
     PROVIDER_API_URL: Optional[str] = None
     
+    # Security
+    DATA_ENCRYPTION_KEY: Optional[str] = None
+    ADMIN_API_KEY: str = "admin-secret-dev"
+    
     # Monitoring
     MLFLOW_TRACKING_URI: Optional[str] = None
     ENABLE_LOGGING: bool = True
     LOG_LEVEL: str = "INFO"
+    
+    # API
+    MEDAGENT_API_URL: str = "http://localhost:8000"
+    
+    # Feature Flags
+    ENABLE_AUDIO: bool = False
     
     # Security
     RATE_LIMIT_ENABLED: bool = True
@@ -70,6 +80,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 # Global settings instance
 settings = Settings()

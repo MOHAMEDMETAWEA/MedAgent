@@ -70,6 +70,21 @@ def generate_professional_data():
             "guideline": "Dysregulated host response to infection. High mortality rate.",
             "indicators": "qSOFA score >= 2 (Altered mental status, SBP <=100, RR >=22). Hypothermia or fever.",
             "treatment": "Sepsis 3-hour bundle: Lactate level, Blood cultures, Broad-spectrum antibiotics, Fluid bolus."
+        },
+        # --- ARABIC PROTOCOLS (Bilingual Grounding) ---
+        {
+            "category": "Cardiology",
+            "condition": "Acute Myocardial Infarction / نوبة قلبية حادة",
+            "guideline": "التشخيص الفوري عبر تخطيط القلب ومستويات التروبونين. الوقت حاسم لإعادة التروية.",
+            "indicators": "ألم خلف القص، يمتد إلى الذراع اليسرى/الفك، تعرق، غثيان، ضيق تنفس.",
+            "treatment": "الأسبرين 325 ملجم (مضغ)، نيتروجليسرين، النقل الفوري لمركز قسطرة."
+        },
+        {
+            "category": "Neurology",
+            "condition": "Ischemic Stroke / سكتة دماغية نقص تروية",
+            "guideline": "الوقت هو الدماغ. نافذة حل الخثرة هي 4.5 ساعة.",
+            "indicators": "تدلي الوجه، ضعف الذراع، صعوبة النطق (FAST).",
+            "treatment": "الأشعة المقطعية بدون صبغة لاستبعاد النزيف. تثبيت ضغط الدم."
         }
     ]
     

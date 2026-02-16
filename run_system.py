@@ -1,42 +1,56 @@
 """
-Safe Run Script for MedAgent.
-Ensures environment is set up and starts API + Frontend.
+Unified Startup Script for MEDAgent.
+Launches the FastAPI backend and Streamlit frontend in parallel.
 """
-import os
 import subprocess
 import sys
-import threading
 import time
-import requests
+import os
 
 def run_backend():
-    print("[Launcher] Starting Backend API on port 8000...")
-    subprocess.run([sys.executable, "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"])
+    print("[SYSTEM] Starting Backend API (Uvicorn)...")
+    # Using sys.executable to ensure we use the same python environment
+    return subprocess.Popen([sys.executable, "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"])
 
 def run_frontend():
-    # Wait for backend
-    time.sleep(5)
-    print("[Launcher] Starting Frontend UI...")
-    subprocess.run([sys.executable, "-m", "streamlit", "run", "api/frontend.py"])
-
-def check_env():
-    print("[Launcher] Checking Environment...")
-    if not os.path.exists(".env"):
-        print("[WARNING] .env file not found! System may fail authorization.")
-        # Proceed anyway as config.py has defaults/errors
-    else:
-        print("[Launcher] .env found.")
+    print("[SYSTEM] Starting Frontend UI (Streamlit)...")
+    # Streamlit usually needs special handling to run via python -m
+    return subprocess.Popen([sys.executable, "-m", "streamlit", "run", "api/frontend.py", "--server.port", "8501"])
 
 if __name__ == "__main__":
-    check_env()
+    print("="*60)
+    print("      MEDAGENT GLOBAL SYSTEM - STARTUP INITIATED")
+    print("="*60)
     
-    # Run in parallel threads
-    backend_thread = threading.Thread(target=run_backend)
-    backend_thread.start()
+    backend_proc = None
+    frontend_proc = None
     
     try:
-        run_frontend()
+        backend_proc = run_backend()
+        time.sleep(3) # Give backend a moment to bind to port
+        
+        frontend_proc = run_frontend()
+        
+        print("\n[SUCCESS] Both services are running.")
+        print("Backend: http://localhost:8000")
+        print("Frontend: http://localhost:8501")
+        print("\nPress Ctrl+C to terminate both servers.")
+        
+        # Keep the main script alive while processes are running
+        while True:
+            if backend_proc.poll() is not None:
+                print("[ERROR] Backend process terminated unexpectedly.")
+                break
+            if frontend_proc.poll() is not None:
+                print("[ERROR] Frontend process terminated unexpectedly.")
+                break
+            time.sleep(1)
+            
     except KeyboardInterrupt:
-        print("[Launcher] Stopping...")
-        # Threads are daemon=False by default, so we might need to kill manually
-        sys.exit(0)
+        print("\n[SYSTEM] Shutting down...")
+    finally:
+        if backend_proc:
+            backend_proc.terminate()
+        if frontend_proc:
+            frontend_proc.terminate()
+        print("[SYSTEM] All services stopped.")

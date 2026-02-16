@@ -37,3 +37,14 @@ class AgentState(TypedDict):
     report_medical: str
     report_doctor_summary: str
     report_patient_instructions: str
+    
+    # Transparency
+    status: str # Descriptive status for UI
+    
+    # Multimodal Vision Integration
+    image_path: str # Local path or URL to uploaded image
+    visual_findings: dict # Output from Vision Analysis Agent
+
+    # Advanced Memory & Tracking
+    long_term_memory: str # Summarized past history/conversations
+    conversation_state: dict # Active case tracking (risk_level, pending_actions, etc.)
