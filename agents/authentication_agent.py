@@ -26,8 +26,13 @@ class AuthenticationAgent:
                 self.persistence.log_user_activity(user.id, "none", "failed", ip=ip)
             return None, "Invalid credentials"
         
-        session_id = self.persistence.create_session(user_id=user.id)
-        token = self.governance.create_access_token({"sub": user.id, "role": user.role, "name": user.username})
+        session_id = self.persistence.create_session(user_id=user.id, mode=user.interaction_mode)
+        token = self.governance.create_access_token({
+            "sub": user.id, 
+            "role": user.role, 
+            "mode": user.interaction_mode,
+            "name": user.username
+        })
         
         self.persistence.log_user_activity(user.id, session_id, "success", ip=ip)
         return {
@@ -37,6 +42,11 @@ class AuthenticationAgent:
                 "id": user.id,
                 "username": user.username,
                 "role": user.role,
-                "full_name": self.governance.decrypt(user.full_name_encrypted)
+                "full_name": self.governance.decrypt(user.full_name_encrypted),
+                "gender": user.gender,
+                "age": user.age,
+                "country": user.country,
+                "interaction_mode": user.interaction_mode,
+                "doctor_verified": user.doctor_verified
             }
         }, None

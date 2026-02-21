@@ -112,11 +112,14 @@ The system utilizes a specialized workforce of agents, coordinated via **LangGra
 
 ## 🚀 Key Features & Scenarios
 
+- **Medical Image Analysis**: Upload X-rays, CT scans, MRI images, skin conditions, and lab reports for AI-powered clinical analysis using GPT-4o Vision. Supports JPG, PNG, WEBP, HEIC, and DICOM formats (max 20MB). Analysis includes confidence scoring, differential diagnosis, severity classification, and automated professional review flagging.
 - **Multi-Turn Symptom Intake**: Dynamic clarification questions to refine diagnostic data.
 - **Chain-of-Thought Reasoning**: Transparent diagnostic steps showing *how* the AI reached a conclusion.
 - **Resource Collision Handling**: Automatic rescheduling and priority-based doctor allocation.
 - **Emergency Escalation**: Detection of "Red Flag" symptoms leading to immediate priority scheduling.
 - **Autonomous Report Generation**: Production of structured medical documentation in standard formats (SOAP).
+- **Bilingual Support**: Full Arabic/English clinical communication.
+- **Data Encryption**: AES-256 encryption at rest for all patient data and analysis results.
 
 ---
 

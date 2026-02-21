@@ -139,7 +139,7 @@ class MedAgentOrchestrator:
         except:
             return "en"
 
-    def run(self, initial_input: str, user_id: str = "guest", image_path: str = None, request_second_opinion: bool = False):
+    def run(self, initial_input: str, user_id: str = "guest", image_path: str = None, request_second_opinion: bool = False, interaction_mode: str = None):
         # 1. Validation & Persistence Setup
         is_valid, error_msg = validate_medical_input(sanitize_input(initial_input))
         if not is_valid:
@@ -148,9 +148,28 @@ class MedAgentOrchestrator:
             return {"final_response": f"Input validation failed: {error_msg}. Please try again.", "status": "error"}
         
         sanitized_input = sanitize_input(initial_input)
-        session_id = self.persistence.create_session(user_id=user_id)
         
-        # 2. Language Detection
+        # 2. Fetch User Profile for Role-Aware Reasoning
+        user_profile = {}
+        if user_id != "guest":
+            # Direct query to get full account details including role
+            from database.models import UserAccount
+            user_acc = self.persistence.db.query(UserAccount).filter(UserAccount.id == user_id).first()
+            if user_acc:
+                user_profile = {
+                    "role": user_acc.role,
+                    "gender": user_acc.gender,
+                    "age": user_acc.age,
+                    "country": user_acc.country,
+                    "interaction_mode": user_acc.interaction_mode,
+                    "doctor_verified": user_acc.doctor_verified
+                }
+        
+        # Default mode logic
+        final_mode = interaction_mode or user_profile.get("interaction_mode", "patient")
+        session_id = self.persistence.create_session(user_id=user_id, mode=final_mode)
+        
+        # 3. Language Detection
         lang = self.detect_language(sanitized_input)
         
         try:
@@ -168,6 +187,12 @@ class MedAgentOrchestrator:
                 "critical_alert": False,
                 # New Fields
                 "language": lang,
+                "interaction_mode": final_mode,
+                "user_role": user_profile.get("role", "patient"),
+                "doctor_verified": user_profile.get("doctor_verified", False),
+                "user_age": user_profile.get("age"),
+                "user_gender": user_profile.get("gender"),
+                "user_country": user_profile.get("country"),
                 "requires_human_review": False,
                 "status": "Initializing...",
                 "image_path": image_path,

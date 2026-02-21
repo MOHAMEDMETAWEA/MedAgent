@@ -21,34 +21,43 @@ class ValidationAgent:
         )
 
     def process(self, state: AgentState):
-        print("--- VALIDATION AGENT: CHECKING CONSISTENCY ---")
+        print("--- VALIDATION AGENT: LAYER 7 HALLUCINATION PREVENTION ---")
         diagnosis = state.get('preliminary_diagnosis', '')
         knowledge = state.get('retrieved_docs', '')
+        patient_info = state.get('patient_info', {})
+        patient_summary = patient_info.get('summary', '')
         
         if not diagnosis:
             return {"validation_status": "skipped", "next_step": "safety"}
 
         prompt = (
-            f"EVIDENCE (GUIDELINES):\n{knowledge}\n\n"
+            f"EVIDENCE (RETRIEVED GUIDELINES):\n{knowledge}\n\n"
+            f"PATIENT SYMPTOMS:\n{patient_summary}\n\n"
             f"PROPOSED DIAGNOSIS:\n{diagnosis}\n\n"
-            f"TASK: Verify if the proposed diagnosis is supported by the Evidence. "
-            f"If there are claims not in the evidence, flag them."
-            f"Output 'VALID' if consistent, or 'ISSUE: <explanation>' if not."
+            f"TASK — Layer 7 Validation Checklist:\n"
+            f"Evaluate the proposed diagnosis against ALL of these criteria:\n"
+            f"1. SYMPTOM-BASED: Is the reasoning directly based on the reported symptoms?\n"
+            f"2. KNOWLEDGE-SUPPORTED: Is the reasoning supported by the retrieved evidence/guidelines?\n"
+            f"3. MEDICALLY LOGICAL: Is the reasoning medically coherent and logical?\n"
+            f"4. SAFETY CHECK: Are unsafe or unsupported conclusions avoided?\n"
+            f"5. UNCERTAINTY: Is clinical uncertainty expressed where evidence is insufficient?\n\n"
+            f"For each criterion, output PASS or FAIL with a brief explanation.\n"
+            f"Final verdict: 'VALID' if all pass, or 'ISSUE: <explanation>' if any fail.\n"
+            f"If uncertain about any claim, flag it explicitly — never fabricate diagnoses, statistics, or medical facts."
         )
 
         try:
             response = self.llm.invoke([
-                SystemMessage(content="You are a Medical Validation Agent. Strict fact-checking."),
+                SystemMessage(content="You are a Medical Validation Agent (Layer 7 — Hallucination Prevention). Perform strict fact-checking against evidence. Never fabricate medical facts."),
                 HumanMessage(content=prompt)
             ])
             
             result = response.content
-            if "VALID" in result:
+            if "VALID" in result and "ISSUE" not in result:
                 return {"validation_status": "valid", "next_step": "safety"}
             else:
-                # If invalid, we might want to loop back or tag it.
-                # For this linear flow, we'll append the warning to the diagnosis
-                new_diagnosis = diagnosis + "\n\n[VALIDATION WARNING]: " + result
+                # If invalid, append the warning to the diagnosis
+                new_diagnosis = diagnosis + "\n\n[VALIDATION WARNING — Layer 7]: " + result
                 return {
                     "preliminary_diagnosis": new_diagnosis, 
                     "validation_status": "warning", 

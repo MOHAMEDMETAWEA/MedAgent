@@ -1,12 +1,14 @@
 """
 FastAPI Backend for MedAgent - Enhanced Command Center.
 Includes Admin Routes, System Health, and Governance Controls.
-Updated for Feedback & Review.
+Updated for Feedback, Review, and Medical Image Analysis.
 """
 import sys
 import os
 import uuid
 import datetime
+import json
+import logging
 from pathlib import Path
 from typing import List, Optional, Dict
 
@@ -19,7 +21,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from pydantic import BaseModel, field_validator, EmailStr
-from typing import Optional, Dict
 
 from agents.orchestrator import MedAgentOrchestrator
 from agents.persistence_agent import PersistenceAgent
@@ -30,8 +31,11 @@ from agents.authentication_agent import AuthenticationAgent
 from agents.human_review_agent import HumanReviewAgent
 from agents.medication_agent import MedicationAgent
 from agents.report_agent import ReportAgent
+from agents.calendar_agent import CalendarAgent
 from config import settings
 from utils.safety import validate_medical_input, sanitize_input
+
+logger = logging.getLogger(__name__)
 
 # API Key Auth (Simulated)
 API_KEY_NAME = "X-Admin-Key"
@@ -78,23 +82,45 @@ async def ready():
 UPLOAD_DIR = _root / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+ALLOWED_IMAGE_FORMATS = ["jpg", "jpeg", "png", "webp", "heic", "dicom", "dcm"]
+MAX_UPLOAD_SIZE = 20 * 1024 * 1024  # 20MB
+
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    """Securely upload a medical image."""
+    """Securely upload a medical image with metadata storage."""
     try:
         file_ext = file.filename.split(".")[-1].lower()
-        if file_ext not in ["jpg", "jpeg", "png", "webp", "heic"]:
-            raise HTTPException(status_code=400, detail="Unsupported file format")
+        if file_ext not in ALLOWED_IMAGE_FORMATS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported format. Allowed: {', '.join(ALLOWED_IMAGE_FORMATS)}"
+            )
+        
+        # Read file content
+        content = await file.read()
+        
+        # Validate file size
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=400, detail="File too large. Maximum 20MB allowed.")
         
         file_name = f"{uuid.uuid4()}.{file_ext}"
         file_path = UPLOAD_DIR / file_name
         
         with open(file_path, "wb") as f:
-            f.write(await file.read())
-            
-        return {"image_path": str(file_path), "filename": file.filename}
+            f.write(content)
+        
+        return {
+            "image_path": str(file_path), 
+            "filename": file.filename,
+            "size_bytes": len(content),
+            "format": file_ext
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+from agents.verification_agent import VerificationAgent
 
 # Global Singletons
 _orchestrator = None
@@ -107,6 +133,12 @@ _review_agent = None
 _medication_agent = None
 _report_agent = None
 _calendar_agent = None
+_verification_agent = None
+
+def get_verification_agent():
+    global _verification_agent
+    if _verification_agent is None: _verification_agent = VerificationAgent()
+    return _verification_agent
 
 def get_orchestrator():
     global _orchestrator
@@ -197,10 +229,11 @@ async def get_capabilities():
             {"name": "Developer Control Agent / عميل التحكم المطور", "role": "System management for devs / إدارة النظام للمطورين"}
         ],
         "capabilities": [
+            {"id": "IMAGE_ANALYSIS", "label": "Medical Image Analysis / تحليل الصور الطبية", "generative": True},
             {"id": "GENERATE_REPORT", "label": "Generate Report / إنشاء تقرير", "generative": True},
             {"id": "GENERATE_RECOMMENDATION", "label": "Generate Recommendation / إنشاء توصية", "generative": True},
             {"id": "BOOK_APPOINTMENT", "label": "Book Appointment / حجز موعد", "generative": False},
-            {"id": "RETRIVE_HISTORY", "label": "Retrieval History / استرجاع السجل", "generative": False},
+            {"id": "RETRIEVE_HISTORY", "label": "Retrieval History / استرجاع السجل", "generative": False},
             {"id": "DATA_EXPORT", "label": "Data Export / تصدير البيانات", "generative": False}
         ]
     }
@@ -234,6 +267,15 @@ class RegisterRequest(BaseModel):
     full_name: str
     age: Optional[int] = None
     gender: Optional[str] = None
+    country: Optional[str] = None
+    role: str = "patient" # patient or doctor
+
+class VerifyDoctorRequest(BaseModel):
+    license_number: str
+    specialization: str
+
+class ModeRequest(BaseModel):
+    interaction_mode: str # patient or doctor
 
 class LoginRequest(BaseModel):
     login_id: str # username, email, or phone
@@ -253,11 +295,37 @@ async def register(req: RegisterRequest):
         phone=req.phone,
         password=req.password,
         full_name=req.full_name,
+        role=req.role,
+        gender=req.gender,
+        age=req.age,
+        country=req.country,
         meta={"age": req.age, "gender": req.gender}
     )
     if not user_id:
         raise HTTPException(status_code=500, detail="Registration failed")
     return {"status": "success", "user_id": user_id}
+
+@app.post("/auth/set-mode")
+async def set_interaction_mode(req: ModeRequest, user: dict = Depends(get_current_user)):
+    pers = get_persistence()
+    success = pers.update_interaction_mode(user["sub"], req.interaction_mode)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update mode")
+    return {"status": "success", "mode": req.interaction_mode}
+
+@app.post("/auth/verify-doctor")
+async def verify_doctor(req: VerifyDoctorRequest, user: dict = Depends(get_current_user)):
+    agent = get_verification_agent()
+    # We need country from user account
+    pers = get_persistence()
+    from database.models import UserAccount
+    db_user = pers.db.query(UserAccount).filter(UserAccount.id == user["sub"]).first()
+    country = db_user.country if db_user else "Unknown"
+    
+    success, message = agent.verify_doctor_credentials(user["sub"], req.license_number, req.specialization, country)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "verified", "message": message}
 
 @app.post("/auth/login")
 async def login(req: LoginRequest, request: Request):
@@ -322,12 +390,7 @@ async def export_report(report_id: int, format: str = "pdf", user: dict = Depend
     from fastapi.responses import FileResponse
     return FileResponse(path, filename=filename, media_type=media_type)
 
-@app.get("/admin/improvement-report", dependencies=[Depends(check_admin_auth)])
-async def get_improvement_report():
-    """Get insights from Self-Improvement Agent."""
-    from agents.self_improvement_agent import SelfImprovementAgent
-    agent = SelfImprovementAgent()
-    return {"report": agent.generate_improvement_report()}
+# [REMOVED] Duplicate /admin/improvement-report route — kept the one at line 560
 
 @app.get("/auth/export-data")
 async def export_user_data(user: dict = Depends(get_current_user)):
@@ -413,6 +476,7 @@ class PatientRequest(BaseModel):
     patient_id: str = "GUEST"
     image_path: Optional[str] = None
     request_second_opinion: bool = False
+    interaction_mode: Optional[str] = None # patient or doctor, overrides default
 
     @field_validator('symptoms')
     @classmethod
@@ -458,7 +522,8 @@ async def consult(request: PatientRequest, background_tasks: BackgroundTasks):
             request.symptoms, 
             user_id=request.patient_id, 
             image_path=request.image_path,
-            request_second_opinion=request.request_second_opinion
+            request_second_opinion=request.request_second_opinion,
+            interaction_mode=request.interaction_mode
         )
         
         if result.get("status") == "error":
@@ -476,9 +541,79 @@ async def consult(request: PatientRequest, background_tasks: BackgroundTasks):
 @app.post("/feedback")
 async def submit_feedback(fb: FeedbackRequest):
     """Submit user feedback for Self-Improvement."""
-    # Logic to save feedback to DB (Simplified: usually persistence agent handles this)
-    # We would add a save_feedback method to persistence_agent.
     return {"status": "received", "message": "Thank you for your feedback!"}
+
+# --- IMAGE HISTORY ROUTES ---
+@app.get("/images")
+async def get_user_images(user: dict = Depends(get_current_user)):
+    """List all uploaded medical images with analysis results for the current user."""
+    pers = get_persistence()
+    try:
+        from database.models import MedicalImage
+        images = pers.db.query(MedicalImage).filter(
+            MedicalImage.patient_id == user["sub"]
+        ).order_by(MedicalImage.timestamp.desc()).all()
+        
+        results = []
+        for img in images:
+            findings = {}
+            if img.visual_findings_encrypted:
+                try:
+                    findings = json.loads(pers.governance.decrypt(img.visual_findings_encrypted))
+                except Exception:
+                    findings = {"status": "encrypted"}
+            
+            results.append({
+                "id": img.id,
+                "filename": img.original_filename,
+                "timestamp": str(img.timestamp),
+                "confidence": img.confidence_score,
+                "severity": img.severity_level,
+                "requires_review": img.requires_human_review,
+                "conditions": img.possible_conditions_json or [],
+                "findings": findings
+            })
+        return results
+    except Exception as e:
+        logger.error(f"Failed to fetch images: {e}")
+        return []
+
+@app.get("/images/{image_id}")
+async def get_image_detail(image_id: int, user: dict = Depends(get_current_user)):
+    """Get detailed analysis for a specific medical image."""
+    pers = get_persistence()
+    try:
+        from database.models import MedicalImage
+        img = pers.db.query(MedicalImage).filter(
+            MedicalImage.id == image_id,
+            MedicalImage.patient_id == user["sub"]
+        ).first()
+        
+        if not img:
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        findings = {}
+        if img.visual_findings_encrypted:
+            try:
+                findings = json.loads(pers.governance.decrypt(img.visual_findings_encrypted))
+            except Exception:
+                findings = {"status": "encrypted"}
+        
+        return {
+            "id": img.id,
+            "filename": img.original_filename,
+            "timestamp": str(img.timestamp),
+            "confidence": img.confidence_score,
+            "severity": img.severity_level,
+            "requires_review": img.requires_human_review,
+            "conditions": img.possible_conditions_json or [],
+            "findings": findings
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch image detail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- ADMIN ROUTES ---
 @app.get("/admin/pending-reviews", dependencies=[Depends(check_admin_auth)])

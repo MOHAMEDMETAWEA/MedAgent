@@ -96,6 +96,8 @@ class GovernanceAgent:
         # Simple policy map
         policy = {
             UserRole.USER: ["READ_OWN_HISTORY", "DELETE_OWN_DATA", "CONSULT"],
+            UserRole.PATIENT: ["READ_OWN_HISTORY", "DELETE_OWN_DATA", "CONSULT"],
+            UserRole.DOCTOR: ["READ_OWN_HISTORY", "DELETE_OWN_DATA", "CONSULT", "DOCTOR_TOOLS", "VIEW_CASE_STUDIES"],
             UserRole.ADMIN: ["READ_ALL_LOGS", "SYSTEM_CONFIG", "VIEW_ANALYTICS", "READ_OWN_HISTORY"],
             UserRole.SYSTEM: ["WRITE_LOGS", "READ_CONFIG"]
         }

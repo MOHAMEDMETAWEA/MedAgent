@@ -22,14 +22,15 @@ class PersistenceAgent:
         self.db: Session = SessionLocal()
         self.governance = GovernanceAgent()
 
-    def create_session(self, user_id: str = "guest") -> str:
+    def create_session(self, user_id: str = "guest", mode: str = "patient") -> str:
         """Start a new tracking session."""
         session_id = str(uuid.uuid4())
         try:
             new_session = UserSession(
                 id=session_id,
                 user_id=user_id,
-                status="active"
+                status="active",
+                interaction_mode=mode
             )
             self.db.add(new_session)
             self.db.commit()
@@ -325,8 +326,10 @@ class PersistenceAgent:
         self.governance.close()
 
     # --- IDENTITY & AUTHENTICATION ---
-    def register_user(self, username: str, email: str, phone: str, password: str, full_name: str, meta: dict = None):
-        """Create a new user account securely."""
+    def register_user(self, username: str, email: str, phone: str, password: str, full_name: str, 
+                      role: str = "patient", gender: str = None, age: int = None, 
+                      country: str = None, meta: dict = None):
+        """Create a new user account securely with role and demographic data."""
         try:
             user_id = str(uuid.uuid4())
             hashed_pwd = self.governance.hash_password(password)
@@ -340,19 +343,54 @@ class PersistenceAgent:
                 phone=phone,
                 full_name_encrypted=enc_name,
                 password_hash=hashed_pwd,
+                role=role,
+                gender=gender,
+                age=age,
+                country=country,
+                interaction_mode=role if role in ["patient", "doctor"] else "patient",
                 profile_metadata_encrypted=enc_meta
             )
             self.db.add(user)
             self.db.commit()
             
             # Auto-create patient profile
-            self.upsert_patient_profile(user_id, full_name, meta.get("age", 0) if meta else 0, meta.get("gender", "Unknown") if meta else "Unknown", "{}")
+            self.upsert_patient_profile(user_id, full_name, age or 0, gender or "Unknown", "{}")
             
             return user_id
         except Exception as e:
             logger.error(f"Registration failed: {e}")
             self.db.rollback()
             return None
+
+    def update_interaction_mode(self, user_id: str, mode: str):
+        """Update user's default interaction mode."""
+        try:
+            user = self.db.query(UserAccount).filter(UserAccount.id == user_id).first()
+            if user:
+                user.interaction_mode = mode
+                self.db.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to update interaction mode: {e}")
+            self.db.rollback()
+            return False
+
+    def verify_doctor(self, user_id: str, license_number: str, specialization: str):
+        """Verify doctor credentials and update account."""
+        try:
+            user = self.db.query(UserAccount).filter(UserAccount.id == user_id).first()
+            if user and user.role == "doctor":
+                user.license_number = license_number
+                user.specialization = specialization
+                user.doctor_verified = True
+                self.db.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to verify doctor: {e}")
+            self.db.rollback()
+            return False
 
     def get_user_by_login(self, login_id: str):
         """Find user by username, email, or phone."""

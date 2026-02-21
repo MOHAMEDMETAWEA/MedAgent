@@ -8,6 +8,7 @@ from config import settings, get_prompt_path
 from utils.safety import sanitize_input, validate_medical_input, detect_critical_symptoms
 import logging
 import re
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class TriageAgent:
             response = self.llm.invoke([system_msg] + list(messages))
             content = response.content
             
-            # Parse Urgency
+            # Parse Layer 2 Output
             urgency = "LOW"
             if "URGENCY: EMERGENCY" in content or is_critical:
                 urgency = "EMERGENCY"
@@ -72,27 +73,33 @@ class TriageAgent:
                 urgency = "HIGH"
             elif "URGENCY: MEDIUM" in content:
                 urgency = "MEDIUM"
-                
-            # If Emergency, we might want to short-circuit, but for now we pass to Reasoning/Response
-            # taking note of the urgency.
+
+            is_sufficient = "STRUCTURED_CASE:" in content
             
-            is_sufficient = "PATIENT SUMMARY:" in content
-            
-            summary = content
-            if "PATIENT SUMMARY:" in content:
-                summary = content.split("PATIENT SUMMARY:")[1].split("URGENCY:")[0].strip()
+            structured_data = {}
+            if "STRUCTURED_CASE:" in content:
+                try:
+                    start = content.find("{")
+                    end = content.rfind("}") + 1
+                    structured_data = json.loads(content[start:end])
+                except:
+                    structured_data = {"summary": content}
+
+            questions = []
+            if "QUESTIONS:" in content:
+                q_block = content.split("QUESTIONS:")[1].strip()
+                questions = [q.strip() for q in q_block.split("\n") if q.strip()]
 
             return {
                 "patient_info": {
-                    "summary": summary,
+                    "summary": structured_data.get("chief_complaint", content),
+                    "structured_case": structured_data,
                     "status": "complete" if is_sufficient else "incomplete",
                     "urgency": urgency,
-                    "original_triage_output": content
+                    "clarification_questions": questions
                 },
                 "critical_alert": (urgency == "EMERGENCY"),
-                "next_step": "knowledge" if is_sufficient else "end" # If incomplete, maybe ask more? 
-                # For this flow, let's assume if incomplete we might loop or end. 
-                # To keep it simple for now: if sufficient -> knowledge, else -> return question
+                "next_step": "knowledge" if is_sufficient else "end"
             }
         except Exception as e:
             logger.error(f"Triage error: {e}")

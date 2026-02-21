@@ -32,6 +32,15 @@ class AgentState(TypedDict):
     # Global/Generic & new features
     language: str # 'en' or 'ar'
     requires_human_review: bool
+
+    # Layer 1 — Identity & Role Context
+    interaction_mode: str      # 'doctor' or 'patient'
+    user_role: str             # 'doctor' or 'patient'
+    doctor_verified: bool
+    user_age: str
+    user_gender: str
+    user_country: str
+    request_second_opinion: bool
     
     # Generative Report Agent outputs (RAG-grounded) - Compatibility
     report_medical: str

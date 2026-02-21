@@ -49,12 +49,20 @@ class PatientAgent:
         memory_graph = self.persistence.get_memory_graph_context(user_id)
         case_id = self.persistence.get_or_create_case(user_id)
         
-        history_context = ""
+        role = state.get("user_role", "patient")
+        mode = state.get("interaction_mode", "patient")
+        gender = profile.get("gender") if profile else "Unknown"
+        age = profile.get("age") if profile else "Unknown"
+        country = profile.get("country") if profile else "Unknown"
+        verified = state.get("doctor_verified", False)
+
+        history_context = f"User Role: {role}, Interaction Mode: {mode}, Doctor Verified: {verified}\n"
+        history_context += f"Patient Details - Age: {age}, Gender: {gender}, Country: {country}\n"
+        
         if profile:
-            history_context = f"Patient Name: {profile.get('name')}, Age: {profile.get('age')}, Profile History: {profile.get('medical_history')}"
+            history_context += f"Profile History: {profile.get('medical_history')}"
         else:
-            history_context = "New Patient (Guest)"
-            # Auto-create guest profile if needed, or wait for explicit registration
+            history_context += "Medical History: New Patient (Guest)"
         
         if not messages:
             return {

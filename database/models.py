@@ -19,6 +19,8 @@ class UserRole(str, enum.Enum):
     USER = "user"
     ADMIN = "admin" # Developer
     SYSTEM = "system" # Internal Agent
+    PATIENT = "patient"
+    DOCTOR = "doctor"
 
 class FeedbackRating(int, enum.Enum):
     ONE = 1
@@ -37,6 +39,7 @@ class UserSession(Base):
     status = Column(String)
     is_anonymized = Column(Boolean, default=False)
     language = Column(String, default="en") # en or ar
+    interaction_mode = Column(String, default="patient") # patient or doctor
     
     logs = relationship("SystemLog", back_populates="session")
     interactions = relationship("Interaction", back_populates="session")
@@ -162,7 +165,17 @@ class UserAccount(Base):
     full_name_encrypted = Column(Text)
     password_hash = Column(String)
     
-    role = Column(Enum(UserRole), default=UserRole.USER)
+    role = Column(Enum(UserRole), default=UserRole.PATIENT)
+    gender = Column(String, nullable=True) # Male, Female, Prefer not to say
+    age = Column(Integer, nullable=True)
+    country = Column(String, nullable=True)
+    interaction_mode = Column(String, default="patient") # patient or doctor
+    
+    # Doctor Specific
+    doctor_verified = Column(Boolean, default=False)
+    license_number = Column(String, nullable=True)
+    specialization = Column(String, nullable=True)
+    
     language_preference = Column(String, default="en")
     
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

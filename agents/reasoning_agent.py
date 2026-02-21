@@ -41,14 +41,32 @@ class ReasoningAgent:
         if not patient_summary:
             return {"preliminary_diagnosis": "Insufficient data for reasoning.", "next_step": "validation"}
 
+        # Metadata for Adaptive Reasoning
+        mode = state.get("interaction_mode", "patient")
+        verified = state.get("doctor_verified", False)
+        role = state.get("user_role", "patient")
+        age = state.get("user_age")
+        gender = state.get("user_gender")
+        country = state.get("user_country")
+        
         try:
-            # 1. Generate Multiple Thought Paths (ToT Stage)
+            # 1. Load Routed Prompt Template
+            template_name = "doctor_mode.txt" if mode == "doctor" else "patient_mode.txt"
+            base_template = self._load_prompt(template_name)
+            
+            # Format the component prompt
+            context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}"
+            routing_prompt = base_template.format(patient_data=context_data, knowledge_base=knowledge)
+
+            # 2. Generate Multiple Thought Paths (ToT Stage)
             tot_prompt = f"""
-            SYSTEM: You are a Cognitive Medical Reasoning Core using Tree-of-Thought (ToT).
-            USER INPUT: {patient_summary}
-            KNOWLEDGE: {knowledge}
-            VISUAL FINDINGS: {visual}
-            HISTORICAL CONTEXT: {history}
+            SYSTEM: You are a Cognitive Medical Reasoning Core. 
+            USER INTERACTION MODE: {mode.upper()}
+            USER ROLE: {role.upper()} (Verified: {verified})
+            PATIENT DEMOGRAPHICS: Age {age}, Gender {gender}, Location {country}
+            
+            INSTRUCTION FROM ROUTING SYSTEM:
+            {routing_prompt}
 
             TASK: Generate 3 distinct medical reasoning branches.
             - BRANCH 1: Conservative/Direct evidence only.

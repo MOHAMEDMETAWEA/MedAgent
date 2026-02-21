@@ -102,12 +102,22 @@ class ReportAgent:
             appointment_details=appointment_details,
         )
         
+        # Metadata for adaptation
+        mode = state.get("interaction_mode", "patient")
+        role = state.get("user_role", "patient")
+        
         # Bilingual instruction
         lang_instruction = "Respond in ENGLISH." if lang == "en" else "Respond in ARABIC (اللغة العربية). Ensure headers are still MEDICAL_REPORT, etc. just translated content."
         
+        mode_instruction = ""
+        if mode == "patient":
+            mode_instruction = "IMPORTANT: For PATIENT mode, ensure PATIENT_INSTRUCTIONS are exceptionally clear and reassuring. Avoid complex jargon in the instructions section."
+        else:
+            mode_instruction = "IMPORTANT: For DOCTOR mode, ensure MEDICAL_REPORT and DOCTOR_SUMMARY use high-level clinical language and diagnostic codes where applicable."
+
         try:
             response = self.llm.invoke([
-                SystemMessage(content=f"You are a Generative Report Agent. {lang_instruction} Output only the three sections with exact ENGLISH headers: MEDICAL_REPORT, DOCTOR_SUMMARY, PATIENT_INSTRUCTIONS."),
+                SystemMessage(content=f"You are a Generative Report Agent. {lang_instruction} {mode_instruction} Output only the three sections with exact ENGLISH headers: MEDICAL_REPORT, DOCTOR_SUMMARY, PATIENT_INSTRUCTIONS."),
                 HumanMessage(content=prompt),
             ])
             content = response.content or ""

@@ -46,9 +46,15 @@ def get_headers():
 def api_call(method, endpoint, data=None, files=None):
     try:
         url = f"{API_BASE}{endpoint}"
-        if method == "GET": r = requests.get(url, headers=get_headers(), timeout=10)
-        elif method == "POST": r = requests.post(url, json=data, files=files, headers=get_headers(), timeout=30)
-        elif method == "DELETE": r = requests.delete(url, headers=get_headers(), timeout=10)
+        headers = get_headers()
+        if method == "GET": r = requests.get(url, headers=headers, timeout=10)
+        elif method == "POST":
+            if files:
+                # When uploading files, don't send json — use data or just files
+                r = requests.post(url, files=files, headers=headers, timeout=60)
+            else:
+                r = requests.post(url, json=data, headers=headers, timeout=30)
+        elif method == "DELETE": r = requests.delete(url, headers=headers, timeout=10)
         return r
     except Exception as e:
         st.error(f"Network error: {e}")
@@ -66,6 +72,36 @@ with st.sidebar:
         st.success(f"Hello, {st.session_state['user_info']['full_name']}")
         st.caption(f"Role: {st.session_state['user_info']['role']}")
         
+        if st.session_state['user_info']['role'] == "doctor":
+            if st.session_state['user_info'].get('doctor_verified'):
+                st.success("✅ Verified Doctor")
+            else:
+                st.warning("⚠️ Unverified Doctor Mode")
+                with st.expander("🩺 Verify Credentials"):
+                    lic = st.text_input("License Number")
+                    spec = st.text_input("Specialization")
+                    if st.button("Submit Verification"):
+                        vr = api_call("POST", "/auth/verify-doctor", data={"license_number": lic, "specialization": spec})
+                        if vr and vr.ok: 
+                            st.success("Verification Submitted!")
+                            st.rerun()
+                        else: st.error("Verification failed.")
+
+        # Interaction Mode Toggle
+        st.markdown("---")
+        mode_options = ["Patient Mode", "Doctor Mode"]
+        current_mode = st.session_state["user_info"].get("interaction_mode", "patient")
+        mode_idx = 0 if current_mode == "patient" else 1
+        
+        new_mode_label = st.radio("Interaction Mode", mode_options, index=mode_idx)
+        new_mode = "patient" if new_mode_label == "Patient Mode" else "doctor"
+        
+        if new_mode != current_mode:
+            r = api_call("POST", "/auth/set-mode", data={"interaction_mode": new_mode})
+            if r and r.ok:
+                st.session_state["user_info"]["interaction_mode"] = new_mode
+                st.rerun()
+
         # Language Toggle
         new_lang = st.selectbox("Language / اللغة", ["English", "Arabic"], index=0 if st.session_state["language"]=="en" else 1)
         st.session_state["language"] = "en" if new_lang == "English" else "ar"
@@ -104,9 +140,29 @@ with st.sidebar:
             r_em = st.text_input("Email")
             r_nm = st.text_input("Full Name")
             r_pw = st.text_input("Password", type="password")
+            
+            col_a, col_g = st.columns(2)
+            with col_a: r_age = st.number_input("Age", min_value=0, max_value=120, value=25)
+            with col_g: r_gen = st.selectbox("Gender", ["Male", "Female", "Prefer not to say"])
+            
+            r_cnt = st.text_input("Country", value="Egypt")
+            r_rol = st.selectbox("Role", ["patient", "doctor"])
+            
             if st.button("Create Account"):
-                r = requests.post(f"{API_BASE}/auth/register", json={"username": r_un, "email": r_em, "phone": "000", "password": r_pw, "full_name": r_nm})
+                payload = {
+                    "username": r_un, 
+                    "email": r_em, 
+                    "phone": "000", 
+                    "password": r_pw, 
+                    "full_name": r_nm,
+                    "age": r_age,
+                    "gender": r_gen,
+                    "country": r_cnt,
+                    "role": r_rol
+                }
+                r = requests.post(f"{API_BASE}/auth/register", json=payload)
                 if r.ok: st.success("Created! Sign in now."); st.session_state["auth_mode"] = "login"; st.rerun()
+                else: st.error(f"Registration failed: {r.text}")
             if st.button("Back to Login"): st.session_state["auth_mode"] = "login"; st.rerun()
 
 # --- MAIN INTERFACE ---
@@ -137,7 +193,7 @@ if not st.session_state["auth_token"]:
         st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=250)
         st.info("🔒 **Secure & Private**: All data is encrypted and stored according to global health authority standards.")
 else:
-    t1, t2, t3, t4, t5, t6 = st.tabs(["💬 Consult", "📅 Appointments", "💊 Meds", "📜 History", "🛡️ Privacy", "🔑 Admin"])
+    t1, t2, t3, t4, t5, t6, t7 = st.tabs(["💬 Consult", "🔬 Image Analysis", "📅 Appointments", "💊 Meds", "📜 History", "🛡️ Privacy", "🔑 Admin"])
     
     # --- TAB 1: CONSULTATION ---
     with t1:
@@ -147,7 +203,7 @@ else:
         with col_in:
             symptoms = st.text_area("Describe symptoms", placeholder="e.g. Sharp chest pain after exercise...", height=150)
             st.session_state["second_opinion_req"] = st.checkbox("🔍 Request specialized Second Opinion (More thorough analysis)")
-            uploaded_file = st.file_uploader("Upload Medical Image (Optional)", type=["jpg", "png", "jpeg"])
+            uploaded_file = st.file_uploader("Upload Medical Image (Optional)", type=["jpg", "png", "jpeg", "webp"])
             
             if st.button("⚡ ANALYZE SYSTEM-WIDE"):
                 img_path = None
@@ -211,8 +267,135 @@ else:
                 with st.expander("🛠️ Advanced Export"):
                     st.download_button("Download Raw JSON", data=json.dumps(res, indent=2), file_name="medical_report.json")
 
-    # --- TAB 2: APPOINTMENTS ---
+    # --- TAB 2: IMAGE ANALYSIS ---
     with t2:
+        st.subheader("🔬 Medical Image Analysis / تحليل الصور الطبية")
+        st.write("Upload X-rays, CT scans, MRI images, skin conditions, or lab reports for AI-powered clinical analysis.")
+        
+        col_upload, col_results = st.columns([1, 1])
+        
+        with col_upload:
+            st.write("### 📤 Upload Image")
+            img_file = st.file_uploader(
+                "Select medical image", 
+                type=["jpg", "jpeg", "png", "webp"],
+                key="image_analysis_uploader",
+                help="Supported: X-ray, CT, MRI, skin photos, lab reports (JPG, PNG, WEBP)"
+            )
+            
+            img_symptoms = st.text_area(
+                "Clinical context (optional)", 
+                placeholder="e.g. Patient reports sharp pain in lower right abdomen for 3 days...",
+                height=100,
+                key="image_context"
+            )
+            
+            if st.button("🔍 Analyze Image", key="analyze_image_btn"):
+                if img_file:
+                    with st.spinner("🧠 Vision Analysis Agent processing..."):
+                        # Upload image
+                        files = {"file": (img_file.name, img_file.getvalue())}
+                        u_resp = api_call("POST", "/upload", files=files)
+                        if u_resp and u_resp.ok:
+                            img_path = u_resp.json().get("image_path")
+                            # Run analysis with clinical context
+                            context = img_symptoms if img_symptoms else "Analyze this medical image"
+                            payload = {
+                                "symptoms": context,
+                                "image_path": img_path,
+                                "patient_id": st.session_state["user_info"]["id"],
+                                "language": st.session_state["language"]
+                            }
+                            r = requests.post(f"{API_BASE}/consult", json=payload, headers=get_headers(), timeout=120)
+                            if r and r.ok:
+                                st.session_state["image_result"] = r.json()
+                                st.success("✅ Analysis complete!")
+                            else:
+                                st.error("Analysis failed. Please try again.")
+                        else:
+                            st.error("Image upload failed.")
+                else:
+                    st.warning("Please upload an image first.")
+        
+        with col_results:
+            if "image_result" in st.session_state:
+                res = st.session_state["image_result"]
+                vf = res.get("visual_findings", {})
+                
+                if vf.get("status") != "skipped":
+                    st.write("### 📊 Analysis Results")
+                    
+                    # Severity indicator
+                    severity = vf.get("severity_level", "unknown")
+                    severity_colors = {"low": "🟢", "moderate": "🟡", "high": "🟠", "critical": "🔴"}
+                    st.write(f"**Severity:** {severity_colors.get(severity, '⚪')} {severity.upper()}")
+                    
+                    # Confidence bar
+                    confidence = vf.get("confidence", 0)
+                    st.progress(float(confidence), text=f"Confidence: {confidence:.0%}")
+                    
+                    if vf.get("requires_human_review"):
+                        st.warning("⚠️ Professional review recommended")
+                    
+                    # Image type
+                    if vf.get("image_type"):
+                        st.info(f"📷 Image Type: {vf['image_type']}")
+                    
+                    # Visual findings
+                    with st.expander("👁️ Visual Findings", expanded=True):
+                        st.write(vf.get("visual_findings", "No findings available"))
+                    
+                    # Differential diagnosis
+                    if vf.get("differential_diagnosis"):
+                        with st.expander("🔬 Differential Diagnosis"):
+                            for dx in vf["differential_diagnosis"]:
+                                likelihood = dx.get("likelihood", "?")
+                                icon = "🟢" if likelihood == "low" else "🟡" if likelihood == "moderate" else "🔴"
+                                st.write(f"{icon} **{dx.get('condition')}** ({likelihood}) — {dx.get('reasoning', '')}")
+                    
+                    # Possible conditions
+                    if vf.get("possible_conditions"):
+                        with st.expander("📋 Possible Conditions"):
+                            for cond in vf["possible_conditions"]:
+                                st.write(f"• {cond}")
+                    
+                    # Recommended actions
+                    if vf.get("recommended_actions"):
+                        with st.expander("✅ Recommended Actions"):
+                            for action in vf["recommended_actions"]:
+                                st.write(f"→ {action}")
+                    
+                    # Uncertainty notes
+                    if vf.get("uncertainty_notes"):
+                        st.caption(f"⚠️ {vf['uncertainty_notes']}")
+                    
+                    # Disclaimer
+                    if vf.get("disclaimer"):
+                        st.caption(f"📌 {vf['disclaimer']}")
+                else:
+                    st.info("No visual analysis available. Upload an image to begin.")
+        
+        # Image History
+        st.markdown("---")
+        st.write("### 📂 Image Analysis History")
+        r_imgs = api_call("GET", "/images")
+        if r_imgs and r_imgs.ok:
+            images = r_imgs.json()
+            if not images:
+                st.caption("No previous image analyses found.")
+            else:
+                for img in images:
+                    severity_icon = {"low": "🟢", "moderate": "🟡", "high": "🟠", "critical": "🔴"}.get(img.get("severity", ""), "⚪")
+                    with st.expander(f"{severity_icon} {img['filename']} — {img['timestamp'][:10]}"):
+                        st.write(f"**Confidence:** {img.get('confidence', 'N/A')}")
+                        st.write(f"**Severity:** {img.get('severity', 'N/A')}")
+                        if img.get("conditions"):
+                            st.write(f"**Conditions:** {', '.join(img['conditions'])}")
+                        if img.get("findings"):
+                            st.json(img["findings"])
+
+    # --- TAB 3: APPOINTMENTS ---
+    with t3:
         st.subheader("Clinical Appointments & Scheduling")
         st.write("Manage your upcoming sessions with specialized agents or human doctors.")
         
@@ -235,8 +418,8 @@ else:
         
         st.info("💡 **Tip:** To book a new appointment, simply type 'Book an appointment for tomorrow at 10am' in the consultation symptoms box.")
 
-    # --- TAB 3: MEDICATION ---
-    with t3:
+    # --- TAB 4: MEDICATION ---
+    with t4:
         st.subheader("Medication Tracker & Digital Reminders")
         mc1, mc2 = st.columns(2)
         
@@ -266,8 +449,8 @@ else:
                 api_call("POST", "/reminders", {"title": r_title, "time": r_time})
                 st.success("Reminder set!")
 
-    # --- TAB 4: HISTORY ---
-    with t4:
+    # --- TAB 5: HISTORY ---
+    with t5:
         st.subheader("Long-Term Medical Memory & Reports")
         r = api_call("GET", "/reports")
         if r and r.ok:
@@ -285,8 +468,8 @@ else:
                     with c_txt:
                         st.markdown(f"[📝 Text]({API_BASE}/reports/{rep['id']}/export?format=text)")
 
-    # --- TAB 5: PRIVACY ---
-    with t5:
+    # --- TAB 6: PRIVACY ---
+    with t6:
         st.subheader("Data Rights & System Support")
         st.write("#### 🛡️ Your Privacy")
         st.write("We implement AES-256 encryption at rest. All reasoning is local or via secure API tunnels.")
@@ -301,8 +484,8 @@ else:
         st.text_area("Message Support")
         if st.button("Send to Support Hub"): st.success("Message queued.")
 
-    # --- TAB 6: ADMIN ---
-    with t6:
+    # --- TAB 7: ADMIN ---
+    with t7:
         if st.session_state["user_info"]["role"] != "admin":
             st.warning("Admin Clearance Required.")
         else:
