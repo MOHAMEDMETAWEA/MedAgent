@@ -22,12 +22,103 @@ st.set_page_config(
 # --- THEME & CSS ---
 st.markdown("""
 <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; border-radius: 8px; font-weight: 500; transition: 0.3s; }
-    .stButton>button:hover { background-color: #2e7d32; color: white; transform: translateY(-2px); }
-    .stAlert { border-radius: 12px; }
-    .report-card { border: 1px solid #e0e0e0; padding: 15px; border-radius: 10px; background: white; margin-bottom: 10px; }
-    .css-1avpv00 { background: #2e7d32; }
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Outfit', sans-serif;
+    }
+    
+    .main { 
+        background-color: #f0f4f8; 
+    }
+    
+    /* Premium Header */
+    .stApp header {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+    }
+    
+    /* Sidebar styling */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+    }
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] label {
+        color: white !important;
+    }
+    
+    /* Global Buttons */
+    .stButton>button { 
+        width: 100%; 
+        border-radius: 12px; 
+        font-weight: 600; 
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        background: linear-gradient(135deg, #2e7d32 0%, #43a047 100%);
+        color: white;
+        border: none;
+        padding: 12px;
+        box-shadow: 0 4px 15px rgba(46, 125, 50, 0.2);
+    }
+    .stButton>button:hover { 
+        transform: translateY(-3px) scale(1.02); 
+        background: linear-gradient(135deg, #388e3c 0%, #4caf50 100%);
+        box-shadow: 0 6px 20px rgba(46, 125, 50, 0.3);
+    }
+    
+    /* Card/Module Styling */
+    .report-card { 
+        border: none;
+        padding: 25px; 
+        border-radius: 20px; 
+        background: white; 
+        margin-bottom: 20px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        border-left: 5px solid #2e7d32;
+    }
+    
+    .analysis-container {
+        background: #ffffff;
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        border: 1px solid #edf2f7;
+    }
+    
+    /* Status indicators */
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .status-emergency { background: #fee2e2; color: #dc2626; }
+    .status-stable { background: #dcfce7; color: #166534; }
+    
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+        background-color: transparent;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #ffffff;
+        border-radius: 10px 10px 0 0;
+        padding: 10px 20px;
+        color: #4a5568;
+        border: 1px solid #edf2f7;
+        transition: all 0.3s;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #2e7d32 !important;
+        color: white !important;
+    }
+    
+    /* Inputs */
+    .stTextArea textarea {
+        border-radius: 15px !important;
+        border: 1px solid #cbd5e0 !important;
+    }
+    
 </style>
 """, unsafe_allow_html=True)
 

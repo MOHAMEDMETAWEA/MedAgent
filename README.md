@@ -150,7 +150,26 @@ MedAgent is equipped with clinical-grade vision analysis supporting:
 
 ---
 
-## 🏁 7. Medical Safety & Clinical Guardrails
+## 🗄️ 7. Database Schema & Data Governance
+
+MedAgent uses an encrypted relational schema to ensure longitudinal case tracking:
+
+| Table | Purpose | Encryption |
+| :--- | :--- | :--- |
+| **UserAccount** | Identity, Roles, and Credentials. | AES-256 (Name/Email) |
+| **UserSession** | Active session tracking and mode management. | None |
+| **MedicalCase** | Groups interactions into a unified clinical case. | None (Title encrypted) |
+| **Interaction** | Individual chat turns with inputs and diagnoses. | AES-256 (Full Content) |
+| **MedicalImage** | Multimodal analysis results and file paths. | AES-256 (Findings/Paths) |
+| **MedicalReport** | SOAP-standard generated reports. | AES-256 (JSON Content) |
+| **MemoryGraph** | Nodes and Edges connecting clinical events. | AES-256 (Node Content) |
+| **Medication** | Active prescriptions and dosages. | AES-256 (All fields) |
+
+**Encryption Authority**: The `Governance Agent` manages the `DATA_ENCRYPTION_KEY` and handles all En/Decryption cycles transparently across the Persistence Layer.
+
+---
+
+## 🏁 8. Medical Safety & Clinical Guardrails
 
 MedAgent implements a **Defense-in-Depth** safety architecture:
 
@@ -159,7 +178,7 @@ MedAgent implements a **Defense-in-Depth** safety architecture:
 * **Adversarial Audit**: The **Second Opinion Agent** performs an autonomous audit of the primary diagnosis path, looking for clinical bias or conflicting evidence.
 * **PII & Data Shield**: All patient data is encrypted using AES-256 before storage. PII (Personally Identifiable Information) is automatically scrubbed by the Governance Agent during non-clinical logs.
 
-## ⚖️ 8. Clinical Protocols Grounding
+## ⚖️ 9. Clinical Protocols Grounding
 
 The **Knowledge Agent** is seeded with authoritative medical literature including:
 
@@ -169,7 +188,7 @@ The **Knowledge Agent** is seeded with authoritative medical literature includin
 
 ---
 
-## 🏁 9. Final Quality Assurance
+## 🏁 10. Final Quality Assurance
 
 The system has been validated through a 100-point pre-launch checklist:
 
@@ -179,7 +198,7 @@ The system has been validated through a 100-point pre-launch checklist:
 
 ---
 
-## ⚖️ 10. Legal Disclaimer
+## ⚖️ 11. Legal Disclaimer
 
 *This system is a high-fidelity AI simulation designed as a graduation project for educational and research purposes. It is NOT a substitute for professional medical advice, diagnosis, or treatment. Always consult a licensed healthcare professional for medical decisions.*
 

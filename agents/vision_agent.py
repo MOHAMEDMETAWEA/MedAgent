@@ -45,6 +45,33 @@ class VisionAnalysisAgent:
             return ""
 
     def _encode_image(self, image_path: str) -> str:
+        ext = os.path.splitext(image_path)[1].lower().strip(".")
+        
+        # Handle DICOM conversion
+        if ext in ["dicom", "dcm"]:
+            try:
+                import pydicom
+                import numpy as np
+                from PIL import Image
+                import io
+                
+                ds = pydicom.dcmread(image_path)
+                # Convert pixel data to image
+                img_array = ds.pixel_array.astype(float)
+                # Rescale to 0-255
+                rescaled = (np.maximum(img_array, 0) / img_array.max()) * 255.0
+                rescaled = np.uint8(rescaled)
+                img = Image.fromarray(rescaled)
+                
+                # Save to buffer as PNG
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                return base64.b64encode(buf.getvalue()).decode('utf-8')
+            except Exception as e:
+                logger.error(f"DICOM conversion failed: {e}")
+                # Fallback or error? For now, re-raise to catch in process()
+                raise
+
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
 

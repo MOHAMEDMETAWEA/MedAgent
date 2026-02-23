@@ -80,6 +80,11 @@ class ReportAgent:
         query = f"{patient_summary} {preliminary_diagnosis}".strip()
         knowledge = self.retriever.retrieve(query) if query else "No guidelines retrieved."
         
+        visual_findings = state.get("visual_findings", {})
+        visual_text = ""
+        if visual_findings and visual_findings.get("status") != "skipped":
+            visual_text = f"Visual Analysis: {visual_findings.get('visual_findings')}\nConfidence: {visual_findings.get('confidence')}\nSeverity: {visual_findings.get('severity_level')}"
+
         template = self._load_prompt("report_agent.txt")
         if not template:
             # Fallback
@@ -87,6 +92,7 @@ class ReportAgent:
             Generate a medical report based on:
             Knowledge: {knowledge}
             Summary: {patient_summary}
+            Visual Data: {visual_text}
             Diagnosis: {preliminary_diagnosis}
             Notes: {doctor_notes}
             Appointment: {appointment_details}
@@ -97,6 +103,7 @@ class ReportAgent:
         prompt = template.format(
             knowledge=knowledge,
             patient_summary=patient_summary,
+            visual_text=visual_text,
             preliminary_diagnosis=preliminary_diagnosis,
             doctor_notes=doctor_notes,
             appointment_details=appointment_details,

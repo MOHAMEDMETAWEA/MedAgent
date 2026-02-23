@@ -25,9 +25,12 @@ class SystemAuditor:
             "Emergency escalation"
         ]
         self.active_features = [
-            "Triage", "RAG Knowledge Retrieval", "Differential Reasoning", 
-            "Safety Check", "Validation", "Report Generation", "Appointment Guidance",
-            "Granular Action Logging", "Bilingual Support", "Capability Explorer"
+            "Triage", "RAG Knowledge Retrieval", "Differential Reasoning (Tree-of-Thought)", 
+            "Safety Check", "Validation", "Report Generation (PDF/Text/Image)", 
+            "Appointment Guidance", "Granular Action Logging", "Bilingual Support (EN/AR)", 
+            "Capability Explorer", "Multimodal Vision Analysis (DICOM/X-ray)", 
+            "Medication & Prescription Tracking", "Memory Graph Persistence",
+            "Emergency Escalation & Risk Scoring", "Secure AES-256 Encryption"
         ]
 
     def run_audit(self):
