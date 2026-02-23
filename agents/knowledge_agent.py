@@ -15,7 +15,7 @@ class KnowledgeAgent:
         self.retriever = MedicalRetriever()
 
     def process(self, state: AgentState):
-        print("--- KNOWLEDGE AGENT: RETRIEVING EVIDENCE ---")
+        logger.info("--- KNOWLEDGE AGENT: RETRIEVING CLINICAL GUIDELINES ---")
         patient_summary = state.get('patient_info', {}).get('summary', '')
         
         if not patient_summary:

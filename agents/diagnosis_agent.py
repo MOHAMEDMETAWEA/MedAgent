@@ -15,8 +15,11 @@ class DiagnosisAgent:
 
     def process(self, state: AgentState):
         """Analyze symptoms and provide specific diagnostic possibilities."""
-        print("--- DIAGNOSIS AGENT: MAPPING CONDITIONS ---")
+        # Assuming 'symptoms' would be extracted from the state or patient_info
+        # For now, using patient_summary as a placeholder to avoid NameError
         patient_summary = state.get("patient_info", {}).get("summary", "")
+        symptoms_for_log = patient_summary if patient_summary else "unknown symptoms"
+        logger.info(f"--- DIAGNOSIS AGENT: MAPPING ICD-10 FOR {symptoms_for_log[:30]}... ---")
         
         # In a generic system, this acts as a specialized filter for the Reasoning Agent
         # It adds "clinical weight" to the ToT paths.

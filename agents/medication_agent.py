@@ -17,7 +17,7 @@ class MedicationAgent:
         """
         Analyze user input for medication-related intents and update tracking.
         """
-        print("--- MEDICATION AGENT: ANALYZING TRACKING INTENT ---")
+        logger.info("--- MEDICATION AGENT: PHARMACOLOGICAL REVIEW ---")
         user_input = state.get('messages', [])[-1].content.lower()
         user_id = state.get('user_id', 'guest')
         lang = state.get('language', 'en')

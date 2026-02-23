@@ -203,7 +203,7 @@ else:
         with col_in:
             symptoms = st.text_area("Describe symptoms", placeholder="e.g. Sharp chest pain after exercise...", height=150)
             st.session_state["second_opinion_req"] = st.checkbox("🔍 Request specialized Second Opinion (More thorough analysis)")
-            uploaded_file = st.file_uploader("Upload Medical Image (Optional)", type=["jpg", "png", "jpeg", "webp"])
+            uploaded_file = st.file_uploader("Upload Medical Image (Optional)", type=["jpg", "png", "jpeg", "webp", "dicom", "dcm"])
             
             if st.button("⚡ ANALYZE SYSTEM-WIDE"):
                 img_path = None
@@ -254,6 +254,22 @@ else:
                 if res.get("critical_alert"):
                     st.error("🚨 EMERGENCY ESCALATION DETECTED")
                 
+                # Expose RAG and ToT Reasoning if available
+                if res.get("retrieved_docs") or res.get("doctor_notes"):
+                    with st.expander("🔬 Agent Insights (RAG & ToT)"):
+                        if res.get("retrieved_docs"):
+                            st.write("**Knowledge Retrieval (RAG):**")
+                            st.caption(res["retrieved_docs"])
+                        if res.get("doctor_notes"):
+                            st.write("**Clinical Reasoning (Tree-of-Thought):**")
+                            st.caption(res["doctor_notes"])
+
+                # Expose Memory Graph Context
+                if res.get("long_term_memory"):
+                    with st.expander("🧠 Longitudinal Memory Graph"):
+                        st.info("The Memory Agent has linked this consultation to your medical history.")
+                        st.write(res["long_term_memory"])
+                
                 if res.get("report_id"):
                     st.write("### ⬇️ Export Clinical Report")
                     c1, c2, c3 = st.columns(3)
@@ -278,9 +294,9 @@ else:
             st.write("### 📤 Upload Image")
             img_file = st.file_uploader(
                 "Select medical image", 
-                type=["jpg", "jpeg", "png", "webp"],
+                type=["jpg", "jpeg", "png", "webp", "dicom", "dcm"],
                 key="image_analysis_uploader",
-                help="Supported: X-ray, CT, MRI, skin photos, lab reports (JPG, PNG, WEBP)"
+                help="Supported: X-ray, CT, MRI, skin photos, lab reports, DICOM (JPG, PNG, WEBP, DCM)"
             )
             
             img_symptoms = st.text_area(

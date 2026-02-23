@@ -80,6 +80,7 @@ class MedAgentOrchestrator:
         workflow.add_node("triage", wrap_node("triage", self.triage_agent.process))
         workflow.add_node("knowledge", wrap_node("knowledge", self.knowledge_agent.process))
         workflow.add_node("reasoning", wrap_node("reasoning", self.reasoning_agent.process))
+        workflow.add_node("validation", wrap_node("validation", self.validation_agent.process))
         workflow.add_node("report", wrap_node("report", self.report_agent.process))
         workflow.add_node("response", wrap_node("response", self.response_agent.process))
         workflow.add_node("doctor", wrap_node("doctor", self.doctor_agent.process))
@@ -89,6 +90,7 @@ class MedAgentOrchestrator:
         workflow.add_node("vision", wrap_node("vision", self.vision_agent.process))
         workflow.add_node("medication", wrap_node("medication", self.medication_agent.process))
         workflow.add_node("second_opinion", wrap_node("second_opinion", self.second_opinion_agent.process))
+        workflow.add_node("safety", wrap_node("safety", self.safety_agent.process))
 
         # Entry Point is now Patient Agent to load Context
         workflow.set_entry_point("patient")
@@ -212,11 +214,22 @@ class MedAgentOrchestrator:
             
             # Save interaction with CASE linking
             case_id = result.get("conversation_state", {}).get("active_case_id")
+            if not case_id and user_id != "guest":
+                case_id = self.persistence.get_or_create_case(user_id, title=sanitized_input[:50])
+                if "conversation_state" not in result: result["conversation_state"] = {}
+                result["conversation_state"]["active_case_id"] = case_id
+
             self.persistence.save_interaction(session_id, sanitized_input, result, case_id=case_id)
             
             # Save visual findings if exists
             if image_path and result.get("visual_findings"):
-                self.persistence.save_medical_image(session_id, image_path, result["visual_findings"], patient_id=user_id if user_id != "guest" else None)
+                self.persistence.save_medical_image(
+                    session_id, 
+                    image_path, 
+                    result["visual_findings"], 
+                    patient_id=user_id if user_id != "guest" else None,
+                    case_id=case_id
+                )
             
             self.persistence.log_system_event("INFO", "Orchestrator", "Consultation Complete", {"session_id": session_id, "lang": lang})
 

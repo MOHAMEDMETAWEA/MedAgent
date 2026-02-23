@@ -7,6 +7,47 @@ import sys
 import time
 import os
 
+def pre_flight_checks():
+    """Ensure system requirements are met before launch."""
+    print("[SYSTEM] Running Pre-flight Checks...")
+    
+    # 1. Check .env
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if not os.path.exists(env_path):
+        print("[WARNING] .env file missing! Defaulting to environment variables.")
+    else:
+        from dotenv import load_dotenv
+        load_dotenv()
+
+    # 2. Check OpenAI Key
+    key = os.getenv("OPENAI_API_KEY")
+    if not key or "your-openai-key" in key:
+        print("[CRITICAL] OPENAI_API_KEY is not set correctly in .env. LLM features will fail.")
+        return False
+
+    # 3. Check RAG Index
+    index_path = os.path.join(os.path.dirname(__file__), "rag", "faiss_index", "index.faiss")
+    if not os.path.exists(index_path):
+        print("[INFO] FAISS index missing. Initializing Knowledge Base...")
+        try:
+            # We run this in-process or as sub-task
+            from rag.retriever import MedicalRetriever
+            # This triggers initialization
+            MedicalRetriever()
+            print("[OK] Knowledge Base Initialized.")
+        except Exception as e:
+            print(f"[ERROR] Failed to initialize RAG: {e}")
+            # Non-critical for launch, but warns
+    
+    # 4. Check Encryption Key
+    enc_key = os.getenv("DATA_ENCRYPTION_KEY")
+    if not enc_key:
+        print("[CRITICAL] DATA_ENCRYPTION_KEY is missing. Security layer cannot start.")
+        return False
+        
+    print("[OK] Pre-flight checks passed.\n")
+    return True
+
 def run_backend():
     print("[SYSTEM] Starting Backend API (Uvicorn)...")
     # Using sys.executable to ensure we use the same python environment
@@ -26,6 +67,10 @@ if __name__ == "__main__":
     frontend_proc = None
     
     try:
+        if not pre_flight_checks():
+            print("[CRITICAL] Pre-flight checks failed. Aborting startup.")
+            sys.exit(1)
+            
         backend_proc = run_backend()
         time.sleep(3) # Give backend a moment to bind to port
         

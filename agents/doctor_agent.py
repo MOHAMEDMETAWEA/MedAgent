@@ -15,7 +15,7 @@ class DoctorAgent:
 
     def process(self, state: AgentState):
         """Review the preliminary diagnosis and action plan for clinical consistency."""
-        print("--- DOCTOR AGENT: CLINICAL REVIEW ---")
+        logger.info("--- DOCTOR AGENT: CLINICAL REVIEW ---")
         diagnosis = state.get("preliminary_diagnosis", "")
         lang = state.get("language", "en")
 

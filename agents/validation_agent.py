@@ -21,7 +21,7 @@ class ValidationAgent:
         )
 
     def process(self, state: AgentState):
-        print("--- VALIDATION AGENT: LAYER 7 HALLUCINATION PREVENTION ---")
+        logger.info("--- VALIDATION AGENT: LAYER 7 HALLUCINATION PREVENTION ---")
         diagnosis = state.get('preliminary_diagnosis', '')
         knowledge = state.get('retrieved_docs', '')
         patient_info = state.get('patient_info', {})

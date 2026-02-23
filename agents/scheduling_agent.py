@@ -14,7 +14,7 @@ class SchedulingAgent:
 
     def process(self, state: AgentState):
         """Handle internal clinic scheduling intents."""
-        print("--- SCHEDULING AGENT: LOCAL APPOINTMENTS ---")
+        logger.info("--- SCHEDULING AGENT: LOCAL APPOINTMENTS ---")
         user_input = state.get('messages', [])[-1].content.lower() if state.get('messages') else ""
         
         # Local scheduling logic (e.g., booking in the internal 'medagent.db')

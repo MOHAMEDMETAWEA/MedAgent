@@ -21,7 +21,7 @@ class SecondOpinionAgent:
 
     def process(self, state: AgentState):
         """Review the existing reasoning and provide a second clinical perspective."""
-        print("--- SECOND OPINION AGENT: CRITICAL REVIEW ---")
+        logger.info("--- SECOND OPINION AGENT: CRITICAL REVIEW ---")
         
         # Only trigger if the user requested it or if confidence is low
         if not state.get("request_second_opinion") and state.get("confidence_score", 1.0) > 0.6:

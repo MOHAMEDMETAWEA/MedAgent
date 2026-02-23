@@ -21,7 +21,7 @@ class VerificationAgent:
         In a real system, this would call a government/medical board API.
         For MEDAgent, we perform format validation and auto-approve for specific demo formats.
         """
-        print(f"--- VERIFICATION AGENT: VALIDATING CREDENTIALS FOR {user_id} ---")
+        logger.info(f"--- VERIFICATION AGENT: VALIDATING CREDENTIALS FOR {user_id} ---")
         
         # Simple simulation logic
         if not license_number or len(license_number) < 5:

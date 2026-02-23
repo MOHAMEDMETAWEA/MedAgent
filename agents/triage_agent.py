@@ -32,7 +32,7 @@ class TriageAgent:
             raise
 
     def process(self, state: AgentState):
-        print("--- TRIAGE AGENT: ANALYZING SYMPTOMS & URGENCY ---")
+        logger.info("--- TRIAGE AGENT: ANALYZING SYMPTOMS & URGENCY ---")
         messages = state.get('messages', [])
         
         # Extract user input

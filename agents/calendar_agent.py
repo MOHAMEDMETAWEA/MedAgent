@@ -57,7 +57,7 @@ class CalendarAgent:
             self.service = None
 
     def process(self, state: AgentState):
-        print("--- CALENDAR AGENT: SCHEDULING ---")
+        logger.info("--- CALENDAR AGENT: SCHEDULING ---")
         user_input = state.get('messages', [])[-1].content
         patient_info = state.get('patient_info', {})
         urgency = patient_info.get('urgency', 'LOW')

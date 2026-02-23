@@ -16,7 +16,7 @@ class ResponseAgent:
 
     def process(self, state: AgentState):
         """Final polish of the system response for the user based on Interaction Mode."""
-        print("--- RESPONSE AGENT: ADAPTIVE POLISH ---")
+        logger.info("--- RESPONSE AGENT: ADAPTIVE POLISH ---")
         final_response = state.get("final_response", "")
         mode = state.get("interaction_mode", "patient")
         role = state.get("user_role", "patient")

@@ -228,6 +228,7 @@ class MedicalImage(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String, ForeignKey("user_sessions.id"))
     patient_id = Column(String, ForeignKey("patient_profiles.id"), nullable=True)
+    case_id = Column(String, ForeignKey("medical_cases.id"), nullable=True)
     
     # Storage details
     image_path_encrypted = Column(Text) # Path to the stored local image (encrypted)
@@ -242,6 +243,7 @@ class MedicalImage(Base):
     requires_human_review = Column(Boolean, default=False)
     
     session = relationship("UserSession")
+    case = relationship("MedicalCase")
 
 class MemoryNode(Base):
     """Nodes for the User Memory Graph."""

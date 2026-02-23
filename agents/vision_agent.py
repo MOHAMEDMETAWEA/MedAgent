@@ -58,7 +58,7 @@ class VisionAnalysisAgent:
         if not image_path or not os.path.exists(image_path):
             return {"visual_findings": {"status": "skipped", "reason": "No image provided"}}
 
-        print(f"--- VISION ANALYSIS AGENT: ANALYZING {os.path.basename(image_path)} ---")
+        logger.info(f"--- VISION ANALYSIS AGENT: ANALYZING {os.path.basename(image_path)} ---")
 
         try:
             base64_image = self._encode_image(image_path)

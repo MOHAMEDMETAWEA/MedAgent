@@ -32,7 +32,7 @@ class SafetyAgent:
             return ""
 
     def process(self, state: AgentState):
-        print("--- SAFETY AGENT: LAYER 5 RISK STRATIFICATION ---")
+        logger.info("--- SAFETY AGENT: LAYER 5 RISK STRATIFICATION ---")
         diagnosis = state.get('preliminary_diagnosis', '')
         
         # 1. Rule-based checks

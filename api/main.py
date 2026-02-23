@@ -56,28 +56,28 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return payload
 
-app = FastAPI(title="MedAgent Global API", version="5.0.0-SELF-IMPROVING")
+app = FastAPI(title="MedAgent Global System", version="5.3.0-PRODUCTION")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/")
 async def root():
-    return {"status": "Online", "version": "5.0.0"}
+    return {"status": "Online", "version": "5.3.0"}
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "5.0.0"}
+    return {"status": "ok", "version": "5.3.0"}
 
 @app.get("/ready")
 async def ready():
     try:
         orch = get_orchestrator()
         if orch:
-            return {"status": "ready", "version": "5.0.0"}
+            return {"status": "ready", "version": "5.3.0"}
     except Exception:
         pass
     from fastapi.responses import JSONResponse
-    return JSONResponse(status_code=503, content={"status": "not_ready", "version": "5.0.0"})
+    return JSONResponse(status_code=503, content={"status": "not_ready", "version": "5.3.0"})
 
 UPLOAD_DIR = _root / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -226,7 +226,14 @@ async def get_capabilities():
             {"name": "Calendar Agent / عميل التقويم", "role": "Manages appointments / يدير المواعيد"},
             {"name": "Supervisor Agent / عميل الإشراف", "role": "Monitors system health / يراقب صحة النظام"},
             {"name": "Self-Improvement Agent / عميل التحسين الذاتي", "role": "Learns from feedback / يتعلم من التعليقات"},
-            {"name": "Developer Control Agent / عميل التحكم المطور", "role": "System management for devs / إدارة النظام للمطورين"}
+            {"name": "Developer Control Agent / عميل التحكم المطور", "role": "System management for devs / إدارة النظام للمطورين"},
+            {"name": "Medication Agent / عميل الأدوية", "role": "Tracks dosages and reminders / يتتبع الجرعات والتذكيرات"},
+            {"name": "Second Opinion Agent / عميل الرأي الثاني", "role": "Independent diagnostic audit / تدقيق تشخيصي مستقل"},
+            {"name": "Human Review Agent / عميل المراجعة البشرية", "role": "Clinician-in-the-loop audit / مراجعة الطبيب المختص"},
+            {"name": "Verification Agent / عميل التحقق", "role": "Validates doctor licenses / يتحقق من تراخيص الأطباء"},
+            {"name": "Authentication Agent / عميل الهوية", "role": "Secure JWT management / إدارة الهوية الآمنة"},
+            {"name": "Persistence Agent / عميل الاستمرارية", "role": "Manages medical memory graph / يدير سجل الذاكرة الطبية"},
+            {"name": "Governance Agent / عميل الحوكمة", "role": "AES-256 encryption authority / سلطة التشفير والحوكمة"}
         ],
         "capabilities": [
             {"id": "IMAGE_ANALYSIS", "label": "Medical Image Analysis / تحليل الصور الطبية", "generative": True},
@@ -234,7 +241,10 @@ async def get_capabilities():
             {"id": "GENERATE_RECOMMENDATION", "label": "Generate Recommendation / إنشاء توصية", "generative": True},
             {"id": "BOOK_APPOINTMENT", "label": "Book Appointment / حجز موعد", "generative": False},
             {"id": "RETRIEVE_HISTORY", "label": "Retrieval History / استرجاع السجل", "generative": False},
-            {"id": "DATA_EXPORT", "label": "Data Export / تصدير البيانات", "generative": False}
+            {"id": "DATA_EXPORT", "label": "Data Export / تصدير البيانات", "generative": False},
+            {"id": "MEMORY_GRAPH", "label": "Memory Graph / سجل الذاكرة", "generative": False},
+            {"id": "RAG_INSIGHTS", "label": "RAG Context / سياق المعرفة Retrieval Augmented Generation", "generative": False},
+            {"id": "TREE_OF_THOUGHT", "label": "Clinical Reasoning (ToT) / التفكير السريري", "generative": True}
         ]
     }
 
@@ -389,8 +399,6 @@ async def export_report(report_id: int, format: str = "pdf", user: dict = Depend
         
     from fastapi.responses import FileResponse
     return FileResponse(path, filename=filename, media_type=media_type)
-
-# [REMOVED] Duplicate /admin/improvement-report route — kept the one at line 560
 
 @app.get("/auth/export-data")
 async def export_user_data(user: dict = Depends(get_current_user)):

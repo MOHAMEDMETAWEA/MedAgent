@@ -32,7 +32,7 @@ class ReasoningAgent:
         except: return "Diagnose the following symptoms based on knowledge: {knowledge}\nSymptoms: {patient_summary}"
 
     def process(self, state: AgentState):
-        print("--- REASONING AGENT: TREE-OF-THOUGHT ANALYSIS ---")
+        logger.info("--- REASONING AGENT: TREE-OF-THOUGHT ANALYSIS ---")
         patient_summary = state.get('patient_info', {}).get('summary', '')
         knowledge = state.get('retrieved_docs', '')
         visual = state.get('visual_findings', {})

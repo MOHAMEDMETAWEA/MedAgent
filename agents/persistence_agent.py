@@ -87,18 +87,35 @@ class PersistenceAgent:
         s_node = self.add_memory_node(user_id, "Symptom", symptom_summary, {"session_id": session_id})
         
         # 2. Link to Case Node
+        c_node = None
         if case_id:
-            c_node = self.db.query(MemoryNode).filter(MemoryNode.user_id == user_id, MemoryNode.node_type == "Case", MemoryNode.metadata_json["case_id"] == case_id).first()
+            c_node = self.db.query(MemoryNode).filter(
+                MemoryNode.user_id == user_id, 
+                MemoryNode.node_type == "Case"
+            ).filter(MemoryNode.metadata_json["case_id"] == case_id).first()
             if not c_node:
                 c_node = self.add_memory_node(user_id, "Case", f"Case: {case_id}", {"case_id": case_id})
             
             self.add_memory_edge(user_id, s_node.id, c_node.id, "relates_to")
             
-        # 3. Create Diagnosis Node if reasoning exists
+        # 3. Create Diagnosis & Reasoning Nodes
         diag = result.get("preliminary_diagnosis")
         if diag:
             d_node = self.add_memory_node(user_id, "Diagnosis", diag, {"session_id": session_id})
             self.add_memory_edge(user_id, s_node.id, d_node.id, "diagnosed_as")
+            if c_node: self.add_memory_edge(user_id, d_node.id, c_node.id, "relates_to")
+
+        # 4. Reason (Tree of Thought) node
+        tot = result.get("doctor_notes")
+        if tot:
+            r_node = self.add_memory_node(user_id, "Reasoning", tot, {"session_id": session_id})
+            if c_node: self.add_memory_edge(user_id, r_node.id, c_node.id, "explains")
+
+        # 5. Report Node
+        report_id = result.get("report_id")
+        if report_id:
+            rp_node = self.add_memory_node(user_id, "Report", f"Clinical Report #{report_id}", {"report_id": report_id, "session_id": session_id})
+            if c_node: self.add_memory_edge(user_id, rp_node.id, c_node.id, "documented_in")
 
     def log_system_event(self, level: str, component: str, message: str, details: dict = None, session_id: str = None):
         """Log a system event or error."""
@@ -258,8 +275,8 @@ class PersistenceAgent:
             logger.error(f"Failed to fetch reports: {e}")
             return []
 
-    def save_medical_image(self, session_id: str, image_path: str, findings: dict, patient_id: str = None):
-        """Save medical image metadata and analysis securely."""
+    def save_medical_image(self, session_id: str, image_path: str, findings: dict, patient_id: str = None, case_id: str = None):
+        """Save medical image metadata and analysis securely with Case linking."""
         try:
             # Encrypt sensitive fields
             enc_path = self.governance.encrypt(image_path)
@@ -268,6 +285,7 @@ class PersistenceAgent:
             new_image = MedicalImage(
                 session_id=session_id,
                 patient_id=patient_id,
+                case_id=case_id,
                 image_path_encrypted=enc_path,
                 original_filename=os.path.basename(image_path),
                 visual_findings_encrypted=enc_findings,
@@ -278,11 +296,36 @@ class PersistenceAgent:
             )
             self.db.add(new_image)
             self.db.commit()
+            
+            # Update memory graph with Image node
+            if patient_id and patient_id != "guest":
+                self._update_memory_graph_with_image(patient_id, session_id, new_image.id, findings, case_id)
+            
             return new_image.id
         except Exception as e:
             logger.error(f"Failed to save medical image: {e}")
             self.db.rollback()
             return None
+
+    def _update_memory_graph_with_image(self, user_id, session_id, image_id, findings, case_id):
+        """Link image to case and findings in the memory graph."""
+        try:
+            # 1. Create Image Node
+            img_node = self.add_memory_node(user_id, "Image", f"Medical Image: {findings.get('image_type', 'Visual Scan')}", {"image_id": image_id, "session_id": session_id})
+            
+            # 2. Link to Case
+            if case_id:
+                case_node = self.db.query(MemoryNode).filter(MemoryNode.user_id == user_id, MemoryNode.node_type == "Case", MemoryNode.metadata_json["case_id"] == case_id).first()
+                if case_node:
+                    self.add_memory_edge(user_id, img_node.id, case_node.id, "based_on")
+            
+            # 3. Create Analysis Node
+            analysis_content = findings.get("visual_findings", "Image Analysis Result")
+            analysis_node = self.add_memory_node(user_id, "Analysis", analysis_content, {"image_id": image_id})
+            self.add_memory_edge(user_id, img_node.id, analysis_node.id, "analyzed_as")
+            
+        except Exception as e:
+            logger.error(f"Failed to update memory graph with image: {e}")
 
     def get_session_images(self, session_id: str):
         """Retrieve all images for a session, decrypted."""
@@ -550,5 +593,3 @@ class PersistenceAgent:
             self.db.rollback()
             return False
 
-    def close(self):
-        self.db.close()

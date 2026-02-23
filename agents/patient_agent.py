@@ -38,7 +38,7 @@ class PatientAgent:
             return ""
 
     def process(self, state: AgentState):
-        print("--- PATIENT AGENT: LOADING PROFILE & VALIDATING INTAKE ---")
+        logger.info("--- PATIENT AGENT: LOADING PROFILE & VALIDATING INTAKE ---")
         
         user_id = state.get('user_id', 'GUEST')
         messages = state.get('messages', [])
