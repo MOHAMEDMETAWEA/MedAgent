@@ -169,26 +169,30 @@ MedAgent uses an encrypted relational schema to ensure longitudinal case trackin
 
 ---
 
-## 🏁 8. Medical Safety & Clinical Guardrails
+## 🏁 10. Prompt Ecosystem & Clinical-Grade Architecture
 
-MedAgent implements a **Defense-in-Depth** safety architecture:
+MedAgent uses a centralized **Prompt Registry** (`agents/prompts/registry.py`) to manage its intelligence layers. This ensures clinical consistency, risk stratification, and regulatory traceability.
 
-* **Zero-Hallucination Policy**: Every diagnosis is cross-referenced against the local RAG knowledge base. If no protocol is found, the agent explicitly states "Guideline not found" rather than guessing.
-* **Confidence Thresholding**: Vision and Diagnosis agents require a >70% confidence score for automated paths. Scores <70% trigger a mandatory **Human-in-the-loop** flag.
-* **Adversarial Audit**: The **Second Opinion Agent** performs an autonomous audit of the primary diagnosis path, looking for clinical bias or conflicting evidence.
-* **PII & Data Shield**: All patient data is encrypted using AES-256 before storage. PII (Personally Identifiable Information) is automatically scrubbed by the Governance Agent during non-clinical logs.
+### **Prompt Layer Cake**
 
-## ⚖️ 9. Clinical Protocols Grounding
+1. **Identity & Orchestration**: High-level behavioral rules and privacy wrappers.
+2. **Clinical Reasoning**: Differential diagnosis, lab interpretation, and drug-interaction checks.
+3. **Multimodal Vision**: Specialized prompts for X-ray/MRI with confidence thresholds.
+4. **Specialty Adapters**: Sensitive logic for Pediatrics, Pregnancy, and Mental Health.
+5. **Governance & Safety**: Adversarial defense, hallucination mitigation, and audit trails.
 
-The **Knowledge Agent** is seeded with authoritative medical literature including:
+### **Risk-Based Routing**
 
-* **ESI Triage Standards**: Simplified Emergency Severity Index for prioritization.
-* **WHO Clinical Guidelines**: Base protocols for common chronic and infectious diseases.
-* **CDC Pathogen Data**: Up-to-date data for symptom-to-condition mapping.
+| Risk Level | Trigger | Action |
+| :--- | :--- | :--- |
+| **Emergency** | Life-threatening indicators | Immediate triage escalation. |
+| **High** | Clinical diagnoses/Vision | Mandatory confidence >0.7 or Human-in-the-loop. |
+| **Medium** | Lab interpretation/SOAP | Standard validation gate. |
+| **Low** | Patient education/Privacy | Automated processing. |
 
 ---
 
-## 🏁 10. Final Quality Assurance
+## 🏁 11. Final Quality Assurance
 
 The system has been validated through a 100-point pre-launch checklist:
 
