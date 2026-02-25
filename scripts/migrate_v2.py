@@ -44,6 +44,26 @@ def migrate():
         else:
             print(f"Error adding column interaction_mode: {e}")
 
+    # 3. Update interactions table with lineage and observability fields
+    interaction_columns = [
+        ("prompt_version", "TEXT"),
+        ("model_used", "TEXT"),
+        ("confidence_score", "REAL"),
+        ("risk_level", "TEXT"),
+        ("audit_hash", "TEXT"),
+        ("secondary_model", "TEXT"),
+        ("latency_ms", "INTEGER")
+    ]
+    for col_name, col_type in interaction_columns:
+        try:
+            cursor.execute(f"ALTER TABLE interactions ADD COLUMN {col_name} {col_type}")
+            print(f"Added column {col_name} to interactions.")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" in str(e):
+                print(f"Column {col_name} already exists in interactions.")
+            else:
+                print(f"Error adding column {col_name} to interactions: {e}")
+
     conn.commit()
     conn.close()
     print("Migration complete.")

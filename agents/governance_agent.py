@@ -13,6 +13,8 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from database.models import SessionLocal, AuditLog, SystemConfig, UserSession, Interaction, UserRole, UserAccount, UserActivity
 from config import settings
+import hmac
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +35,13 @@ class GovernanceAgent:
         # Password Hashing
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         
-        # JWT Config
-        self.jwt_secret = os.getenv("JWT_SECRET_KEY", "medagent-super-secret-jwt-key")
+        # JWT Config (must be provided via env)
+        self.jwt_secret = os.getenv("JWT_SECRET_KEY") or getattr(settings, "JWT_SECRET_KEY", None)
         self.jwt_algorithm = "HS256"
         self.token_expire_minutes = 60 * 24 # 24 hours
+        if not self.jwt_secret:
+            logger.critical("JWT_SECRET_KEY is not set. Refusing to operate without a secure JWT secret.")
+            raise RuntimeError("JWT secret missing")
 
     # --- ENCRYPTION ---
     def encrypt(self, data: str) -> str:
@@ -162,3 +167,14 @@ class GovernanceAgent:
 
     def close(self):
         self.db.close()
+
+    # --- AUDIT EVIDENCE SIGNING ---
+    def sign_evidence(self, payload: str) -> str:
+        """
+        Create HMAC-SHA256 signature for evidence payload using AUDIT_SIGNING_KEY.
+        """
+        key = os.getenv("AUDIT_SIGNING_KEY") or getattr(settings, "AUDIT_SIGNING_KEY", None)
+        if not key:
+            raise RuntimeError("AUDIT_SIGNING_KEY not configured")
+        sig = hmac.new(key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        return sig

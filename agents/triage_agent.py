@@ -17,12 +17,11 @@ class TriageAgent:
     Analyzes symptoms to determine urgency and structure patient data.
     """
     def __init__(self, model=None):
-        model = model or settings.OPENAI_MODEL
-        self.llm = ChatOpenAI(
-            model=model, 
-            temperature=0.0, # Strict for classification
-            api_key=settings.OPENAI_API_KEY
-        )
+        self.default_model = model or settings.OPENAI_MODEL
+    
+    def _get_llm(self, state: AgentState):
+        model = state.get("model_used") or self.default_model
+        return ChatOpenAI(model=model, temperature=0.0, api_key=settings.OPENAI_API_KEY)
 
     def _load_prompt(self, filename: str) -> str:
         try:
@@ -62,7 +61,8 @@ class TriageAgent:
         try:
             prompt_template = self._load_prompt('triage_agent.txt')
             system_msg = SystemMessage(content=prompt_template)
-            response = self.llm.invoke([system_msg] + list(messages))
+            llm = self._get_llm(state)
+            response = llm.invoke([system_msg] + list(messages))
             content = response.content
             
             # Parse Layer 2 Output

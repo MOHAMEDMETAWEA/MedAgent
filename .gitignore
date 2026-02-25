@@ -1,0 +1,8 @@
+medagent.db
+.env
+data/uploads/*
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+*.log

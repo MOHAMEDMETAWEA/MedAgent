@@ -34,15 +34,24 @@ from agents.report_agent import ReportAgent
 from agents.calendar_agent import CalendarAgent
 from config import settings
 from utils.safety import validate_medical_input, sanitize_input
+from utils.rate_limit import check_rate_limit, get_client_identifier
+import time
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter
 
 logger = logging.getLogger(__name__)
 
-# API Key Auth (Simulated)
+# API Key Auth (Hardened)
 API_KEY_NAME = "X-Admin-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 def check_admin_auth(api_key: str = Depends(api_key_header)):
-    expected_key = os.getenv("ADMIN_API_KEY", "admin-secret-dev") 
+    expected_key = settings.ADMIN_API_KEY
+    if not expected_key:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server misconfigured: ADMIN_API_KEY missing")
     if api_key != expected_key:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Auth Failed")
     return True
@@ -58,7 +67,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 app = FastAPI(title="MedAgent Global System", version="5.3.0-PRODUCTION")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+# Restrictive CORS by default (can be widened via env in future)
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:8501"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# Observability: Prometheus metrics
+REQUEST_LATENCY = Histogram("medagent_request_latency_ms", "Request latency in ms", buckets=[50,100,200,500,1000,2000,5000])
+REQUEST_ERRORS = Counter("medagent_request_errors_total", "Total request errors")
+ESCALATIONS = Counter("medagent_escalations_total", "Total critical escalations")
+MODEL_USAGE = Counter("medagent_model_usage_total", "Model usage counter", ["model"])
+
+# Minimal OpenTelemetry setup (console exporter)
+try:
+    trace.set_tracer_provider(TracerProvider())
+    tracer_provider = trace.get_tracer_provider()
+    tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+    tracer = trace.get_tracer("medagent.api")
+except Exception:
+    tracer = None
 
 @app.get("/")
 async def root():
@@ -68,6 +93,17 @@ async def root():
 async def health():
     return {"status": "ok", "version": "5.3.0"}
 
+@app.get("/health/live")
+async def health_live():
+    return {"status": "live"}
+
+@app.get("/health/ready")
+async def health_ready():
+    return await ready()
+
+@app.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 @app.get("/ready")
 async def ready():
     try:
@@ -121,6 +157,7 @@ async def upload_image(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 from agents.verification_agent import VerificationAgent
+from agents.interop.fhir_hl7_builder import InteropBuilder
 
 # Global Singletons
 _orchestrator = None
@@ -190,6 +227,9 @@ def get_calendar_agent():
     global _calendar_agent
     if _calendar_agent is None: _calendar_agent = CalendarAgent()
     return _calendar_agent
+    
+def get_interop_builder():
+    return InteropBuilder()
 
 # --- DEVELOPER/SYSTEM ROUTES ---
 @app.get("/system/health", dependencies=[Depends(check_admin_auth)])
@@ -400,6 +440,54 @@ async def export_report(report_id: int, format: str = "pdf", user: dict = Depend
     from fastapi.responses import FileResponse
     return FileResponse(path, filename=filename, media_type=media_type)
 
+# --- INTEROPERABILITY ROUTES ---
+class InteropRequest(BaseModel):
+    report_id: int
+
+@app.post("/interop/fhir")
+async def export_fhir(req: InteropRequest, user: dict = Depends(get_current_user)):
+    pers = get_persistence()
+    gov = get_governance()
+    from database.models import MedicalReport, Interaction
+    # Fetch report and related interaction/session
+    report = pers.db.query(MedicalReport).filter(MedicalReport.id == req.report_id, MedicalReport.patient_id == user["sub"]).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    # Build clinical data from decrypted report content and minimal metadata
+    content = json.loads(gov.decrypt(report.report_content_encrypted))
+    clinical_data = {
+        "patient_id": report.patient_id,
+        "generated_at": str(report.generated_at),
+        "language": report.language,
+        "report": content
+    }
+    builder = get_interop_builder()
+    fhir = builder.build_fhir_bundle(clinical_data)
+    if isinstance(fhir, dict) and fhir.get("error"):
+        raise HTTPException(status_code=500, detail=fhir["error"])
+    return JSONResponse(content=fhir)
+
+@app.post("/interop/hl7")
+async def export_hl7(req: InteropRequest, user: dict = Depends(get_current_user)):
+    pers = get_persistence()
+    gov = get_governance()
+    from database.models import MedicalReport
+    report = pers.db.query(MedicalReport).filter(MedicalReport.id == req.report_id, MedicalReport.patient_id == user["sub"]).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    content = json.loads(gov.decrypt(report.report_content_encrypted))
+    interaction_data = {
+        "patient_id": report.patient_id,
+        "generated_at": str(report.generated_at),
+        "language": report.language,
+        "report": content
+    }
+    builder = get_interop_builder()
+    hl7 = builder.build_hl7_v2(interaction_data)
+    if isinstance(hl7, str) and hl7.startswith("ERROR:"):
+        raise HTTPException(status_code=500, detail=hl7)
+    return JSONResponse(content={"hl7": hl7})
+
 @app.get("/auth/export-data")
 async def export_user_data(user: dict = Depends(get_current_user)):
     """Export all user records as CSV (Portability)."""
@@ -523,18 +611,53 @@ async def send_health_alerts(user_id: str, message: str):
 
 # --- PUBLIC ROUTES ---
 @app.post("/consult")
-async def consult(request: PatientRequest, background_tasks: BackgroundTasks):
+async def consult(request: PatientRequest, background_tasks: BackgroundTasks, req: Request = None):
     try:
+        # Rate limiting
+        if req:
+            allowed, retry_after = check_rate_limit(get_client_identifier(req))
+            if not allowed:
+                raise HTTPException(status_code=429, detail=f"Rate limit exceeded. Retry in {retry_after}s")
+        request_id = str(uuid.uuid4())
         orch = get_orchestrator()
-        result = orch.run(
-            request.symptoms, 
-            user_id=request.patient_id, 
-            image_path=request.image_path,
-            request_second_opinion=request.request_second_opinion,
-            interaction_mode=request.interaction_mode
-        )
+        t0 = time.perf_counter()
+        if tracer:
+            with tracer.start_as_current_span("consult") as span:
+                span.set_attribute("request.id", request_id)
+                span.set_attribute("user.id", request.patient_id)
+                result = orch.run(
+                    request.symptoms, 
+                    user_id=request.patient_id, 
+                    image_path=request.image_path,
+                    request_second_opinion=request.request_second_opinion,
+                    interaction_mode=request.interaction_mode
+                )
+        else:
+            result = orch.run(
+                request.symptoms, 
+                user_id=request.patient_id, 
+                image_path=request.image_path,
+                request_second_opinion=request.request_second_opinion,
+                interaction_mode=request.interaction_mode
+            )
+        t1 = time.perf_counter()
+        result["request_id"] = request_id
+        if "latency_ms" not in result:
+            result["latency_ms"] = int((t1 - t0) * 1000)
+        try:
+            REQUEST_LATENCY.observe(result["latency_ms"])
+            if result.get("model_used"):
+                MODEL_USAGE.labels(result["model_used"]).inc()
+            if result.get("critical_alert"):
+                ESCALATIONS.inc()
+        except Exception:
+            pass
         
         if result.get("status") == "error":
+            try:
+                REQUEST_ERRORS.inc()
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail=result.get("final_response"))
             
         # Trigger background logic if priority is high
@@ -544,6 +667,10 @@ async def consult(request: PatientRequest, background_tasks: BackgroundTasks):
         return result
     except Exception as e:
         logger.error(f"Consultation failure: {e}")
+        try:
+            REQUEST_ERRORS.inc()
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/feedback")
@@ -661,6 +788,129 @@ async def improvement_report():
     improver = get_improver()
     report = improver.generate_improvement_report()
     return {"report": report}
+
+# --- CLINICAL UTILITIES & GOVERNANCE ---
+class LabInterpretRequest(BaseModel):
+    lab_data: dict
+    patient_id: Optional[str] = None
+
+class SOAPRequest(BaseModel):
+    interaction_id: int
+
+class ABTestRequest(BaseModel):
+    prompt_id: str
+    prompt_a: str
+    prompt_b: str
+    test_cases: list
+
+class RegistryReviewRequest(BaseModel):
+    old_hash: str
+    new_hash: str
+    delta_report: str
+
+class OverrideEscalationRequest(BaseModel):
+    interaction_id: int
+    override: bool
+    rationale: Optional[str] = None
+
+@app.post("/labs/interpret")
+async def labs_interpret(req: LabInterpretRequest, user: dict = Depends(get_current_user)):
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+    from agents.prompts.registry import PROMPT_REGISTRY
+    entry = PROMPT_REGISTRY.get("MED-LOG-LAB-INT-001")
+    if not entry:
+        raise HTTPException(status_code=500, detail="Lab interpretation prompt missing")
+    llm = ChatOpenAI(model=settings.OPENAI_MODEL, temperature=0.0, api_key=settings.OPENAI_API_KEY)
+    prompt = entry.content.format(lab_data=req.lab_data, standard_ranges="standard")
+    resp = llm.invoke([SystemMessage(content="You are a Clinical Pathology Interpreter."), HumanMessage(content=prompt)])
+    return {"interpretation": resp.content}
+
+@app.post("/docs/soap")
+async def docs_soap(req: SOAPRequest, user: dict = Depends(get_current_user)):
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+    from agents.prompts.registry import PROMPT_REGISTRY
+    from database.models import Interaction
+    pers = get_persistence()
+    inter = pers.db.query(Interaction).filter(Interaction.id == req.interaction_id).first()
+    if not inter:
+        raise HTTPException(status_code=404, detail="Interaction not found")
+    gov = get_governance()
+    patient_story = gov.decrypt(inter.user_input_encrypted)
+    diagnosis = gov.decrypt(inter.diagnosis_output_encrypted)
+    entry = PROMPT_REGISTRY.get("MED-OP-SOAP-001")
+    if not entry:
+        raise HTTPException(status_code=500, detail="SOAP prompt missing")
+    llm = ChatOpenAI(model=settings.OPENAI_MODEL, temperature=0.0, api_key=settings.OPENAI_API_KEY)
+    prompt = entry.content.format(patient_story=patient_story, vitals_and_labs="N/A", diagnosis=diagnosis, next_steps="N/A")
+    resp = llm.invoke([SystemMessage(content="Format strictly as SOAP note."), HumanMessage(content=prompt)])
+    return {"soap": resp.content}
+
+@app.post("/experiments/ab-test", dependencies=[Depends(check_admin_auth)])
+async def ab_test(req: ABTestRequest):
+    from agents.intelligence.ab_tester import ABTester
+    tester = ABTester()
+    result = tester.run_comparison(req.prompt_id, req.prompt_a, req.prompt_b, req.test_cases)
+    return result
+
+@app.post("/registry/review", dependencies=[Depends(check_admin_auth)])
+async def registry_review(req: RegistryReviewRequest):
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+    from agents.prompts.registry import PROMPT_REGISTRY
+    entry = PROMPT_REGISTRY.get("MED-GOV-REGISTRY-001")
+    if not entry:
+        raise HTTPException(status_code=500, detail="Registry review prompt missing")
+    llm = ChatOpenAI(model=settings.OPENAI_MODEL, temperature=0.0, api_key=settings.OPENAI_API_KEY)
+    prompt = entry.content.format(old_hash=req.old_hash, new_hash=req.new_hash, delta_report=req.delta_report)
+    resp = llm.invoke([SystemMessage(content="You are the Prompt Registry Governance Engine."), HumanMessage(content=prompt)])
+    return {"review": resp.content}
+
+@app.post("/admin/override-escalation", dependencies=[Depends(check_admin_auth)])
+async def override_escalation(req: OverrideEscalationRequest):
+    from database.models import Interaction, ReviewStatus
+    pers = get_persistence()
+    inter = pers.db.query(Interaction).filter(Interaction.id == req.interaction_id).first()
+    if not inter:
+        raise HTTPException(status_code=404, detail="Interaction not found")
+    inter.requires_human_review = not req.override
+    inter.review_status = ReviewStatus.APPROVED if req.override else ReviewStatus.FLAGGED
+    inter.reviewer_comment = req.rationale
+    pers.db.commit()
+    return {"status": "ok", "requires_human_review": inter.requires_human_review}
+
+class AuditExportRequest(BaseModel):
+    interaction_id: Optional[int] = None
+
+@app.post("/admin/audit-export", dependencies=[Depends(check_admin_auth)])
+async def audit_export(req: AuditExportRequest):
+    from database.models import Interaction, AuditLog
+    pers = get_persistence()
+    gov = get_governance()
+    data = {}
+    if req.interaction_id:
+        inter = pers.db.query(Interaction).filter(Interaction.id == req.interaction_id).first()
+        if not inter:
+            raise HTTPException(status_code=404, detail="Interaction not found")
+        data["interaction"] = {
+            "id": inter.id,
+            "timestamp": str(inter.timestamp),
+            "audit_hash": inter.audit_hash,
+            "model_used": inter.model_used,
+            "prompt_version": inter.prompt_version,
+            "risk_level": inter.risk_level,
+            "confidence_score": inter.confidence_score,
+        }
+    # include recent audit logs summary
+    logs = pers.db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(10).all()
+    data["audit_logs"] = [{"time": str(l.timestamp), "actor": l.actor_id, "action": l.action, "status": l.status} for l in logs]
+    payload = json.dumps(data, indent=2)
+    try:
+        sig = gov.sign_evidence(payload)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"evidence": data, "signature": sig}
 
 if __name__ == "__main__":
     import uvicorn

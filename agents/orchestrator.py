@@ -27,9 +27,12 @@ from .human_review_agent import HumanReviewAgent
 from .authentication_agent import AuthenticationAgent
 from .medication_agent import MedicationAgent
 from .second_opinion_agent import SecondOpinionAgent
+from .orchestration.risk_router import RiskRouter
 from config import settings
 from utils.safety import sanitize_input, validate_medical_input
 import logging
+import re
+from .confidence_agent import ConfidenceScorerAgent
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,8 @@ class MedAgentOrchestrator:
             self.auth_agent = AuthenticationAgent()
             self.medication_agent = MedicationAgent()
             self.second_opinion_agent = SecondOpinionAgent()
+            self.risk_router = RiskRouter()
+            self.confidence_scorer = ConfidenceScorerAgent()
             
             self.graph = self._build_graph()
             
@@ -204,13 +209,58 @@ class MedAgentOrchestrator:
                 "conversation_state": {"active_case_id": None, "risk_level": "unknown", "pending_actions": []}
             }
             
+            # 2.5 Risk-based routing (lineage only; model override integration pending)
+            try:
+                route_info = self.risk_router.route(sanitized_input, {"profile": user_profile})
+            except Exception as _:
+                route_info = {}
+            if isinstance(route_info, dict):
+                state["risk_level"] = route_info.get("risk_level")
+                state["model_used"] = route_info.get("selected_model", settings.OPENAI_MODEL)
+                state["cross_check_required"] = route_info.get("cross_check_required", False)
+                state["secondary_model"] = route_info.get("secondary_model")
+            
+            # 2.6 Specialty triggers
+            specialty = []
+            text = sanitized_input.lower()
+            if state.get("user_age") is not None and state.get("user_age") <= 14:
+                specialty.append("pediatric")
+            if re.search(r"pregnan", text):
+                specialty.append("pregnancy")
+            if re.search(r"suicide|self-harm", text):
+                specialty.append("mental_health")
+            state["specialty_adapters"] = specialty
+            
+            import time
+            _start = time.perf_counter()
             result = self.graph.invoke(state)
+            _end = time.perf_counter()
+            latency_ms = int((_end - _start) * 1000)
             
             # 3. Post-Process for Human Review Flagging
             needs_review = result.get('critical_alert', False) or result.get('validation_status') == 'warning'
             
             result['requires_human_review'] = needs_review
             result['language'] = lang
+            result['latency_ms'] = latency_ms
+            # propagate lineage into result for persistence
+            if "model_used" not in result and "model_used" in state:
+                result["model_used"] = state.get("model_used")
+            if "secondary_model" not in result and "secondary_model" in state:
+                result["secondary_model"] = state.get("secondary_model")
+            if "risk_level" not in result and "risk_level" in state:
+                result["risk_level"] = state.get("risk_level")
+            # prompt versions currently unknown at runtime for each agent; placeholder for registry-managed versions
+            if "prompt_version" not in result:
+                result["prompt_version"] = "registry-1.0.0"
+            # ensure confidence score
+            if result.get("confidence_score") is None and result.get("preliminary_diagnosis"):
+                try:
+                    score = self.confidence_scorer.score(result.get("preliminary_diagnosis"), state)
+                    if score is not None:
+                        result["confidence_score"] = score
+                except Exception as _:
+                    pass
             
             # Save interaction with CASE linking
             case_id = result.get("conversation_state", {}).get("active_case_id")

@@ -10,6 +10,8 @@ import logging
 from sqlalchemy.orm import Session
 from database.models import SessionLocal, UserSession, Interaction, SystemLog, PatientProfile, MedicalReport, UserAction, MedicalImage, UserAccount, UserActivity, MedicalCase, MemoryNode, MemoryEdge
 from agents.governance_agent import GovernanceAgent
+from config import settings
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,17 @@ class PersistenceAgent:
             enc_diagnosis = self.governance.encrypt(result.get("preliminary_diagnosis", ""))
             enc_response = self.governance.encrypt(result.get("final_response", ""))
             
+            # Derive lineage/observability fields
+            prompt_version = result.get("prompt_version")
+            model_used = result.get("model_used", getattr(settings, "OPENAI_MODEL", None))
+            secondary_model = result.get("secondary_model")
+            confidence_score = result.get("confidence_score")
+            risk_level = result.get("risk_level")
+            latency_ms = result.get("latency_ms")
+            # Compute audit hash (chainable) using encrypted payloads for privacy
+            base_str = f"{session_id}|{enc_input}|{self.governance.encrypt(result.get('final_response',''))}|{model_used or ''}|{prompt_version or ''}|{datetime.datetime.utcnow().isoformat()}"
+            audit_hash = hashlib.sha256(base_str.encode("utf-8")).hexdigest()
+            
             interaction = Interaction(
                 session_id=session_id,
                 case_id=case_id,
@@ -55,7 +68,14 @@ class PersistenceAgent:
                 diagnosis_output_encrypted=enc_diagnosis,
                 final_response_encrypted=enc_response,
                 metadata_json=result.get("patient_info", {}),
-                safety_flags={"critical_alert": result.get("critical_alert", False)}
+                safety_flags={"critical_alert": result.get("critical_alert", False)},
+                prompt_version=prompt_version,
+                model_used=model_used,
+                secondary_model=secondary_model,
+                confidence_score=confidence_score,
+                risk_level=risk_level,
+                audit_hash=audit_hash,
+                latency_ms=latency_ms
             )
             self.db.add(interaction)
             
@@ -120,11 +140,23 @@ class PersistenceAgent:
     def log_system_event(self, level: str, component: str, message: str, details: dict = None, session_id: str = None):
         """Log a system event or error."""
         try:
+            # Optional PHI redaction of message/details
+            redacted_message = message
+            redacted_details = details or {}
+            try:
+                from agents.safety.privacy_audit import PrivacyAuditLayer
+                pal = PrivacyAuditLayer()
+                redacted_message = pal.redact_phi(message) if message else message
+                # Best-effort redaction of details dict stringified
+                if redacted_details:
+                    redacted_details = {"_redacted": pal.redact_phi(str(redacted_details))}
+            except Exception:
+                pass
             log_entry = SystemLog(
                 level=level,
                 component=component,
-                message=message,
-                details=details or {},
+                message=redacted_message,
+                details=redacted_details,
                 session_id=session_id
             )
             self.db.add(log_entry)

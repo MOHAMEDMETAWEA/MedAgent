@@ -18,11 +18,11 @@ class SafetyAgent:
     Uses Layer 5 structured prompt for risk classification and red flag detection.
     """
     def __init__(self, model=None):
-        self.llm = ChatOpenAI(
-            model=model or settings.OPENAI_MODEL, 
-            temperature=0.0,
-            api_key=settings.OPENAI_API_KEY
-        )
+        self.default_model = model or settings.OPENAI_MODEL
+    
+    def _get_llm(self, state: AgentState):
+        model = state.get("model_used") or self.default_model
+        return ChatOpenAI(model=model, temperature=0.0, api_key=settings.OPENAI_API_KEY)
 
     def _load_prompt(self, filename: str) -> str:
         try:
@@ -59,7 +59,8 @@ class SafetyAgent:
             )
 
         try:
-            response = self.llm.invoke([
+            llm = self._get_llm(state)
+            response = llm.invoke([
                 SystemMessage(content="You are a Medical Safety and Risk Stratification Agent (Layer 5). Protect the user. Output strict JSON."),
                 HumanMessage(content=prompt)
             ])

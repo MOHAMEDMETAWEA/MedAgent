@@ -18,12 +18,7 @@ class ReportAgent:
     Also handles Persistence and Versioning.
     """
     def __init__(self, model=None):
-        model = model or settings.OPENAI_MODEL
-        self.llm = ChatOpenAI(
-            model=model,
-            temperature=settings.LLM_TEMPERATURE_DOCTOR,
-            api_key=settings.OPENAI_API_KEY,
-        )
+        self.default_model = model or settings.OPENAI_MODEL
         self.retriever = MedicalRetriever()
         self.persistence = PersistenceAgent()
 
@@ -123,10 +118,27 @@ class ReportAgent:
             mode_instruction = "IMPORTANT: For DOCTOR mode, ensure MEDICAL_REPORT and DOCTOR_SUMMARY use high-level clinical language and diagnostic codes where applicable."
 
         try:
-            response = self.llm.invoke([
+            model_override = state.get("model_used") or self.default_model
+            llm = ChatOpenAI(model=model_override, temperature=settings.LLM_TEMPERATURE_DOCTOR, api_key=settings.OPENAI_API_KEY)
+            response = llm.invoke([
                 SystemMessage(content=f"You are a Generative Report Agent. {lang_instruction} {mode_instruction} Output only the three sections with exact ENGLISH headers: MEDICAL_REPORT, DOCTOR_SUMMARY, PATIENT_INSTRUCTIONS."),
                 HumanMessage(content=prompt),
             ])
+        except Exception as e:
+            sec = state.get("secondary_model")
+            if not sec:
+                logger.error(f"Report agent error: {e}")
+                return {
+                    "final_response": f"Report generation failed: {e}",
+                    "report_medical": "",
+                    "next_step": "end",
+                }
+            llm = ChatOpenAI(model=sec, temperature=settings.LLM_TEMPERATURE_DOCTOR, api_key=settings.OPENAI_API_KEY)
+            response = llm.invoke([
+                SystemMessage(content=f"You are a Generative Report Agent. {lang_instruction} {mode_instruction} Output only the three sections with exact ENGLISH headers: MEDICAL_REPORT, DOCTOR_SUMMARY, PATIENT_INSTRUCTIONS."),
+                HumanMessage(content=prompt),
+            ])
+        try:
             content = response.content or ""
             medical, doctor_summary, patient_instructions = self._parse_sections(content)
             

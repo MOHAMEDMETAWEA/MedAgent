@@ -44,6 +44,12 @@ def pre_flight_checks():
     if not enc_key:
         print("[CRITICAL] DATA_ENCRYPTION_KEY is missing. Security layer cannot start.")
         return False
+    
+    # 5. Check JWT Secret
+    jwt_key = os.getenv("JWT_SECRET_KEY")
+    if not jwt_key:
+        print("[CRITICAL] JWT_SECRET_KEY is missing. Authentication cannot start.")
+        return False
         
     print("[OK] Pre-flight checks passed.\n")
     return True

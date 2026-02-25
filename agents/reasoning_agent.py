@@ -20,7 +20,11 @@ class ReasoningAgent:
     """
     def __init__(self, model=None):
         model = model or settings.OPENAI_MODEL
-        self.llm = ChatOpenAI(
+        self.default_model = model
+    
+    def _get_llm(self, state: AgentState):
+        model = state.get("model_used") or self.default_model
+        return ChatOpenAI(
             model=model, 
             temperature=settings.LLM_TEMPERATURE_DIAGNOSIS,
             api_key=settings.OPENAI_API_KEY
@@ -58,6 +62,10 @@ class ReasoningAgent:
             context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}"
             routing_prompt = base_template.format(patient_data=context_data, knowledge_base=knowledge)
 
+            # Specialty adapters
+            adapters = state.get("specialty_adapters", [])
+            if adapters:
+                routing_prompt += f"\n\n[Specialty Adapters Engaged]: {', '.join(adapters)}. Adjust reasoning accordingly."
             # 2. Generate Multiple Thought Paths (ToT Stage)
             tot_prompt = f"""
             SYSTEM: You are a Cognitive Medical Reasoning Core. 
@@ -79,7 +87,8 @@ class ReasoningAgent:
             [BRANCH 3]: ...
             """
             
-            paths_response = self.llm.invoke([
+            llm = self._get_llm(state)
+            paths_response = llm.invoke([
                 SystemMessage(content="You are a Tree-of-Thought Medical Orchestrator."),
                 HumanMessage(content=tot_prompt)
             ])
@@ -102,7 +111,18 @@ class ReasoningAgent:
             Do not mention that you are a tree of thought. Output final clinical reasoning.
             """
             
-            final_selection = self.llm.invoke([
+            try:
+                final_selection = llm.invoke([
+                    SystemMessage(content="You are a Medical Expert Board Auditor."),
+                    HumanMessage(content=eval_prompt)
+                ])
+            except Exception as e:
+                # Fallback to secondary model if available
+                sec = state.get("secondary_model")
+                if not sec:
+                    raise e
+                llm = ChatOpenAI(model=sec, temperature=settings.LLM_TEMPERATURE_DIAGNOSIS, api_key=settings.OPENAI_API_KEY)
+                final_selection = llm.invoke([
                 SystemMessage(content="You are a Medical Expert Board Auditor."),
                 HumanMessage(content=eval_prompt)
             ])

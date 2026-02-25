@@ -345,12 +345,50 @@ else:
                 if res.get("critical_alert"):
                     st.error("🚨 EMERGENCY ESCALATION DETECTED")
                 
+                # Confidence and Risk badges (if available)
+                if res.get("confidence_score") is not None or res.get("risk_level"):
+                    col_conf, col_risk = st.columns(2)
+                    with col_conf:
+                        conf = res.get("confidence_score")
+                        if conf is not None:
+                            st.progress(float(conf), text=f"Confidence: {conf:.0%}")
+                    with col_risk:
+                        risk = (res.get("risk_level") or "unknown").upper()
+                        st.info(f"Risk Level: {risk}")
+                
+                # Lineage info
+                lineage = []
+                if res.get("model_used"): lineage.append(f"Model: {res['model_used']}")
+                if res.get("secondary_model"): lineage.append(f"Fallback: {res['secondary_model']}")
+                if res.get("prompt_version"): lineage.append(f"Prompt: {res['prompt_version']}")
+                if lineage:
+                    st.caption(" | ".join(lineage))
+                
                 # Expose RAG and ToT Reasoning if available
                 if res.get("retrieved_docs") or res.get("doctor_notes"):
                     with st.expander("🔬 Agent Insights (RAG & ToT)"):
                         if res.get("retrieved_docs"):
                             st.write("**Knowledge Retrieval (RAG):**")
-                            st.caption(res["retrieved_docs"])
+                            # Try to parse citations
+                            try:
+                                docs = res["retrieved_docs"]
+                                if isinstance(docs, str):
+                                    parsed = json.loads(docs)
+                                else:
+                                    parsed = docs
+                                if isinstance(parsed, list):
+                                    for d in parsed:
+                                        if isinstance(d, dict):
+                                            title = d.get("title") or d.get("source") or "Reference"
+                                            url = d.get("url") or d.get("link")
+                                            if url:
+                                                st.markdown(f"- [{title}]({url})")
+                                            else:
+                                                st.markdown(f"- {title}")
+                                else:
+                                    st.caption(res["retrieved_docs"])
+                            except Exception:
+                                st.caption(res["retrieved_docs"])
                         if res.get("doctor_notes"):
                             st.write("**Clinical Reasoning (Tree-of-Thought):**")
                             st.caption(res["doctor_notes"])
@@ -373,6 +411,21 @@ else:
                 
                 with st.expander("🛠️ Advanced Export"):
                     st.download_button("Download Raw JSON", data=json.dumps(res, indent=2), file_name="medical_report.json")
+                    if res.get("report_id"):
+                        # FHIR/HL7 export via authenticated API calls
+                        if st.button("Generate FHIR Bundle"):
+                            r = api_call("POST", "/interop/fhir", {"report_id": res["report_id"]})
+                            if r and r.ok:
+                                st.download_button("Download FHIR JSON", data=json.dumps(r.json(), indent=2), file_name=f"report_{res['report_id']}_fhir.json")
+                            else:
+                                st.error("FHIR generation failed.")
+                        if st.button("Generate HL7 v2"):
+                            r = api_call("POST", "/interop/hl7", {"report_id": res["report_id"]})
+                            if r and r.ok:
+                                hl7_txt = r.json().get("hl7", "")
+                                st.download_button("Download HL7 Message", data=hl7_txt, file_name=f"report_{res['report_id']}.hl7")
+                            else:
+                                st.error("HL7 generation failed.")
 
     # --- TAB 2: IMAGE ANALYSIS ---
     with t2:
@@ -574,10 +627,35 @@ else:
                         st.markdown(f"[🖼️ Image]({API_BASE}/reports/{rep['id']}/export?format=image)")
                     with c_txt:
                         st.markdown(f"[📝 Text]({API_BASE}/reports/{rep['id']}/export?format=text)")
+                    # Interop with authentication
+                    c_fhir, c_hl7 = st.columns(2)
+                    with c_fhir:
+                        if st.button(f"Generate FHIR #{rep['id']}"):
+                            rr = api_call("POST", "/interop/fhir", {"report_id": rep["id"]})
+                            if rr and rr.ok:
+                                st.download_button("Download FHIR JSON", data=json.dumps(rr.json(), indent=2), file_name=f"report_{rep['id']}_fhir.json")
+                            else:
+                                st.error("FHIR generation failed.")
+                    with c_hl7:
+                        if st.button(f"Generate HL7 #{rep['id']}"):
+                            rr = api_call("POST", "/interop/hl7", {"report_id": rep["id"]})
+                            if rr and rr.ok:
+                                st.download_button("Download HL7 Message", data=rr.json().get("hl7", ""), file_name=f"report_{rep['id']}.hl7")
+                            else:
+                                st.error("HL7 generation failed.")
 
     # --- TAB 6: PRIVACY ---
     with t6:
         st.subheader("Data Rights & System Support")
+        acc = st.checkbox("Accessibility Mode (High Contrast / Larger Fonts)")
+        if acc:
+            st.markdown("""
+            <style>
+            html, body { filter: contrast(120%); }
+            .stButton>button { font-size: 1.1rem; }
+            .stTextArea textarea { font-size: 1.1rem !important; }
+            </style>
+            """, unsafe_allow_html=True)
         st.write("#### 🛡️ Your Privacy")
         st.write("We implement AES-256 encryption at rest. All reasoning is local or via secure API tunnels.")
         if st.button("Export All My Data (CSV - Portability)"):
@@ -619,6 +697,35 @@ else:
                     st.text_area("Live Improvement Report", r_si.json().get("report", "No data"), height=300)
                 else:
                     st.error("Failed to fetch improvement report.")
+            
+            st.write("#### 🧪 A/B Testing")
+            with st.expander("Run A/B Test"):
+                pid = st.text_input("Prompt ID")
+                pa = st.text_area("Prompt A")
+                pb = st.text_area("Prompt B")
+                cases = st.text_area("Test Cases (JSON list)")
+                if st.button("Run A/B"):
+                    try:
+                        data = {"prompt_id": pid, "prompt_a": pa, "prompt_b": pb, "test_cases": json.loads(cases or "[]")}
+                        r = api_call("POST", "/experiments/ab-test", data)
+                        if r and r.ok:
+                            st.json(r.json())
+                        else:
+                            st.error("A/B run failed")
+                    except Exception as e:
+                        st.error(f"Invalid test cases JSON: {e}")
+            
+            st.write("#### 🔏 Registry Governance Review")
+            with st.expander("Review Prompt Change"):
+                oldh = st.text_input("Old Hash")
+                newh = st.text_input("New Hash")
+                delta = st.text_area("Delta Report")
+                if st.button("Submit Review"):
+                    r = api_call("POST", "/registry/review", {"old_hash": oldh, "new_hash": newh, "delta_report": delta})
+                    if r and r.ok:
+                        st.json(r.json())
+                    else:
+                        st.error("Review failed")
 
 # --- FOOTER ---
 st.markdown("---")

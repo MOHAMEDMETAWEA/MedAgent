@@ -162,7 +162,8 @@ Assign a confidence score (0-1) to the following diagnosis based on:
 - Evidence strength.
 - Consistency of symptoms.
 - Clarity of image findings (if any).
-Diagnosis: {diagnosis}""",
+Diagnosis: {diagnosis}
+Output JSON: {"confidence_score": <0..1>}""",
     risk_level="low",
     applicable_role=["system"]
 ))

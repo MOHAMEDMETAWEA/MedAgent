@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+    JWT_SECRET_KEY: Optional[str] = None
     
     # Paths
     BASE_DIR: Path = Path(__file__).parent
@@ -55,7 +56,8 @@ class Settings(BaseSettings):
     
     # Security
     DATA_ENCRYPTION_KEY: Optional[str] = None
-    ADMIN_API_KEY: str = "admin-secret-dev"
+    ADMIN_API_KEY: Optional[str] = None
+    AUDIT_SIGNING_KEY: Optional[str] = None
     
     # Monitoring
     MLFLOW_TRACKING_URI: Optional[str] = None

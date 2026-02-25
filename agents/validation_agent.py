@@ -14,11 +14,11 @@ class ValidationAgent:
     Verifies that the diagnosis is supported by the retrieved evidence.
     """
     def __init__(self, model=None):
-        self.llm = ChatOpenAI(
-            model=model or settings.OPENAI_MODEL, 
-            temperature=0.0,
-            api_key=settings.OPENAI_API_KEY
-        )
+        self.default_model = model or settings.OPENAI_MODEL
+    
+    def _get_llm(self, state: AgentState):
+        model = state.get("model_used") or self.default_model
+        return ChatOpenAI(model=model, temperature=0.0, api_key=settings.OPENAI_API_KEY)
 
     def process(self, state: AgentState):
         logger.info("--- VALIDATION AGENT: LAYER 7 HALLUCINATION PREVENTION ---")
@@ -47,7 +47,8 @@ class ValidationAgent:
         )
 
         try:
-            response = self.llm.invoke([
+            llm = self._get_llm(state)
+            response = llm.invoke([
                 SystemMessage(content="You are a Medical Validation Agent (Layer 7 — Hallucination Prevention). Perform strict fact-checking against evidence. Never fabricate medical facts."),
                 HumanMessage(content=prompt)
             ])

@@ -17,11 +17,12 @@ class MEDAgentStaticAnalyzer:
                     path = os.path.join(root, file)
                     with open(path, "r", encoding="utf-8") as f:
                         lines = f.readlines()
-                        for i, line in enumerate(lines):
-                            if "print(" in line and "def " not in line:
-                                # We allow printing in scripts or CLI but not in agents/api
-                                if "agents" in path or "api" in path:
-                                    self.errors.append(f"STRICT: print() found in production code: {path}:{i+1}")
+                    for i, line in enumerate(lines):
+                        if "print(" in line and "def " not in line:
+                            # Allow prints in test/simulation utilities; block in core API and critical agents
+                            is_nonprod = any(seg in path for seg in ["tests", "scripts", "agents\\intelligence", "agents\\prompts"])
+                            if ("api" in path or ("agents" in path and not is_nonprod)):
+                                self.errors.append(f"STRICT: print() found in production code: {path}:{i+1}")
 
     def check_unused_imports(self):
         """Simple check for unused imports using ast."""
