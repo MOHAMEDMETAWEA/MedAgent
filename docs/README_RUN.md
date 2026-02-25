@@ -67,10 +67,14 @@ Wait until installation finishes without errors.
    cp .env.example .env
    ```
 
-2. Open the `.env` file in a text editor and replace `your_api_key_here` with your real OpenAI API key:
+2. Open the `.env` file and set ALL required secrets:
 
    ```bash
    OPENAI_API_KEY=sk-your-actual-key-here
+   DATA_ENCRYPTION_KEY=your_fernet_key
+   JWT_SECRET_KEY=your_jwt_secret
+   ADMIN_API_KEY=admin_control_key
+   AUDIT_SIGNING_KEY=evidence_signature_key
    ```
 
    Save and close the file. **Do not share this file or commit it to Git.**
@@ -89,9 +93,15 @@ You should see: `Generated ... medical_guidelines.json` and `Generated ... patie
 
 ---
 
-## Step 6: Start the System
+## Step 6: Run DB Migration (first time after upgrade)
 
-### Method A: The Easy Way (Recommended)
+```bash
+python scripts/migrate_v2.py
+```
+
+## Step 7: Start the System
+
+### Method A: Unified Launcher (Recommended)
 
 Run the unified launcher script. This will start both the backend and the frontend for you.
 
@@ -102,7 +112,7 @@ python run_system.py
 - Backend API: **<http://localhost:8000>**
 - Frontend UI: **<http://localhost:8501>** (opens automatically)
 
-### Method B: The Manual Way
+### Method B: Manual Services
 
 If you prefer to run them separately (e.g., for troubleshooting), follow these steps:
 
@@ -141,6 +151,7 @@ Your browser should open to **<http://localhost:8501>**.
 | Problem | What to do |
 | :--- | :--- |
 | **“OPENAI_API_KEY Missing”** | Create `.env` from `.env.example` and set `OPENAI_API_KEY=your_key`. Restart the backend. |
+| **“JWT_SECRET_KEY/DATA_ENCRYPTION_KEY Missing”** | Set both in `.env`. The system refuses startup without them. |
 | **“No module named …”** | Run `pip install -r requirements.txt` from the project root. |
 | **Port 8000 already in use** | Stop the program using port 8000, or use another port: `uvicorn api.main:app --port 8001`. Then set in `.env`: `MEDAGENT_API_URL=http://localhost:8001` and use that port in the frontend. |
 | **Port 8501 already in use** | Use another port: `streamlit run api/frontend.py --server.port 8502` and open <http://localhost:8502>. |
@@ -162,6 +173,21 @@ Backend: <http://localhost:8000>
 Frontend: <http://localhost:8501>  
 
 Put your `.env` (with `OPENAI_API_KEY`) in the **parent** of the `deployment` folder (project root).
+
+---
+
+## Admin & Observability
+
+- Admin endpoints require header `X-Admin-Key: ${ADMIN_API_KEY}`.
+- Metrics endpoint for Prometheus: `GET /metrics`.
+- Health: `GET /health/live`, `GET /health/ready`.
+- Signed audit export: `POST /admin/audit-export` with optional `interaction_id`.
+
+## Interoperability
+
+- Generate FHIR/HL7 via UI (Advanced Export) or API:
+  - `POST /interop/fhir` `{ "report_id": <id> }`
+  - `POST /interop/hl7` `{ "report_id": <id> }`
 
 ---
 

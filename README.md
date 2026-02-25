@@ -2,10 +2,10 @@
 
 > **A State-of-the-Art Multi-Agent Smart Hospital System Powered by Generative & Agentic AI**
 
-**Version:** v5.6.0 "Omni-Vision"  
+**Version:** v5.3.0-PRODUCTION  
 **Project Track:** DEPI Graduation Project - Generative & Agentic AI  
 **Author:** Mohamed Mostafa Metawea  
-**Validation Status:** Clinical-Grade Production Ready (Passed 95+ Audit Points)
+**Validation Status:** Hardened Build with Observability & Lineage
 
 ---
 
@@ -96,6 +96,7 @@ MedAgent is equipped with clinical-grade vision analysis supporting:
 | **API Framework** | FastAPI + Uvicorn |
 | **Frontend UI** | Streamlit (High-Performance Dashboard) |
 | **Security** | PyCryptodome (AES), Passlib (Bcrypt), JWT |
+| **Observability** | Prometheus (/metrics), OpenTelemetry (spans) |
 
 ---
 
@@ -105,6 +106,7 @@ MedAgent is equipped with clinical-grade vision analysis supporting:
 
 * OpenAI API Key (GPT-4o access required for Vision)
 * Python Environment (venv recommended)
+* Required Secrets (see below)
 
 ### **Setup Steps**
 
@@ -122,11 +124,14 @@ MedAgent is equipped with clinical-grade vision analysis supporting:
     ```
 
 3. **Environment Configuration**:
-    Configure `.env` using `.env.example`:
+    Configure `.env` using `.env.example` (do NOT commit `.env`):
 
     ```env
     OPENAI_API_KEY=sk-...
-    DATA_ENCRYPTION_KEY=your_key_here
+    DATA_ENCRYPTION_KEY=your_fernet_key
+    JWT_SECRET_KEY=your_jwt_secret
+    ADMIN_API_KEY=admin_control_key
+    AUDIT_SIGNING_KEY=evidence_signature_key
     ```
 
 4. **Initialize Knowledge Base**:
@@ -135,17 +140,24 @@ MedAgent is equipped with clinical-grade vision analysis supporting:
     python data/generate_data.py
     ```
 
-5. **Run the System**:
-    Launcher for Windows:
-
-    ```cmd
-    START_MEDAGENT.bat
-    ```
-
-    Or manually:
+5. **Run DB Migration (adds lineage & audit fields)**:
 
     ```bash
+    python scripts/migrate_v2.py
+    ```
+
+6. **Run the System**:
+    Unified launcher:
+
+    ```cmd
     python run_system.py
+    ```
+
+    Or manual processes:
+
+    ```bash
+    uvicorn api.main:app --host 0.0.0.0 --port 8000
+    streamlit run api/frontend.py --server.port 8501
     ```
 
 ---
@@ -159,13 +171,40 @@ MedAgent uses an encrypted relational schema to ensure longitudinal case trackin
 | **UserAccount** | Identity, Roles, and Credentials. | AES-256 (Name/Email) |
 | **UserSession** | Active session tracking and mode management. | None |
 | **MedicalCase** | Groups interactions into a unified clinical case. | None (Title encrypted) |
-| **Interaction** | Individual chat turns with inputs and diagnoses. | AES-256 (Full Content) |
+| **Interaction** | Interactions with lineage and audit. Fields include: prompt_version, model_used, secondary_model, confidence_score, risk_level, audit_hash, latency_ms | AES-256 (Content) |
 | **MedicalImage** | Multimodal analysis results and file paths. | AES-256 (Findings/Paths) |
 | **MedicalReport** | SOAP-standard generated reports. | AES-256 (JSON Content) |
 | **MemoryGraph** | Nodes and Edges connecting clinical events. | AES-256 (Node Content) |
 | **Medication** | Active prescriptions and dosages. | AES-256 (All fields) |
 
 **Encryption Authority**: The `Governance Agent` manages the `DATA_ENCRYPTION_KEY` and handles all En/Decryption cycles transparently across the Persistence Layer.
+
+---
+
+## 🧭 8. Observability & Monitoring
+
+- Prometheus metrics endpoint: `GET /metrics`  
+  - `medagent_request_latency_ms` (histogram)  
+  - `medagent_request_errors_total` (counter)  
+  - `medagent_escalations_total` (counter)  
+  - `medagent_model_usage_total{model}` (counter)
+- OpenTelemetry spans (console exporter) for consult flow with `request_id` and `user_id` attributes.
+- Health: `GET /health/live`, `GET /health/ready`.
+
+---
+
+## 🔌 9. Interoperability & Admin Endpoints
+
+- `POST /interop/fhir` → FHIR Bundle JSON (from report)
+- `POST /interop/hl7` → HL7 v2 message
+- `POST /labs/interpret` → Lab results interpretation
+- `POST /docs/soap` → SOAP note generation
+- `POST /experiments/ab-test` (Admin)
+- `POST /registry/review` (Admin)
+- `POST /admin/override-escalation` (Admin)
+- `POST /admin/audit-export` (Admin) → Signed evidence export (HMAC using `AUDIT_SIGNING_KEY`)
+
+Admin endpoints require header: `X-Admin-Key: ${ADMIN_API_KEY}`
 
 ---
 
@@ -185,14 +224,24 @@ MedAgent uses a centralized **Prompt Registry** (`agents/prompts/registry.py`) t
 
 | Risk Level | Trigger | Action |
 | :--- | :--- | :--- |
-| **Emergency** | Life-threatening indicators | Immediate triage escalation. |
-| **High** | Clinical diagnoses/Vision | Mandatory confidence >0.7 or Human-in-the-loop. |
+| **Emergency** | Life-threatening indicators | Immediate triage escalation + high-accuracy model. |
+| **High** | Clinical diagnoses/Vision | High-accuracy model + cross-check fallback. |
 | **Medium** | Lab interpretation/SOAP | Standard validation gate. |
 | **Low** | Patient education/Privacy | Automated processing. |
 
 ---
 
-## 🏁 11. Final Quality Assurance
+## 🧑‍⚕️ 11. UI Features (Patient & Doctor)
+
+- Confidence score bar and risk level badge.
+- Lineage: model, fallback, and prompt version shown.
+- Evidence citations rendered when available (Agent Insights).
+- FHIR/HL7 export buttons (Advanced Export & History).
+- Accessibility mode (high contrast, larger fonts).
+
+---
+
+## 🏁 12. Final Quality Assurance
 
 The system has been validated through a 100-point pre-launch checklist:
 
@@ -202,7 +251,20 @@ The system has been validated through a 100-point pre-launch checklist:
 
 ---
 
-## ⚖️ 11. Legal Disclaimer
+## 🛡️ 13. Security & Secrets
+
+Required secrets (do not commit):
+- `OPENAI_API_KEY`  
+- `DATA_ENCRYPTION_KEY`  
+- `JWT_SECRET_KEY`  
+- `ADMIN_API_KEY`  
+- `AUDIT_SIGNING_KEY`
+
+Rotate any previously exposed keys. Startup will fail-fast if critical secrets are missing.
+
+---
+
+## ⚖️ 14. Legal Disclaimer
 
 *This system is a high-fidelity AI simulation designed as a graduation project for educational and research purposes. It is NOT a substitute for professional medical advice, diagnosis, or treatment. Always consult a licensed healthcare professional for medical decisions.*
 
