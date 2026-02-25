@@ -25,19 +25,20 @@ def pre_flight_checks():
         print("[CRITICAL] OPENAI_API_KEY is not set correctly in .env. LLM features will fail.")
         return False
 
-    # 3. Check RAG Index
+    # 3. Check RAG Index (optional initialization)
     index_path = os.path.join(os.path.dirname(__file__), "rag", "faiss_index", "index.faiss")
     if not os.path.exists(index_path):
-        print("[INFO] FAISS index missing. Initializing Knowledge Base...")
-        try:
-            # We run this in-process or as sub-task
-            from rag.retriever import MedicalRetriever
-            # This triggers initialization
-            MedicalRetriever()
-            print("[OK] Knowledge Base Initialized.")
-        except Exception as e:
-            print(f"[ERROR] Failed to initialize RAG: {e}")
-            # Non-critical for launch, but warns
+        if os.getenv("INIT_RAG_ON_START", "false").lower() == "true":
+            print("[INFO] FAISS index missing. Initializing Knowledge Base...")
+            try:
+                from rag.retriever import MedicalRetriever
+                MedicalRetriever()
+                print("[OK] Knowledge Base Initialized.")
+            except Exception as e:
+                print(f"[ERROR] Failed to initialize RAG: {e}")
+                # Non-critical for launch, continue startup
+        else:
+            print("[INFO] FAISS index missing. Skipping initialization (set INIT_RAG_ON_START=true to build).")
     
     # 4. Check Encryption Key
     enc_key = os.getenv("DATA_ENCRYPTION_KEY")

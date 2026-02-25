@@ -470,3 +470,37 @@ Detect contradictions or logic jumps.""",
     risk_level="medium",
     applicable_role=["system"]
 ))
+register_prompt(PromptEntry(
+    prompt_id="MED-GEN-EDU-001",
+    content="""Generate a short, evidence-based educational summary about '{topic}' for a {audience_level} audience. 
+Language: {lang}. 
+Ensure clarity, safety, and follow global health guidelines. Do not include specific patient data.""",
+    risk_level="low",
+    applicable_role=["patient", "caregiver", "doctor"]
+))
+
+register_prompt(PromptEntry(
+    prompt_id="MED-GEN-SIM-001",
+    content="""Create a highly realistic clinical simulation scenario for a patient presenting with {condition}.
+Difficulty Level: {difficulty}.
+Include:
+- 👤 Anonymized Patient Profile (Age, Gender, Vitals).
+- 🚩 Chief Complaint (in patient's words).
+- 📜 Relevant Past Medical History.
+- 🔬 Objective Findings (Lab/Vision hints).
+Target: Medical training and system stress-testing.""",
+    risk_level="low",
+    applicable_role=["doctor", "admin"]
+))
+
+register_prompt(PromptEntry(
+    prompt_id="MED-GEN-PLAN-001",
+    content="""Develop a personalized clinical care plan (Diet, Lifestyle, Home Monitoring) based on the following:
+Clinical Diagnosis: {diagnosis}
+Patient Demographic Context: {profile_summary}
+Primary Goal: Evidence-guided self-care and secondary prevention.
+Safety Rule: Must emphasize that this is supportive, not a replacement for active clinician monitoring.""",
+    risk_level="medium",
+    applicable_role=["patient", "doctor"],
+    governance_flags=["clinical-safety"]
+))

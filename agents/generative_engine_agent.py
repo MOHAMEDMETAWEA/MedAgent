@@ -27,15 +27,16 @@ class GenerativeEngineAgent:
         )
 
     def generate_educational_content(self, topic: str, audience_level: str = "patient", lang: str = "en") -> str:
-        """Generate educational article or summary."""
-        prompt = f"Create a short educational medical summary about '{topic}' for a {audience_level} audience. Language: {lang}. Ensure accuracy and clarity."
+        """Generate educational article or summary using Registry."""
+        from agents.prompts.registry import PROMPT_REGISTRY
+        entry = PROMPT_REGISTRY.get("MED-GEN-EDU-001")
+        if not entry: return "Education prompt missing."
         
         try:
-            # Check for injection in topic
             is_injection, _ = detect_prompt_injection(topic)
-            if is_injection:
-                 return "Error: unsafe topic request."
+            if is_injection: return "Error: unsafe topic request."
             
+            prompt = entry.content.format(topic=topic, audience_level=audience_level, lang=lang)
             response = self.llm.invoke([
                 SystemMessage(content="You are a Medical Education Specialist. Provide accurate, safe, and clear information."),
                 HumanMessage(content=prompt)
@@ -46,10 +47,13 @@ class GenerativeEngineAgent:
             return "Error generating content."
 
     def generate_simulation_scenario(self, condition: str, difficulty: str = "medium") -> str:
-        """Generate a clinical case scenario for training."""
-        prompt = f"Generate a realistic clinical case scenario for a patient with {condition}. Difficulty: {difficulty}. Include: Patient Profile, Chief Complaint, Vitals, and History."
+        """Generate a clinical case scenario using Registry."""
+        from agents.prompts.registry import PROMPT_REGISTRY
+        entry = PROMPT_REGISTRY.get("MED-GEN-SIM-001")
+        if not entry: return "Simulation prompt missing."
         
         try:
+            prompt = entry.content.format(condition=condition, difficulty=difficulty)
             response = self.llm.invoke([
                 SystemMessage(content="You are a Clinical Simulation Expert. valuable for medical training."), 
                 HumanMessage(content=prompt)
@@ -60,12 +64,15 @@ class GenerativeEngineAgent:
             return "Error generating simulation."
 
     def generate_personalized_plan(self, patient_profile: dict, diagnosis: str) -> str:
-        """Create a personalized care plan based on profile and diagnosis."""
-        # This would use RAG in a full implementation
-        summary = f"Patient: {patient_profile.get('age')}yo {patient_profile.get('gender')}. History: {patient_profile.get('medical_history')}. Diagnosis: {diagnosis}"
-        prompt = f"Create a personalized care plan (diet, lifestyle, monitoring) for: {summary}"
+        """Create a personalized care plan using Registry."""
+        from agents.prompts.registry import PROMPT_REGISTRY
+        entry = PROMPT_REGISTRY.get("MED-GEN-PLAN-001")
+        if not entry: return "Care plan prompt missing."
+        
+        summary = f"Age: {patient_profile.get('age')}, Gender: {patient_profile.get('gender')}. Region: {patient_profile.get('country')}"
         
         try:
+            prompt = entry.content.format(diagnosis=diagnosis, profile_summary=summary)
             response = self.llm.invoke([
                 SystemMessage(content="You are a Personalized Care Specialist. Output actionable, safe lifestyle advice."),
                 HumanMessage(content=prompt)

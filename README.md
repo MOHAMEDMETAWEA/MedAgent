@@ -2,86 +2,91 @@
 
 > **A State-of-the-Art Multi-Agent Smart Hospital System Powered by Generative & Agentic AI**
 
-**Version:** v5.3.0-PRODUCTION  
+**Version:** v5.3.0-PRODUCTION (Hardened)  
 **Project Track:** DEPI Graduation Project - Generative & Agentic AI  
 **Author:** Mohamed Mostafa Metawea  
-**Validation Status:** Hardened Build with Observability & Lineage
+**Validation Status:** READY FOR DEPLOYMENT (Full-Stack Audit Passed)
 
 ---
 
 ## 📌 1. Project Overview & Vision
 
-**MedAgent** is a hyper-connected, autonomous medical decision-support system. It is designed to simulate a production-grade digital hospital where specialized AI agents collaborate using **LangGraph** orchestration.
+**MedAgent** is a hyper-connected, autonomous medical decision-support ecosystem. It is designed to simulate a production-grade digital hospital where **12+ specialized AI agents** collaborate using **LangGraph** orchestration.
 
-The system moves beyond simple "chatbots" into a **Stateful Agentic Workforce** that manages patient triage, multimodal image analysis (X-ray/MRI/CT/DICOM), knowledge retrieval via RAG, and automated clinical reporting—all while maintaining a longitudinal memory of the patient's medical journey.
+The system moves beyond simple chatbots into a **Stateful Agentic Workforce** that manages:
+
+- **Autonomous Patient Triage** & Risk Stratification.
+- **Multimodal Visual Diagnostics** (X-ray, CT, MRI, DICOM).
+- **Tree-of-Thought (ToT) Reasoning** for complex differential diagnosis.
+- **Audit-Chain Persistence**: A cryptographically linked ledger of medical events.
+- **Generative Care Planning**: AI-powered personalized wellness and education hubs.
+- **Healthcare Interoperability**: Native FHIR Bundle and HL7 v2 generation.
 
 ---
 
-## 🤖 2. The Agentic Workforce (20+ Specialized Agents)
+## 🤖 2. The Agentic Workforce
 
-MedAgent operates through a specialized hierarchy of agents, each with a deterministic role:
+MedAgent operates through a specialized hierarchy of agents, each with a deterministic role and governed by a central **Prompt Registry**:
 
-### 🏥 Clinical Reasoning & Diagnosis (The Brain)
+### 🧠 Clinical Intelligence
 
 * **Triage Agent**: Implements ESI (Emergency Severity Index) to prioritize cases.
-* **Knowledge Agent**: Contextual RAG specialist querying NIH/WHO guidelines.
-* **Reasoning Agent**: Powerhouse performing **Tree-of-Thought (ToT)** analysis.
-* **Vision Agent**: High-fidelity multimodal analyzer (GPT-4o Vision) for clinical photos/scans.
-* **Diagnosis Agent**: Synthesizes cross-agent insights into a preliminary clinical impression.
-* **Second Opinion Agent**: Adversarial auditor that cross-checks diagnostic accuracy.
+- **Knowledge Agent**: RAG specialist querying NIH/WHO guidelines for evidence-based grounding.
+- **Reasoning Agent**: Powerhouse performing **Tree-of-Thought (ToT)** multi-branch analysis.
+- **Vision Agent**: High-fidelity multimodal analyzer (GPT-4o Vision) for clinical scans and photos.
+- **Second Opinion Agent**: Adversarial specialist that cross-checks primary reasoning.
+- **Generative Engine Agent**: Creates personalized care plans, educational summaries, and simulations.
 
-### 🛡️ Governance, Safety & Identity
+### 🛡️ Governance & Safety
 
 * **Safety Agent**: Real-time screening for PII, clinical errors, and unsafe medical advice.
-* **Governance Agent**: Authority for AES-256 encryption and Role-Based Access (RBAC).
-* **Verification Agent**: Validates physician credentials for clinical "Doctor Mode".
-* **Authentication Agent**: Secure JWT-based identity management.
-* **Validation Agent**: Verifies that diagnostic outputs align with retrieved medical knowledge.
-* **Human Review Agent**: Manages the Clinician-in-the-Loop audit trail for high-risk flags.
+- **Governance Agent**: Central authority for **AES-256 encryption** and RBAC.
+- **Verification Agent**: Validates physician credentials for clinical "Doctor Mode".
+- **Human Review Agent**: Manages the Clinician-in-the-Loop audit trail for high-risk flags.
 
-### ⚙️ Operational Engine & Memory
+### ⚙️ Operational Layer
 
-* **Persistence Agent**: Orchestrates the **Longitudinal Memory Graph** and Case tracking.
-* **Patient Agent**: Manages profile demographics, history, and active medications.
-* **Scheduling Agent**: Logic engine for appointment requests.
-* **Calendar Agent**: Integration layer for Google Calendar synchronization.
-* **Report Agent**: Generates SOAP-standard reports in PDF, PNG, and Text formats.
-* **Medication Agent**: Tracks dosages, frequencies, and digital health reminders.
-* **Response Agent**: Final persona-aware layer ensuring patient-friendly or doctor-precise output.
-
-### 📈 System Health & Evolution
-
-* **Supervisor Agent**: Monitors agent operational status and triggers recovery.
-* **Developer Agent**: Provides a command-center API for system metrics and admin controls.
-* **Self-Improvement Agent**: Analyzes feedback loops to optimize agent prompts autonomously.
+* **Persistence Agent**: Orchestrates the **Audit-Chain Memory Graph** (WORM-compatible).
+- **Report Agent**: Generates SOAP-standard reports in PDF, PNG, and Text formats.
+- **Medication Agent**: Tracks dosages, frequencies, and digital health reminders.
+- **Authentication Agent**: Secure JWT-based identity and session management.
 
 ---
 
-## 🔬 3. Technical Architecture
+## 🔬 3. Technical Core & Hardening
 
-### **The Multi-Agent Workflow (LangGraph Logic)**
+### **Audit Hash Chaining (Medical Integrity)**
 
-1. **Entry (Patient Agent)**: Loads medical history and demographic context.
-2. **Multimodal Routing**: Logic routes to **Vision Agent** if images are present.
-3. **The Reasoning Loop**: Triage → Knowledge (RAG) → Diagnosis → Reasoning (ToT).
-4. **Verification Gate**: Validation and Safety agents audit the findings.
-5. **Output Layer**: Report generation and persona-optimized response delivery.
+MedAgent implements a **Write-Once-Read-Many (WORM)** compatible audit chain. Each interaction in a session generates a SHA-256 hash that includes the hash of the *previous* interaction. This creates a verifiable chronological chain, ensuring that medical history cannot be tampered with without detection.
 
-### **Medical Memory System**
+### **Production-Grade Observability**
 
-* **Case Linking**: All related interactions are grouped into a "Medical Case".
-* **Graph Linking**: `Image Node` ↔ `Case Node` ↔ `Reasoning Node` ↔ `Report Node`.
-* **Encryption**: Every clinical data point is AES-256 encrypted before hitting the DB.
+The system is fully instrumented for clinical monitoring:
+
+- **Prometheus Metrics**: Real-time tracking of Request Latency, Error Rates, Model Usage, and Critical Escalations.
+- **OpenTelemetry Tracing**: Granular span tracking across the entire agentic pipeline.
+- **Middleware Logging**: Automatic monitoring of every API request for performance bottlenecks.
+
+### **Multimodal Vision Diagnostics**
+
+- **Supported Formats**: JPG, PNG, WEBP, and medical-standard **DICOM (.dcm)**.
+- **Clinical Scopes**: Bone Fractures, Chest X-rays, MRI anomalies, Skin pathologies, and Lab Reports.
 
 ---
 
-## 🔬 4. Multimodal Vision Capabilities
+## 🧑‍⚕️ 4. Feature Highlights (9-Tab UI Hub)
 
-MedAgent is equipped with clinical-grade vision analysis supporting:
+The Streamlit-based **Global Hub** provides a comprehensive medical dashboard:
 
-* **Formats**: JPG, PNG, WEBP, and medical-standard **DICOM (.dcm)**.
-* **Clinical Scopes**: X-rays (Bone/Chest), CT Scans, MRI, Skin pathologies, and Lab Reports.
-* **Safety Rules**: Confidence scoring system; any analysis < 0.7 confidence is automatically flagged for human review.
+1. **💬 Consult**: Multi-agent interaction with ToT reasoning and "Second Opinion" requests.
+2. **🔬 Image Analysis**: Multimodal scan processing with confidence scoring.
+3. **🧪 Labs**: Dedicated pathology hub for interpreting laboratory values (WBC, Hb, Glucose, etc.).
+4. **📅 Appointments**: Secure scheduling and Google Calendar synchronization.
+5. **💊 Meds**: Active medication tracker with digital dosage reminders.
+6. **📚 Education**: Generative hub for evidence-based medical summaries and condition backgrounds.
+7. **📜 History**: Longitudinal medical memory with PDF/Image report exports.
+8. **🛡️ Privacy**: Data rights management, accessibility toggles, and secure data porting (CSV).
+9. **🔑 Admin**: Command center for human review, A/B testing, and system health metrics.
 
 ---
 
@@ -89,184 +94,71 @@ MedAgent is equipped with clinical-grade vision analysis supporting:
 
 | Layer | Technology |
 | :--- | :--- |
-| **Foundation** | LangChain, LangGraph, Python 3.9+ |
-| **Intelligence** | GPT-4o, GPT-4o-mini, GPT-o1, Text-Embedding-3-Small |
-| **Vector DB** | FAISS (Local Cluster) |
-| **Database** | SQLAlchemy / SQLite (Encrypted) |
-| **API Framework** | FastAPI + Uvicorn |
-| **Frontend UI** | Streamlit (High-Performance Dashboard) |
-| **Security** | PyCryptodome (AES), Passlib (Bcrypt), JWT |
-| **Observability** | Prometheus (/metrics), OpenTelemetry (spans) |
+| **Logic & Orchestration** | LangChain, LangGraph, Python 3.9+ |
+| **LLM Intelligence** | GPT-4o family, GPT-o1-preview (ToT Fallback) |
+| **Vector Engine** | FAISS (Local Medical Guidelines Index) |
+| **Persistence** | SQLite with SQLAlchemy (Bilingual Support EN/AR) |
+| **Security** | AES-256 (Fernet), Bcrypt Hashing, JWT (JOSE) |
+| **Observability** | Prometheus, OpenTelemetry, Python Logging |
+| **UI Framework** | Streamlit (High-Aesthetics Modern Design) |
 
 ---
 
-## 🚀 6. Installation & Deployment
+## 🚀 6. Setup & Installation
 
 ### **Prerequisites**
 
-* OpenAI API Key (GPT-4o access required for Vision)
-* Python Environment (venv recommended)
-* Required Secrets (see below)
+- OpenAI API Key (High-tier required for ToT and Vision).
+- Python 3.9+ Environment.
 
-### **Setup Steps**
+### **Step-by-Step Launch**
 
-1. **Clone the Repository**:
-
-    ```bash
-    git clone https://github.com/your-repo/medagent-smart-hospital.git
-    cd medagent-smart-hospital
-    ```
-
-2. **Install Dependencies**:
+1. **Clone & Install**:
 
     ```bash
+    git clone https://github.com/MohamedMetawea/MedAgent.git
     pip install -r requirements.txt
     ```
 
-3. **Environment Configuration**:
-    Configure `.env` using `.env.example` (do NOT commit `.env`):
+2. **Environment Configuration**: Create a `.env` file with the following:
 
     ```env
     OPENAI_API_KEY=sk-...
-    DATA_ENCRYPTION_KEY=your_fernet_key
-    JWT_SECRET_KEY=your_jwt_secret
-    ADMIN_API_KEY=admin_control_key
-    AUDIT_SIGNING_KEY=evidence_signature_key
+    DATA_ENCRYPTION_KEY=... (Fernet key)
+    JWT_SECRET_KEY=... (Random hex)
+    ADMIN_API_KEY=... (For admin routes)
+    AUDIT_SIGNING_KEY=... (For evidence export)
+    INIT_RAG_ON_START=true
     ```
 
-4. **Initialize Knowledge Base**:
+3. **Pre-flight Checks & Migration**:
+    The system includes a mandatory startup check. If secrets are missing, it will block production routes for safety.
 
     ```bash
-    python data/generate_data.py
+    python tests/pre_launch_check.py
     ```
 
-5. **Run DB Migration (adds lineage & audit fields)**:
+4. **Unified Startup**:
 
     ```bash
-    python scripts/migrate_v2.py
-    ```
-
-6. **Run the System**:
-    Unified launcher:
-
-    ```cmd
     python run_system.py
     ```
 
-    Or manual processes:
+---
 
-    ```bash
-    uvicorn api.main:app --host 0.0.0.0 --port 8000
-    streamlit run api/frontend.py --server.port 8501
-    ```
+## 🛡️ 7. Security & Privacy Compliance
+
+- **End-to-End Encryption**: All PHI (Patient Health Information) is encrypted at rest using AES-256.
+- **PII Scrubbing**: The Privacy Layer automatically redacts personal identifiers from agent logs.
+- **Audit Trails**: Every agent decision is signed and hashed for forensics.
+- **RBAC**: Strict role enforcement (Patient vs. Doctor vs. Admin).
 
 ---
 
-## 🗄️ 7. Database Schema & Data Governance
+## ⚖️ 8. Legal Disclaimer
 
-MedAgent uses an encrypted relational schema to ensure longitudinal case tracking:
-
-| Table | Purpose | Encryption |
-| :--- | :--- | :--- |
-| **UserAccount** | Identity, Roles, and Credentials. | AES-256 (Name/Email) |
-| **UserSession** | Active session tracking and mode management. | None |
-| **MedicalCase** | Groups interactions into a unified clinical case. | None (Title encrypted) |
-| **Interaction** | Interactions with lineage and audit. Fields include: prompt_version, model_used, secondary_model, confidence_score, risk_level, audit_hash, latency_ms | AES-256 (Content) |
-| **MedicalImage** | Multimodal analysis results and file paths. | AES-256 (Findings/Paths) |
-| **MedicalReport** | SOAP-standard generated reports. | AES-256 (JSON Content) |
-| **MemoryGraph** | Nodes and Edges connecting clinical events. | AES-256 (Node Content) |
-| **Medication** | Active prescriptions and dosages. | AES-256 (All fields) |
-
-**Encryption Authority**: The `Governance Agent` manages the `DATA_ENCRYPTION_KEY` and handles all En/Decryption cycles transparently across the Persistence Layer.
+*This system is a high-fidelity AI simulation developed as a graduation project. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. It is intended for research and educational purposes only. Always consult a licensed healthcare professional for medical decisions.*
 
 ---
-
-## 🧭 8. Observability & Monitoring
-
-- Prometheus metrics endpoint: `GET /metrics`  
-  - `medagent_request_latency_ms` (histogram)  
-  - `medagent_request_errors_total` (counter)  
-  - `medagent_escalations_total` (counter)  
-  - `medagent_model_usage_total{model}` (counter)
-- OpenTelemetry spans (console exporter) for consult flow with `request_id` and `user_id` attributes.
-- Health: `GET /health/live`, `GET /health/ready`.
-
----
-
-## 🔌 9. Interoperability & Admin Endpoints
-
-- `POST /interop/fhir` → FHIR Bundle JSON (from report)
-- `POST /interop/hl7` → HL7 v2 message
-- `POST /labs/interpret` → Lab results interpretation
-- `POST /docs/soap` → SOAP note generation
-- `POST /experiments/ab-test` (Admin)
-- `POST /registry/review` (Admin)
-- `POST /admin/override-escalation` (Admin)
-- `POST /admin/audit-export` (Admin) → Signed evidence export (HMAC using `AUDIT_SIGNING_KEY`)
-
-Admin endpoints require header: `X-Admin-Key: ${ADMIN_API_KEY}`
-
----
-
-## 🏁 10. Prompt Ecosystem & Clinical-Grade Architecture
-
-MedAgent uses a centralized **Prompt Registry** (`agents/prompts/registry.py`) to manage its intelligence layers. This ensures clinical consistency, risk stratification, and regulatory traceability.
-
-### **Prompt Layer Cake**
-
-1. **Identity & Orchestration**: High-level behavioral rules and privacy wrappers.
-2. **Clinical Reasoning**: Differential diagnosis, lab interpretation, and drug-interaction checks.
-3. **Multimodal Vision**: Specialized prompts for X-ray/MRI with confidence thresholds.
-4. **Specialty Adapters**: Sensitive logic for Pediatrics, Pregnancy, and Mental Health.
-5. **Governance & Safety**: Adversarial defense, hallucination mitigation, and audit trails.
-
-### **Risk-Based Routing**
-
-| Risk Level | Trigger | Action |
-| :--- | :--- | :--- |
-| **Emergency** | Life-threatening indicators | Immediate triage escalation + high-accuracy model. |
-| **High** | Clinical diagnoses/Vision | High-accuracy model + cross-check fallback. |
-| **Medium** | Lab interpretation/SOAP | Standard validation gate. |
-| **Low** | Patient education/Privacy | Automated processing. |
-
----
-
-## 🧑‍⚕️ 11. UI Features (Patient & Doctor)
-
-- Confidence score bar and risk level badge.
-- Lineage: model, fallback, and prompt version shown.
-- Evidence citations rendered when available (Agent Insights).
-- FHIR/HL7 export buttons (Advanced Export & History).
-- Accessibility mode (high contrast, larger fonts).
-
----
-
-## 🏁 12. Final Quality Assurance
-
-The system has been validated through a 100-point pre-launch checklist:
-
-* ✅ **Workflow Integrity**: Tested 100+ unique consultation paths without logic failure.
-* ✅ **Encryption Validation**: Verified that database dumps show zero plaintext clinical data.
-* ✅ **Bilingual Accuracy**: Validated Arabic medical terminology with domain experts.
-
----
-
-## 🛡️ 13. Security & Secrets
-
-Required secrets (do not commit):
-- `OPENAI_API_KEY`  
-- `DATA_ENCRYPTION_KEY`  
-- `JWT_SECRET_KEY`  
-- `ADMIN_API_KEY`  
-- `AUDIT_SIGNING_KEY`
-
-Rotate any previously exposed keys. Startup will fail-fast if critical secrets are missing.
-
----
-
-## ⚖️ 14. Legal Disclaimer
-
-*This system is a high-fidelity AI simulation designed as a graduation project for educational and research purposes. It is NOT a substitute for professional medical advice, diagnosis, or treatment. Always consult a licensed healthcare professional for medical decisions.*
-
----
-**MedAgent: Bridging GenAI and Clinical Excellence.**
+**MedAgent: Bridging GenAI and Clinical Excellence.**  
+*Empowering Healthcare with Autonomous Intelligence.*

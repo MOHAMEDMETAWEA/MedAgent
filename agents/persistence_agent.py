@@ -12,6 +12,7 @@ from database.models import SessionLocal, UserSession, Interaction, SystemLog, P
 from agents.governance_agent import GovernanceAgent
 from config import settings
 import hashlib
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +57,12 @@ class PersistenceAgent:
             secondary_model = result.get("secondary_model")
             confidence_score = result.get("confidence_score")
             risk_level = result.get("risk_level")
-            latency_ms = result.get("latency_ms")
-            # Compute audit hash (chainable) using encrypted payloads for privacy
-            base_str = f"{session_id}|{enc_input}|{self.governance.encrypt(result.get('final_response',''))}|{model_used or ''}|{prompt_version or ''}|{datetime.datetime.utcnow().isoformat()}"
+            # 4. Compute chainable audit hash
+            # Fetch previous interaction hash in this session for chaining
+            prev_interaction = self.db.query(Interaction).filter(Interaction.session_id == session_id).order_by(Interaction.timestamp.desc()).first()
+            prev_hash = prev_interaction.audit_hash if prev_interaction else "GENESIS"
+            
+            base_str = f"{session_id}|{enc_input}|{enc_response}|{model_used or ''}|{prompt_version or ''}|{prev_hash}|{datetime.datetime.utcnow().isoformat()}"
             audit_hash = hashlib.sha256(base_str.encode("utf-8")).hexdigest()
             
             interaction = Interaction(
@@ -75,6 +79,7 @@ class PersistenceAgent:
                 confidence_score=confidence_score,
                 risk_level=risk_level,
                 audit_hash=audit_hash,
+                previous_audit_hash=prev_hash,
                 latency_ms=latency_ms
             )
             self.db.add(interaction)

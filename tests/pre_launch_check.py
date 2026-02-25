@@ -57,8 +57,8 @@ def record(test_name: str, passed: bool, detail: str = "", critical: bool = Fals
         "detail": detail,
         "critical": critical and not passed,
     })
-    icon = "✅" if passed else "❌"
-    logger.info(f"{icon} {test_name}: {status} {('| ' + detail) if detail else ''}")
+    status_icon = "[OK]" if passed else "[FAIL]"
+    logger.info(f"{status_icon} {test_name}: {status} {('| ' + detail) if detail else ''}")
 
 def timed(label):
     """Context manager for timing a block."""
@@ -549,52 +549,48 @@ def generate_report():
     critical_fails = [r for r in results if r.get("critical")]
 
     print("\n")
-    print("╔" + "═" * 60 + "╗")
-    print("║" + "  MEDAgent PRE-LAUNCH SYSTEM TEST REPORT  ".center(60) + "║")
-    print("║" + f"  {datetime.datetime.now().isoformat()}  ".center(60) + "║")
-    print("╠" + "═" * 60 + "╣")
-    print(f"║  Total Tests:    {total:<42}║")
-    print(f"║  ✅ Passed:       {passed:<42}║")
-    print(f"║  ❌ Failed:       {failed:<42}║")
-    print(f"║  🚨 Critical:    {len(critical_fails):<42}║")
-    print("╠" + "═" * 60 + "╣")
+    print("=" * 60)
+    print("  MEDAgent PRE-LAUNCH SYSTEM TEST REPORT  ".center(60))
+    print(f"  {datetime.datetime.now().isoformat()}  ".center(60))
+    print("-" * 60)
+    print(f"  Total Tests:    {total:<42}")
+    print(f"  Passed:          {passed:<42}")
+    print(f"  Failed:          {failed:<42}")
+    print(f"  Critical:        {len(critical_fails):<42}")
+    print("-" * 60)
 
     if critical_fails:
-        print("║  🚨 CRITICAL ISSUES (MUST RESOLVE BEFORE LAUNCH):       ║")
+        print("  CRITICAL ISSUES (MUST RESOLVE BEFORE LAUNCH):")
         for cf in critical_fails:
             name = cf['test'][:50]
-            print(f"║   - {name:<55}║")
+            print(f"   - {name:<55}")
             if cf.get("detail"):
                 det = cf['detail'][:52]
-                print(f"║     {det:<55}║")
-        print("╠" + "═" * 60 + "╣")
+                print(f"     {det:<55}")
+        print("-" * 60)
 
     if timings:
-        print("║  ⏱  PERFORMANCE TIMINGS:                                ║")
+        print("  PERFORMANCE TIMINGS:")
         for label, secs in timings.items():
             line = f"{label}: {secs}s"
-            print(f"║   {line:<57}║")
-        print("╠" + "═" * 60 + "╣")
+            print(f"   {line:<57}")
+        print("-" * 60)
 
     # Verdict
     if not critical_fails:
-        print("║                                                            ║")
-        print("║   ✅ SYSTEM IS READY FOR LAUNCH                           ║")
-        print("║                                                            ║")
+        print("   SYSTEM IS READY FOR LAUNCH")
     else:
-        print("║                                                            ║")
-        print("║   ❌ SYSTEM HAS CRITICAL ISSUES — DO NOT LAUNCH           ║")
-        print("║                                                            ║")
-    print("╚" + "═" * 60 + "╝")
+        print("   SYSTEM HAS CRITICAL ISSUES - DO NOT LAUNCH")
+    print("=" * 60)
 
     # Full details
     print("\n--- DETAILED RESULTS ---")
     for r in results:
-        icon = "✅" if r["status"] == "PASS" else "❌"
-        crit = " 🚨" if r.get("critical") else ""
-        print(f"  {icon} {r['test']}: {r['status']}{crit}")
+        status_label = "[OK]" if r["status"] == "PASS" else "[FAIL]"
+        crit = " [CRITICAL]" if r.get("critical") else ""
+        print(f"  {status_label} {r['test']}: {r['status']}{crit}")
         if r.get("detail"):
-            print(f"      └─ {r['detail']}")
+            print(f"      L- {r['detail']}")
 
     # Save to file
     report_path = PROJECT_ROOT / "PRE_LAUNCH_TEST_REPORT.md"
@@ -622,17 +618,18 @@ def generate_report():
             for label, secs in timings.items():
                 f.write(f"- **{label}**: {secs}s\n")
 
-        verdict = "✅ READY FOR LAUNCH" if not critical_fails else "❌ CRITICAL ISSUES — DO NOT LAUNCH"
+        verdict = "✅ READY FOR LAUNCH" if not critical_fails else "❌ CRITICAL ISSUES -- DO NOT LAUNCH"
         f.write(f"\n## Verdict\n\n**{verdict}**\n")
 
     logger.info(f"Report saved to: {report_path}")
     return len(critical_fails) == 0
 
 
+
 if __name__ == "__main__":
-    print("╔══════════════════════════════════════════════════════╗")
-    print("║   MEDAgent PRE-LAUNCH SYSTEM CHECK v5.0 — START     ║")
-    print("╚══════════════════════════════════════════════════════╝")
+    print("=" * 60)
+    print("   MEDAgent PRE-LAUNCH SYSTEM CHECK v5.0 -- START     ")
+    print("=" * 60)
 
     api_key_available = test_configuration()
     agents_loaded = test_agent_loading()

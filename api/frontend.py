@@ -217,14 +217,19 @@ with st.sidebar:
             l_id = st.text_input("ID / Email / Phone")
             l_pw = st.text_input("Password", type="password")
             if st.button("Sign In"):
-                r = requests.post(f"{API_BASE}/auth/login", json={"login_id": l_id, "password": l_pw})
-                if r.ok:
-                    data = r.json()
-                    st.session_state["auth_token"] = data["access_token"]
-                    st.session_state["user_info"] = data["user"]
-                    st.session_state["session_id"] = data["session_id"]
-                    st.rerun()
-                else: st.error("Invalid credentials.")
+                try:
+                    r = requests.post(f"{API_BASE}/auth/login", json={"login_id": l_id, "password": l_pw}, timeout=10)
+                    if r.ok:
+                        data = r.json()
+                        st.session_state["auth_token"] = data["access_token"]
+                        st.session_state["user_info"] = data["user"]
+                        st.session_state["session_id"] = data["session_id"]
+                        st.rerun()
+                    else: st.error("Invalid credentials.")
+                except requests.exceptions.ConnectionError:
+                    st.error("❌ Cannot connect to backend API. Please ensure the backend is running (run_backend.bat).")
+                except Exception as e:
+                    st.error(f"Login error: {e}")
             if st.button("New here? Register"): st.session_state["auth_mode"] = "register"; st.rerun()
         else:
             r_un = st.text_input("Username")
@@ -251,9 +256,14 @@ with st.sidebar:
                     "country": r_cnt,
                     "role": r_rol
                 }
-                r = requests.post(f"{API_BASE}/auth/register", json=payload)
-                if r.ok: st.success("Created! Sign in now."); st.session_state["auth_mode"] = "login"; st.rerun()
-                else: st.error(f"Registration failed: {r.text}")
+                try:
+                    r = requests.post(f"{API_BASE}/auth/register", json=payload, timeout=10)
+                    if r.ok: st.success("Created! Sign in now."); st.session_state["auth_mode"] = "login"; st.rerun()
+                    else: st.error(f"Registration failed: {r.text}")
+                except requests.exceptions.ConnectionError:
+                    st.error("❌ Cannot connect to backend API. Please ensure the backend is running (run_backend.bat).")
+                except Exception as e:
+                    st.error(f"Registration error: {e}")
             if st.button("Back to Login"): st.session_state["auth_mode"] = "login"; st.rerun()
 
 # --- MAIN INTERFACE ---
@@ -284,7 +294,7 @@ if not st.session_state["auth_token"]:
         st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=250)
         st.info("🔒 **Secure & Private**: All data is encrypted and stored according to global health authority standards.")
 else:
-    t1, t2, t3, t4, t5, t6, t7 = st.tabs(["💬 Consult", "🔬 Image Analysis", "📅 Appointments", "💊 Meds", "📜 History", "🛡️ Privacy", "🔑 Admin"])
+    t1, t2, t3, t4, t5, t6, t7, t8, t9 = st.tabs(["💬 Consult", "🔬 Image Analysis", "🧪 Labs", "📅 Appointments", "💊 Meds", "📚 Education", "📜 History", "🛡️ Privacy", "🔑 Admin"])
     
     # --- TAB 1: CONSULTATION ---
     with t1:
@@ -408,7 +418,20 @@ else:
                         st.markdown(f"[🖼️ Image]({API_BASE}/reports/{res['report_id']}/export?format=image)")
                     with c3:
                         st.markdown(f"[📝 Text]({API_BASE}/reports/{res['report_id']}/export?format=text)")
-                
+                    
+                    st.markdown("---")
+                    st.write("### 🥗 Actionable Clinical Care Plan")
+                    if st.button("✨ Generate Personalized Care Plan"):
+                        with st.spinner("Creating your custom wellness plan..."):
+                            plan_r = api_call("POST", "/generative/care-plan", {
+                                "diagnosis": res.get("preliminary_diagnosis", "General health assessment"),
+                                "patient_profile": st.session_state["user_info"]
+                            })
+                            if plan_r and plan_r.ok:
+                                st.success("Your Personalized Plan is Ready!")
+                                st.markdown(plan_r.json().get("content"))
+                            else: st.error("Failed to generate plan.")
+
                 with st.expander("🛠️ Advanced Export"):
                     st.download_button("Download Raw JSON", data=json.dumps(res, indent=2), file_name="medical_report.json")
                     if res.get("report_id"):
@@ -554,8 +577,21 @@ else:
                         if img.get("findings"):
                             st.json(img["findings"])
 
-    # --- TAB 3: APPOINTMENTS ---
+    # --- TAB 3: LABS ---
     with t3:
+        st.subheader("🧪 Laboratory Result Interpretation / تفسير النتائج المخبرية")
+        st.write("Paste your lab results (blood test, urinalysis, etc.) for AI interpretation and clinical context.")
+        lab_text = st.text_area("Lab Data", height=200, placeholder="WBC: 12.0, Hb: 10.5, Glucose: 200...")
+        if st.button("Interpret Labs"):
+            with st.spinner("Pathology Agent analyzing..."):
+                r = api_call("POST", "/labs/interpret", data={"lab_data": lab_text})
+                if r and r.ok:
+                    st.info("📊 Clinical Interpretation")
+                    st.markdown(r.json().get("interpretation"))
+                else: st.error("Interpretation failed.")
+
+    # --- TAB 4: APPOINTMENTS ---
+    with t4:
         st.subheader("Clinical Appointments & Scheduling")
         st.write("Manage your upcoming sessions with specialized agents or human doctors.")
         
@@ -578,8 +614,8 @@ else:
         
         st.info("💡 **Tip:** To book a new appointment, simply type 'Book an appointment for tomorrow at 10am' in the consultation symptoms box.")
 
-    # --- TAB 4: MEDICATION ---
-    with t4:
+    # --- TAB 5: MEDICATION ---
+    with t5:
         st.subheader("Medication Tracker & Digital Reminders")
         mc1, mc2 = st.columns(2)
         
@@ -609,8 +645,21 @@ else:
                 api_call("POST", "/reminders", {"title": r_title, "time": r_time})
                 st.success("Reminder set!")
 
-    # --- TAB 5: HISTORY ---
-    with t5:
+    # --- TAB 6: EDUCATION ---
+    with t6:
+        st.subheader("📚 Medical Knowledge Hub")
+        st.write("Get evidence-based education on medical conditions and treatments.")
+        topic = st.text_input("Enter Topic (e.g. Type 2 Diabetes Management)")
+        if st.button("Generate Educational Summary"):
+            with st.spinner("Consulting Knowledge Agents..."):
+                r = api_call("POST", "/generative/education", {"topic": topic, "lang": st.session_state["language"]})
+                if r and r.ok:
+                    st.success(f"Context: {topic}")
+                    st.markdown(r.json().get("content"))
+                else: st.error("Failed to generate content.")
+
+    # --- TAB 7: HISTORY ---
+    with t7:
         st.subheader("Long-Term Medical Memory & Reports")
         r = api_call("GET", "/reports")
         if r and r.ok:
@@ -644,8 +693,8 @@ else:
                             else:
                                 st.error("HL7 generation failed.")
 
-    # --- TAB 6: PRIVACY ---
-    with t6:
+    # --- TAB 8: PRIVACY ---
+    with t8:
         st.subheader("Data Rights & System Support")
         acc = st.checkbox("Accessibility Mode (High Contrast / Larger Fonts)")
         if acc:
@@ -669,12 +718,12 @@ else:
         st.text_area("Message Support")
         if st.button("Send to Support Hub"): st.success("Message queued.")
 
-    # --- TAB 7: ADMIN ---
-    with t7:
-        if st.session_state["user_info"]["role"] != "admin":
-            st.warning("Admin Clearance Required.")
+    # --- TAB 9: ADMIN ---
+    with t9:
+        if st.session_state["user_info"]["role"] != "admin" and st.session_state["user_info"]["role"] != "doctor":
+             st.warning("Admin/Doctor Clearance Required.")
         else:
-            st.subheader("Admin Control Panel")
+            st.subheader("Medical Intelligence Control Panel")
             st.write("#### 🏥 System Health")
             r_hp = api_call("GET", "/system/health")
             if r_hp and r_hp.ok: st.json(r_hp.json())

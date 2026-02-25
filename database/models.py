@@ -1,9 +1,9 @@
 """
 Database Models - Enhanced for Feedback, Human Review, and Self-Improvement.
 """
-4→import datetime
-5→import enum
-6→from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean, Enum, Float
+import datetime
+import enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean, Enum, Float
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from sqlalchemy import create_engine
 
@@ -82,6 +82,7 @@ class Interaction(Base):
     confidence_score = Column(Float, nullable=True)
     risk_level = Column(String, nullable=True)  # low, medium, high, critical
     audit_hash = Column(String, nullable=True)
+    previous_audit_hash = Column(String, nullable=True)
     secondary_model = Column(String, nullable=True)
     latency_ms = Column(Integer, nullable=True)
     

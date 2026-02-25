@@ -12,6 +12,14 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Dict
 
+import bcrypt
+# Monkeypatch bcrypt for passlib compatibility in newer versions
+if not hasattr(bcrypt, "__about__"):
+    class BcryptAbout:
+        __version__ = getattr(bcrypt, "__version__", "unknown")
+    bcrypt.__about__ = BcryptAbout()
+
+
 _root = Path(__file__).resolve().parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
@@ -30,8 +38,10 @@ from agents.developer_agent import DeveloperControlAgent
 from agents.authentication_agent import AuthenticationAgent
 from agents.human_review_agent import HumanReviewAgent
 from agents.medication_agent import MedicationAgent
-from agents.report_agent import ReportAgent
 from agents.calendar_agent import CalendarAgent
+from agents.generative_engine_agent import GenerativeEngineAgent
+from agents.report_agent import ReportAgent
+from agents.interop.fhir_hl7_builder import InteropBuilder
 from config import settings
 from utils.safety import validate_medical_input, sanitize_input
 from utils.rate_limit import check_rate_limit, get_client_identifier
@@ -66,6 +76,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return payload
 
 app = FastAPI(title="MedAgent Global System", version="5.3.0-PRODUCTION")
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting MedAgent Global System...")
+    # Strict Secret Verification
+    if not settings.OPENAI_API_KEY or "your-openai-key" in settings.OPENAI_API_KEY:
+        logger.critical("PRODUCTION BLOCKER: OPENAI_API_KEY is missing or invalid.")
+        # We don't exit(1) to allow the process to stay alive for metrics/logs, but routes will fail.
+    if not settings.JWT_SECRET_KEY:
+        logger.critical("PRODUCTION BLOCKER: JWT_SECRET_KEY is missing.")
+    if not settings.DATA_ENCRYPTION_KEY:
+        logger.critical("PRODUCTION BLOCKER: DATA_ENCRYPTION_KEY is missing.")
+
 
 # Restrictive CORS by default (can be widened via env in future)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:8501"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -171,6 +194,18 @@ _medication_agent = None
 _report_agent = None
 _calendar_agent = None
 _verification_agent = None
+_generative_engine = None
+_interop_builder = None
+
+def get_generative_engine():
+    global _generative_engine
+    if _generative_engine is None: _generative_engine = GenerativeEngineAgent()
+    return _generative_engine
+
+def get_interop_builder():
+    global _interop_builder
+    if _interop_builder is None: _interop_builder = InteropBuilder()
+    return _interop_builder
 
 def get_verification_agent():
     global _verification_agent
@@ -227,9 +262,6 @@ def get_calendar_agent():
     global _calendar_agent
     if _calendar_agent is None: _calendar_agent = CalendarAgent()
     return _calendar_agent
-    
-def get_interop_builder():
-    return InteropBuilder()
 
 # --- DEVELOPER/SYSTEM ROUTES ---
 @app.get("/system/health", dependencies=[Depends(check_admin_auth)])
@@ -669,9 +701,38 @@ async def consult(request: PatientRequest, background_tasks: BackgroundTasks, re
         logger.error(f"Consultation failure: {e}")
         try:
             REQUEST_ERRORS.inc()
-        except Exception:
-            pass
+        except: pass
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- GENERATIVE ENGINE ROUTES ---
+class EduRequest(BaseModel):
+    topic: str
+    audience: str = "patient"
+    lang: str = "en"
+
+class PlanRequest(BaseModel):
+    diagnosis: str
+    patient_profile: dict
+
+@app.post("/generative/education")
+async def generate_education(req: EduRequest, user: dict = Depends(get_current_user)):
+    gen = get_generative_engine()
+    content = gen.generate_educational_content(req.topic, req.audience, req.lang)
+    return {"content": content}
+
+@app.post("/generative/care-plan")
+async def generate_care_plan(req: PlanRequest, user: dict = Depends(get_current_user)):
+    gen = get_generative_engine()
+    content = gen.generate_personalized_plan(req.patient_profile, req.diagnosis)
+    return {"content": content}
+
+@app.post("/generative/simulation")
+async def generate_simulation(condition: str, user: dict = Depends(get_current_user)):
+    if user["role"] != "doctor":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only doctors can run simulations")
+    gen = get_generative_engine()
+    content = gen.generate_simulation_scenario(condition)
+    return {"simulation": content}
 
 @app.post("/feedback")
 async def submit_feedback(fb: FeedbackRequest):
