@@ -134,18 +134,18 @@ if "second_opinion_req" not in st.session_state: st.session_state["second_opinio
 def get_headers():
     return {"Authorization": f"Bearer {st.session_state['auth_token']}"}
 
-def api_call(method, endpoint, data=None, files=None):
+def api_call(method, endpoint, data=None, files=None, timeout=120):
     try:
         url = f"{API_BASE}{endpoint}"
         headers = get_headers()
-        if method == "GET": r = requests.get(url, headers=headers, timeout=10)
+        if method == "GET": r = requests.get(url, headers=headers, timeout=timeout)
         elif method == "POST":
             if files:
                 # When uploading files, don't send json — use data or just files
-                r = requests.post(url, files=files, headers=headers, timeout=60)
+                r = requests.post(url, files=files, headers=headers, timeout=timeout)
             else:
-                r = requests.post(url, json=data, headers=headers, timeout=30)
-        elif method == "DELETE": r = requests.delete(url, headers=headers, timeout=10)
+                r = requests.post(url, json=data, headers=headers, timeout=timeout)
+        elif method == "DELETE": r = requests.delete(url, headers=headers, timeout=timeout)
         return r
     except Exception as e:
         st.error(f"Network error: {e}")

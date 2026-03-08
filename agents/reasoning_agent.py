@@ -66,82 +66,107 @@ class ReasoningAgent:
             adapters = state.get("specialty_adapters", [])
             if adapters:
                 routing_prompt += f"\n\n[Specialty Adapters Engaged]: {', '.join(adapters)}. Adjust reasoning accordingly."
-            # 2. Generate Multiple Thought Paths (ToT Stage)
-            tot_prompt = f"""
-            SYSTEM: You are a Cognitive Medical Reasoning Core. 
-            USER INTERACTION MODE: {mode.upper()}
-            USER ROLE: {role.upper()} (Verified: {verified})
-            PATIENT DEMOGRAPHICS: Age {age}, Gender {gender}, Location {country}
-            
-            INSTRUCTION FROM ROUTING SYSTEM:
-            {routing_prompt}
-
-            TASK: Generate 3 distinct medical reasoning branches.
-            - BRANCH 1: Conservative/Direct evidence only.
-            - BRANCH 2: Contextual/History-linked (look for trends in past sessions).
-            - BRANCH 3: Differential/Rare cases (edge cases or high-risk possibilities).
-
-            Format each branch as:
-            [BRANCH 1]: ...
-            [BRANCH 2]: ...
-            [BRANCH 3]: ...
-            """
-            
             llm = self._get_llm(state)
-            paths_response = llm.invoke([
-                SystemMessage(content="You are a Tree-of-Thought Medical Orchestrator."),
-                HumanMessage(content=tot_prompt)
-            ])
+            risk_level = state.get("risk_level", "low").lower()
             
-            eval_prompt = f"""
-            Review the following 3 Reasoning Branches:
-            {paths_response.content}
+            # --- FAST PATH OPTIMIZATION ---
+            if risk_level not in ["high", "emergency"]:
+                logger.info("--- REASONING AGENT: FAST PATH (Bypassing ToT) ---")
+                direct_prompt = f"""
+                SYSTEM: You are a Cognitive Medical Reasoning Core. 
+                USER INTERACTION MODE: {mode.upper()}
+                USER ROLE: {role.upper()} (Verified: {verified})
+                PATIENT DEMOGRAPHICS: Age {age}, Gender {gender}, Location {country}
+                
+                INSTRUCTION FROM ROUTING SYSTEM:
+                {routing_prompt}
 
-            Evaluate each for:
-            1. Medical Consistency (Alignment with knowledge)
-            2. Safety (Addressing high-risk indicators)
-            3. Evidence Alignment (Clarity and direct mapping)
-
-            Select the BEST branch. 
-            Format your response as a JSON:
-            {{
-                "diagnosis": "The full reasoning of the best branch",
-                "confidence_score": 0.0 to 1.0
-            }}
-            Do not mention that you are a tree of thought. Output final clinical reasoning.
-            """
-            
-            try:
-                final_selection = llm.invoke([
+                TASK: Provide a clear, evidence-based clinical reasoning response based strictly on the provided context and knowledge. 
+                Do not generate multiple branches. Provide the final diagnostic impression directly.
+                """
+                response = llm.invoke([
+                    SystemMessage(content="You are a direct Clinical Reasoning AI."),
+                    HumanMessage(content=direct_prompt)
+                ])
+                diag = response.content
+                conf = 0.8
+                
+            else:
+                # 2. Generate Multiple Thought Paths (ToT Stage)
+                tot_prompt = f"""
+                SYSTEM: You are a Cognitive Medical Reasoning Core. 
+                USER INTERACTION MODE: {mode.upper()}
+                USER ROLE: {role.upper()} (Verified: {verified})
+                PATIENT DEMOGRAPHICS: Age {age}, Gender {gender}, Location {country}
+                
+                INSTRUCTION FROM ROUTING SYSTEM:
+                {routing_prompt}
+    
+                TASK: Generate 3 distinct medical reasoning branches.
+                - BRANCH 1: Conservative/Direct evidence only.
+                - BRANCH 2: Contextual/History-linked (look for trends in past sessions).
+                - BRANCH 3: Differential/Rare cases (edge cases or high-risk possibilities).
+    
+                Format each branch as:
+                [BRANCH 1]: ...
+                [BRANCH 2]: ...
+                [BRANCH 3]: ...
+                """
+                
+                paths_response = llm.invoke([
+                    SystemMessage(content="You are a Tree-of-Thought Medical Orchestrator."),
+                    HumanMessage(content=tot_prompt)
+                ])
+                
+                eval_prompt = f"""
+                Review the following 3 Reasoning Branches:
+                {paths_response.content}
+    
+                Evaluate each for:
+                1. Medical Consistency (Alignment with knowledge)
+                2. Safety (Addressing high-risk indicators)
+                3. Evidence Alignment (Clarity and direct mapping)
+    
+                Select the BEST branch. 
+                Format your response as a JSON:
+                {{
+                    "diagnosis": "The full reasoning of the best branch",
+                    "confidence_score": 0.0 to 1.0
+                }}
+                Do not mention that you are a tree of thought. Output final clinical reasoning.
+                """
+                
+                try:
+                    final_selection = llm.invoke([
+                        SystemMessage(content="You are a Medical Expert Board Auditor."),
+                        HumanMessage(content=eval_prompt)
+                    ])
+                except Exception as e:
+                    # Fallback to secondary model if available
+                    sec = state.get("secondary_model")
+                    if not sec:
+                        raise e
+                    llm_sec = ChatOpenAI(model=sec, temperature=settings.LLM_TEMPERATURE_DIAGNOSIS, api_key=settings.OPENAI_API_KEY)
+                    final_selection = llm_sec.invoke([
                     SystemMessage(content="You are a Medical Expert Board Auditor."),
                     HumanMessage(content=eval_prompt)
                 ])
-            except Exception as e:
-                # Fallback to secondary model if available
-                sec = state.get("secondary_model")
-                if not sec:
-                    raise e
-                llm = ChatOpenAI(model=sec, temperature=settings.LLM_TEMPERATURE_DIAGNOSIS, api_key=settings.OPENAI_API_KEY)
-                final_selection = llm.invoke([
-                SystemMessage(content="You are a Medical Expert Board Auditor."),
-                HumanMessage(content=eval_prompt)
-            ])
-            
-            try:
-                # Attempt to parse JSON
-                content = final_selection.content
-                if "{" in content:
-                    start = content.find("{")
-                    end = content.rfind("}") + 1
-                    data = json.loads(content[start:end])
-                    diag = data.get("diagnosis", content)
-                    conf = data.get("confidence_score", 0.7)
-                else:
-                    diag = content
-                    conf = 0.65
-            except:
-                diag = final_selection.content
-                conf = 0.6
+                
+                try:
+                    # Attempt to parse JSON
+                    content = final_selection.content
+                    if "{" in content:
+                        start = content.find("{")
+                        end = content.rfind("}") + 1
+                        data = json.loads(content[start:end])
+                        diag = data.get("diagnosis", content)
+                        conf = data.get("confidence_score", 0.7)
+                    else:
+                        diag = content
+                        conf = 0.65
+                except:
+                    diag = final_selection.content
+                    conf = 0.6
             
             return {
                 "preliminary_diagnosis": diag,

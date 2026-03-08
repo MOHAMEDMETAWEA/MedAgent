@@ -49,17 +49,9 @@ class RiskRouter:
                 result = json.loads(content[start:end])
                 
                 # Apply model selection defaults
-                if result.get("risk_level") == "emergency":
-                    result["selected_model"] = "gpt-4o"  # Override with most capable
-                    result["secondary_model"] = "gpt-o1-preview" # For cross-check
-                    result["cross_check_required"] = True
-                elif result.get("risk_level") == "high":
-                    result["selected_model"] = "gpt-4o"
-                    result["secondary_model"] = "gpt-4o-mini"
-                    result["cross_check_required"] = True
-                else:
-                    result["selected_model"] = result.get("selected_model", "gpt-4o-mini")
-                    result["cross_check_required"] = result.get("cross_check_required", False)
+                result["selected_model"] = settings.OPENAI_MODEL
+                result["secondary_model"] = settings.OPENAI_MODEL
+                result["cross_check_required"] = result.get("cross_check_required", False)
 
                 return result
             return {"raw_routing": content}

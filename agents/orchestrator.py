@@ -76,9 +76,12 @@ class MedAgentOrchestrator:
         # Wrapper functions for transparency
         def wrap_node(node_name, agent_func):
             def wrapper(state: AgentState):
+                print(f"--- [DEBUG] STARTING AGENT: {node_name.upper()} ---")
                 state["status"] = f"Agent: {node_name.capitalize()} is processing..."
                 self.persistence.log_system_event("INFO", "Orchestrator", f"Transition to {node_name}", session_id=state.get("session_id"))
-                return agent_func(state)
+                res = agent_func(state)
+                print(f"--- [DEBUG] FINISHED AGENT: {node_name.upper()} ---")
+                return res
             return wrapper
 
         workflow.add_node("patient", wrap_node("patient", self.patient_agent.process))
@@ -119,20 +122,46 @@ class MedAgentOrchestrator:
             "medication": "medication"
         })
         
-        workflow.add_edge("vision", "triage") 
+        workflow.add_edge("vision", "triage")
         
-        # Conditional Edge after Triage: if insufficient docs -> knowledge -> reasoning, elser -> END or LOOP
-        # For simplicity in this launch, we follow the best-case path but with safety.
+        # 1. Triage -> Knowledge (Always)
         workflow.add_edge("triage", "knowledge")
-        workflow.add_edge("knowledge", "diagnosis")
+        
+        # 2. Knowledge -> Diagnosis / Reasoning
+        def route_knowledge(state: AgentState):
+            risk = state.get("risk_level", "low").lower()
+            if risk in ["high", "emergency"]:
+                return "diagnosis"
+            return "reasoning"
+        
+        workflow.add_conditional_edges("knowledge", route_knowledge, {"diagnosis": "diagnosis", "reasoning": "reasoning"})
         workflow.add_edge("diagnosis", "reasoning")
-        workflow.add_edge("reasoning", "validation")
+        
+        # 3. Reasoning -> Validation / Report
+        def route_reasoning(state: AgentState):
+            risk = state.get("risk_level", "low").lower()
+            if risk in ["high", "emergency"] or state.get("cross_check_required", False):
+                return "validation"
+            return "report"
+            
+        workflow.add_conditional_edges("reasoning", route_reasoning, {"validation": "validation", "report": "report"})
         workflow.add_edge("validation", "doctor")
         workflow.add_edge("doctor", "safety")
-        workflow.add_edge("safety", "second_opinion")
+        
+        # 4. Safety -> Second Opinion / Report
+        def route_safety(state: AgentState):
+            if state.get("request_second_opinion", False):
+                return "second_opinion"
+            return "report"
+            
+        workflow.add_conditional_edges("safety", route_safety, {"second_opinion": "second_opinion", "report": "report"})
         workflow.add_edge("second_opinion", "report")
+        
+        # 5. Report -> Response -> END
         workflow.add_edge("report", "response")
         workflow.add_edge("response", END)
+        
+        # Scheduling / Medication branches
         workflow.add_edge("scheduling", "calendar")
         workflow.add_edge("calendar", END)
         workflow.add_edge("medication", END)
