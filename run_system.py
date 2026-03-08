@@ -63,7 +63,7 @@ def run_backend():
 def run_frontend():
     print("[SYSTEM] Starting Frontend UI (Streamlit)...")
     # Streamlit usually needs special handling to run via python -m
-    return subprocess.Popen([sys.executable, "-m", "streamlit", "run", "api/frontend.py", "--server.port", "8501"])
+    return subprocess.Popen([sys.executable, "-m", "streamlit", "run", "api/frontend.py", "--server.port", "8501", "--server.headless", "true"])
 
 if __name__ == "__main__":
     print("="*60)
