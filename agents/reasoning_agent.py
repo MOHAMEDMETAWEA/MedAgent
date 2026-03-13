@@ -49,18 +49,33 @@ class ReasoningAgent:
         mode = state.get("interaction_mode", "patient")
         verified = state.get("doctor_verified", False)
         role = state.get("user_role", "patient")
-        age = state.get("user_age")
-        gender = state.get("user_gender")
-        country = state.get("user_country")
+        age = state.get("user_age", "Unknown")
+        gender = state.get("user_gender", "Unknown")
+        country = state.get("user_country", "Unknown")
+        
+        edu = state.get("education_level", "unknown")
+        lit = state.get("medical_literacy_level", "moderate")
+        emo = state.get("emotional_state", "calm")
         
         try:
-            # 1. Load Routed Prompt Template
-            template_name = "doctor_mode.txt" if mode == "doctor" else "patient_mode.txt"
-            base_template = self._load_prompt(template_name)
+            # 1. Load Unified Clinical Cognitive Engine Layer
+            base_template = self._load_prompt("clinical_cognitive_layer.txt")
             
-            # Format the component prompt
+            # Format the component prompt with deeply integrated context
             context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}"
-            routing_prompt = base_template.format(patient_data=context_data, knowledge_base=knowledge)
+            routing_prompt = base_template.format(
+                mode=mode.upper(),
+                role=role.upper(),
+                verified=str(verified),
+                age=age,
+                gender=gender,
+                country=country,
+                education=edu.upper(),
+                literacy=lit.upper(),
+                emotion=emo.upper(),
+                patient_data=context_data, 
+                knowledge_base=knowledge
+            )
 
             # Specialty adapters
             adapters = state.get("specialty_adapters", [])
@@ -74,9 +89,6 @@ class ReasoningAgent:
                 logger.info("--- REASONING AGENT: FAST PATH (Bypassing ToT) ---")
                 direct_prompt = f"""
                 SYSTEM: You are a Cognitive Medical Reasoning Core. 
-                USER INTERACTION MODE: {mode.upper()}
-                USER ROLE: {role.upper()} (Verified: {verified})
-                PATIENT DEMOGRAPHICS: Age {age}, Gender {gender}, Location {country}
                 
                 INSTRUCTION FROM ROUTING SYSTEM:
                 {routing_prompt}
@@ -95,9 +107,6 @@ class ReasoningAgent:
                 # 2. Generate Multiple Thought Paths (ToT Stage)
                 tot_prompt = f"""
                 SYSTEM: You are a Cognitive Medical Reasoning Core. 
-                USER INTERACTION MODE: {mode.upper()}
-                USER ROLE: {role.upper()} (Verified: {verified})
-                PATIENT DEMOGRAPHICS: Age {age}, Gender {gender}, Location {country}
                 
                 INSTRUCTION FROM ROUTING SYSTEM:
                 {routing_prompt}

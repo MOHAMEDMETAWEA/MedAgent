@@ -75,6 +75,14 @@ class Settings(BaseSettings):
     MAX_REQUESTS_PER_MINUTE: int = 60
     REDIS_URL: Optional[str] = None
     
+    # Notifications (SMTP)
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: str = "noreply@medagent.local"
+    ENABLE_NOTIFICATIONS: bool = True
+    
     # Calendar Integration
     CALENDAR_CREDENTIALS_FILE: Path = BASE_DIR / "credentials.json"
     CALENDAR_TOKEN_FILE: Path = BASE_DIR / "token.json"

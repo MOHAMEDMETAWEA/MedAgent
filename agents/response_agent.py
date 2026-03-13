@@ -30,33 +30,35 @@ class ResponseAgent:
         mode_label = mode.upper()
         if mode == "doctor" and not verified:
             mode_label = "UNVERIFIED DOCTOR MODE"
+            
+        edu = state.get("education_level", "unknown")
+        lit = state.get("medical_literacy_level", "moderate")
+        emo = state.get("emotional_state", "calm")
+        age = state.get("user_age", "Unknown")
+        gender = state.get("user_gender", "Unknown")
+        country = state.get("user_country", "Unknown")
 
-        prompt = f"""
-        Role: Communication Adaptation Specialist.
-        Target Audience: {mode.upper()} ({role.upper()})
-        Interaction Mode: {mode_label}
-        Language: {lang}
+        try:
+            from config import get_prompt_path
+            template_path = get_prompt_path("clinical_communication_layer.txt")
+            with open(template_path, 'r', encoding='utf-8') as f:
+                base_prompt = f.read()
 
-        INPUT CONTENT:
-        {final_response}
-
-        TASK:
-        Rewrite the input content to perfectly suit the Target Audience.
-        
-        IF MODE IS PATIENT:
-        - Use simple language and easy explanations.
-        - Avoid technical jargon (or explain it simply).
-        - Use examples and provide reassurance.
-        - Focus on understanding and guidance.
-        
-        IF MODE IS DOCTOR:
-        - Use advanced medical terminology.
-        - Detailed reasoning and differential diagnosis.
-        - Clinical explanation and evidence-based analysis.
-        - Maintain technical precision.
-
-        Retain the core medical meaning exactly. Do not change the diagnosis or safety advice.
-        """
+            prompt = base_prompt.format(
+                mode=mode_label,
+                role=role.upper(),
+                verified=str(verified),
+                age=age,
+                gender=gender,
+                country=country,
+                education=edu.upper(),
+                literacy=lit.upper(),
+                emotion=emo.upper(),
+                input_content=final_response
+            )
+        except Exception as e:
+            logger.error(f"Failed to load communication template: {e}")
+            prompt = final_response # Fallback
 
         try:
             response = self.llm.invoke([

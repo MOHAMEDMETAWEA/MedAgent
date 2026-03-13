@@ -629,6 +629,7 @@ class AgentResponse(BaseModel):
     patient_instructions: Optional[str] = None
     language: str = "en"
     requires_human_review: bool = False
+    interaction_mode: str = "patient"
 
 class AdminReviewAction(BaseModel):
     interaction_id: int

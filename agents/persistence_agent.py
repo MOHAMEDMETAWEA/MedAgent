@@ -8,7 +8,7 @@ import datetime
 import os
 import logging
 from sqlalchemy.orm import Session
-from database.models import SessionLocal, UserSession, Interaction, SystemLog, PatientProfile, MedicalReport, UserAction, MedicalImage, UserAccount, UserActivity, MedicalCase, MemoryNode, MemoryEdge
+from database.models import SessionLocal, get_db, UserSession, Interaction, SystemLog, PatientProfile, MedicalReport, UserAction, MedicalImage, UserAccount, UserActivity, MedicalCase, MemoryNode, MemoryEdge, UserRole
 from agents.governance_agent import GovernanceAgent
 from config import settings
 import hashlib
@@ -22,12 +22,16 @@ class PersistenceAgent:
     Now integrates with Governance for Encryption.
     """
     def __init__(self):
-        self.db: Session = SessionLocal()
         self.governance = GovernanceAgent()
+
+    def _get_db(self):
+        """Create a fresh DB session for each operation."""
+        return SessionLocal()
 
     def create_session(self, user_id: str = "guest", mode: str = "patient") -> str:
         """Start a new tracking session."""
         session_id = str(uuid.uuid4())
+        db = self._get_db()
         try:
             new_session = UserSession(
                 id=session_id,
@@ -35,16 +39,18 @@ class PersistenceAgent:
                 status="active",
                 interaction_mode=mode
             )
-            self.db.add(new_session)
-            self.db.commit()
+            db.add(new_session)
+            db.commit()
             return session_id
         except Exception as e:
             logger.error(f"Failed to create session: {e}")
-            self.db.rollback()
-            return session_id 
+            db.rollback()
+            return session_id
+        finally:
+            db.close()
 
-    def save_interaction(self, session_id: str, user_input: str, result: dict, case_id: str = None):
-        """Save a complete interaction flow with ENCRYPTION and Case linking."""
+    def _save_interaction_db(self, db, session_id: str, user_input: str, result: dict, case_id: str = None):
+        """Internal helper to save interaction using provided DB session."""
         try:
             # Encrypt sensitive fields
             enc_input = self.governance.encrypt(user_input)
@@ -57,9 +63,11 @@ class PersistenceAgent:
             secondary_model = result.get("secondary_model")
             confidence_score = result.get("confidence_score")
             risk_level = result.get("risk_level")
+            latency_ms = result.get("latency_ms", 0)
+            
             # 4. Compute chainable audit hash
             # Fetch previous interaction hash in this session for chaining
-            prev_interaction = self.db.query(Interaction).filter(Interaction.session_id == session_id).order_by(Interaction.timestamp.desc()).first()
+            prev_interaction = db.query(Interaction).filter(Interaction.session_id == session_id).order_by(Interaction.timestamp.desc()).first()
             prev_hash = prev_interaction.audit_hash if prev_interaction else "GENESIS"
             
             base_str = f"{session_id}|{enc_input}|{enc_response}|{model_used or ''}|{prompt_version or ''}|{prev_hash}|{datetime.datetime.utcnow().isoformat()}"
@@ -82,68 +90,78 @@ class PersistenceAgent:
                 previous_audit_hash=prev_hash,
                 latency_ms=latency_ms
             )
-            self.db.add(interaction)
+            db.add(interaction)
             
             # Update case risk score if applicable
             if case_id:
-                case = self.db.query(MedicalCase).filter(MedicalCase.id == case_id).first()
+                case = db.query(MedicalCase).filter(MedicalCase.id == case_id).first()
                 if case:
                     # Update risk based on critical alert
                     if result.get("critical_alert"):
                         case.risk_score = 100
                     case.updated_at = datetime.datetime.utcnow()
             
-            self.db.commit()
+            db.commit()
             
             # Update Memory Graph
-            self._update_memory_graph(session_id, user_input, result, case_id)
+            self._update_memory_graph_with_db(db, session_id, user_input, result, case_id)
             
         except Exception as e:
             logger.error(f"Failed to save interaction: {e}")
-            self.db.rollback()
+            db.rollback()
 
-    def _update_memory_graph(self, session_id, user_input, result, case_id):
+    def save_interaction(self, session_id: str, user_input: str, result: dict, case_id: str = None):
+        """Save a complete interaction flow with ENCRYPTION and Case linking."""
+        db = self._get_db()
+        return self._save_interaction_db(db, session_id, user_input, result, case_id)
+
+    def _update_memory_graph_with_db(self, db, session_id, user_input, result, case_id):
         """Internal helper to populate memory nodes and edges from an interaction."""
-        user_id = self.db.query(UserSession).filter(UserSession.id == session_id).first().user_id
+        user_session = db.query(UserSession).filter(UserSession.id == session_id).first()
+        if not user_session: return
+        user_id = user_session.user_id
         if user_id == "guest": return
 
         # 1. Create/Find Symptom Node
         symptom_summary = result.get("patient_info", {}).get("summary", "New Symptoms")
-        s_node = self.add_memory_node(user_id, "Symptom", symptom_summary, {"session_id": session_id})
+        s_node = self._add_memory_node_db(db, user_id, "Symptom", symptom_summary, {"session_id": session_id})
         
         # 2. Link to Case Node
         c_node = None
         if case_id:
-            c_node = self.db.query(MemoryNode).filter(
+            c_node = db.query(MemoryNode).filter(
                 MemoryNode.user_id == user_id, 
                 MemoryNode.node_type == "Case"
-            ).filter(MemoryNode.metadata_json["case_id"] == case_id).first()
-            if not c_node:
-                c_node = self.add_memory_node(user_id, "Case", f"Case: {case_id}", {"case_id": case_id})
+            ).all() # Filter manually for JSON field in SQLite
+            c_node = next((n for n in c_node if n.metadata_json.get("case_id") == case_id), None)
             
-            self.add_memory_edge(user_id, s_node.id, c_node.id, "relates_to")
+            if not c_node:
+                c_node = self._add_memory_node_db(db, user_id, "Case", f"Case: {case_id}", {"case_id": case_id})
+            
+            self._add_memory_edge_db(db, user_id, s_node.id, c_node.id, "relates_to")
             
         # 3. Create Diagnosis & Reasoning Nodes
         diag = result.get("preliminary_diagnosis")
         if diag:
-            d_node = self.add_memory_node(user_id, "Diagnosis", diag, {"session_id": session_id})
-            self.add_memory_edge(user_id, s_node.id, d_node.id, "diagnosed_as")
-            if c_node: self.add_memory_edge(user_id, d_node.id, c_node.id, "relates_to")
+            d_node = self._add_memory_node_db(db, user_id, "Diagnosis", diag, {"session_id": session_id})
+            self._add_memory_edge_db(db, user_id, s_node.id, d_node.id, "diagnosed_as")
+            if c_node: self._add_memory_edge_db(db, user_id, d_node.id, c_node.id, "relates_to")
 
         # 4. Reason (Tree of Thought) node
         tot = result.get("doctor_notes")
         if tot:
-            r_node = self.add_memory_node(user_id, "Reasoning", tot, {"session_id": session_id})
-            if c_node: self.add_memory_edge(user_id, r_node.id, c_node.id, "explains")
+            r_node = self._add_memory_node_db(db, user_id, "Reasoning", tot, {"session_id": session_id})
+            if c_node: self._add_memory_edge_db(db, user_id, r_node.id, c_node.id, "explains")
 
         # 5. Report Node
         report_id = result.get("report_id")
         if report_id:
-            rp_node = self.add_memory_node(user_id, "Report", f"Clinical Report #{report_id}", {"report_id": report_id, "session_id": session_id})
-            if c_node: self.add_memory_edge(user_id, rp_node.id, c_node.id, "documented_in")
+            rp_node = self._add_memory_node_db(db, user_id, "Report", f"Clinical Report #{report_id}", {"report_id": report_id, "session_id": session_id})
+            if c_node: self._add_memory_edge_db(db, user_id, rp_node.id, c_node.id, "documented_in")
 
     def log_system_event(self, level: str, component: str, message: str, details: dict = None, session_id: str = None):
         """Log a system event or error."""
+        db = self._get_db()
         try:
             # Optional PHI redaction of message/details
             redacted_message = message
@@ -164,30 +182,37 @@ class PersistenceAgent:
                 details=redacted_details,
                 session_id=session_id
             )
-            self.db.add(log_entry)
-            self.db.commit()
+            db.add(log_entry)
+            db.commit()
         except Exception as e:
             logger.error(f"DB Logging failed: {e}")
+            db.rollback()
+        finally:
+            db.close()
 
     def get_user_history(self, user_id: str, limit: int = 10):
         """Retrieve past sessions for a user, DECRYPTING data."""
+        db = self._get_db()
         try:
             # This just gets sessions. To get interactions, we need to query interactions.
-            sessions = self.db.query(UserSession).filter(
+            sessions = db.query(UserSession).filter(
                 UserSession.user_id == user_id
             ).order_by(UserSession.start_time.desc()).limit(limit).all()
             return sessions
         except Exception as e:
             logger.error(f"Failed to retrieve history: {e}")
             return []
+        finally:
+            db.close()
 
     def get_long_term_memory(self, user_id: str, limit_sessions: int = 3):
         """Fetch and format past interactions for LLM context."""
+        db = self._get_db()
         try:
-            sessions = self.db.query(UserSession).filter(UserSession.user_id == user_id).order_by(UserSession.start_time.desc()).limit(limit_sessions).all()
+            sessions = db.query(UserSession).filter(UserSession.user_id == user_id).order_by(UserSession.start_time.desc()).limit(limit_sessions).all()
             memory_text = ""
             for s in sessions:
-                interactions = self.db.query(Interaction).filter(Interaction.session_id == s.id).all()
+                interactions = db.query(Interaction).filter(Interaction.session_id == s.id).all()
                 if not interactions: continue
                 memory_text += f"\n--- PAST SESSION: {s.id} ({s.start_time.strftime('%Y-%m-%d')}) ---\n"
                 for i in interactions:
@@ -198,6 +223,8 @@ class PersistenceAgent:
         except Exception as e:
             logger.error(f"Failed to fetch long term memory: {e}")
             return "Error loading history."
+        finally:
+            db.close()
 
     
     # -----------------------------------------------------
@@ -206,8 +233,9 @@ class PersistenceAgent:
     
     def get_patient_profile(self, user_id: str):
         """Retrieve decrypted patient profile."""
+        db = self._get_db()
         try:
-            profile = self.db.query(PatientProfile).filter(PatientProfile.id == user_id).first()
+            profile = db.query(PatientProfile).filter(PatientProfile.id == user_id).first()
             if not profile:
                 return None
             
@@ -226,11 +254,21 @@ class PersistenceAgent:
         except Exception as e:
             logger.error(f"Failed to fetch patient profile: {e}")
             return None
+        finally:
+            db.close()
 
     def upsert_patient_profile(self, user_id: str, name: str, age: int, gender: str, history_json: str):
         """Create or Update patient profile securely."""
+        db = self._get_db()
         try:
-            profile = self.db.query(PatientProfile).filter(PatientProfile.id == user_id).first()
+            return self._upsert_patient_profile_db(db, user_id, name, age, gender, history_json)
+        finally:
+            db.close()
+
+    def _upsert_patient_profile_db(self, db, user_id: str, name: str, age: int, gender: str, history_json: str):
+        """Internal helper for patient profile upsert."""
+        try:
+            profile = db.query(PatientProfile).filter(PatientProfile.id == user_id).first()
             enc_name = self.governance.encrypt(name)
             enc_history = self.governance.encrypt(history_json)
             
@@ -242,34 +280,35 @@ class PersistenceAgent:
                     gender=gender,
                     medical_history_encrypted=enc_history
                 )
-                self.db.add(profile)
+                db.add(profile)
             else:
                 profile.name_encrypted = enc_name
                 profile.age = age
                 profile.gender = gender
                 profile.medical_history_encrypted = enc_history
             
-            self.db.commit()
+            db.commit()
             return True
         except Exception as e:
             logger.error(f"Failed to upsert profile: {e}")
-            self.db.rollback()
+            db.rollback()
             return False
 
     def save_medical_report(self, session_id: str, patient_id: str, content_json: str, report_type: str = "comprehensive", lang: str = "en", status: str = "pending"):
         """Save a new version of a generated medical report."""
+        db = self._get_db()
         try:
             # Check if profile exists; if not, create a placeholder? Best logic: ensure profile created by PatientAgent first.
             # Assuming profile exists or we handle FK error.
-            if not self.db.query(PatientProfile).filter(PatientProfile.id == patient_id).first():
+            if not db.query(PatientProfile).filter(PatientProfile.id == patient_id).first():
                 # Auto-create minimal profile if missing (Guest)
-                self.upsert_patient_profile(patient_id, "Guest Patient", 0, "Unknown", "{}")
+                self._upsert_patient_profile_db(db, patient_id, "Guest Patient", 0, "Unknown", "{}")
             
             # Encrypt report content
             enc_content = self.governance.encrypt(content_json)
             
             # Get latest version
-            last_report = self.db.query(MedicalReport).filter(
+            last_report = db.query(MedicalReport).filter(
                 MedicalReport.patient_id == patient_id
             ).order_by(MedicalReport.version.desc()).first()
             
@@ -284,18 +323,21 @@ class PersistenceAgent:
                 version=new_version,
                 status=status # pending review or approved
             )
-            self.db.add(new_report)
-            self.db.commit()
+            db.add(new_report)
+            db.commit()
             return new_report.id
         except Exception as e:
             logger.error(f"Failed to save medical report: {e}")
-            self.db.rollback()
+            db.rollback()
             return None
+        finally:
+            db.close()
 
     def get_reports_by_patient(self, user_id: str):
         """Retrieve all medical reports for a patient, decrypted."""
+        db = self._get_db()
         try:
-            reports = self.db.query(MedicalReport).filter(MedicalReport.patient_id == user_id).order_by(MedicalReport.generated_at.desc()).all()
+            reports = db.query(MedicalReport).filter(MedicalReport.patient_id == user_id).order_by(MedicalReport.generated_at.desc()).all()
             results = []
             for r in reports:
                 results.append({
@@ -311,9 +353,12 @@ class PersistenceAgent:
         except Exception as e:
             logger.error(f"Failed to fetch reports: {e}")
             return []
+        finally:
+            db.close()
 
     def save_medical_image(self, session_id: str, image_path: str, findings: dict, patient_id: str = None, case_id: str = None):
         """Save medical image metadata and analysis securely with Case linking."""
+        db = self._get_db()
         try:
             # Encrypt sensitive fields
             enc_path = self.governance.encrypt(image_path)
@@ -331,43 +376,47 @@ class PersistenceAgent:
                 severity_level=findings.get("severity_level", "low"),
                 requires_human_review=findings.get("requires_human_review", False)
             )
-            self.db.add(new_image)
-            self.db.commit()
+            db.add(new_image)
+            db.commit()
             
             # Update memory graph with Image node
             if patient_id and patient_id != "guest":
-                self._update_memory_graph_with_image(patient_id, session_id, new_image.id, findings, case_id)
+                self._update_memory_graph_with_image_db(db, patient_id, session_id, new_image.id, findings, case_id)
             
             return new_image.id
         except Exception as e:
             logger.error(f"Failed to save medical image: {e}")
-            self.db.rollback()
+            db.rollback()
             return None
+        finally:
+            db.close()
 
-    def _update_memory_graph_with_image(self, user_id, session_id, image_id, findings, case_id):
-        """Link image to case and findings in the memory graph."""
+    def _update_memory_graph_with_image_db(self, db, user_id, session_id, image_id, findings, case_id):
+        """Link image to case and findings in the memory graph using provided DB session."""
         try:
             # 1. Create Image Node
-            img_node = self.add_memory_node(user_id, "Image", f"Medical Image: {findings.get('image_type', 'Visual Scan')}", {"image_id": image_id, "session_id": session_id})
+            img_node = self._add_memory_node_db(db, user_id, "Image", f"Medical Image: {findings.get('image_type', 'Visual Scan')}", {"image_id": image_id, "session_id": session_id})
             
             # 2. Link to Case
             if case_id:
-                case_node = self.db.query(MemoryNode).filter(MemoryNode.user_id == user_id, MemoryNode.node_type == "Case", MemoryNode.metadata_json["case_id"] == case_id).first()
+                case_nodes = db.query(MemoryNode).filter(MemoryNode.user_id == user_id, MemoryNode.node_type == "Case").all()
+                case_node = next((n for n in case_nodes if n.metadata_json.get("case_id") == case_id), None)
                 if case_node:
-                    self.add_memory_edge(user_id, img_node.id, case_node.id, "based_on")
+                    self._add_memory_edge_db(db, user_id, img_node.id, case_node.id, "based_on")
             
             # 3. Create Analysis Node
             analysis_content = findings.get("visual_findings", "Image Analysis Result")
-            analysis_node = self.add_memory_node(user_id, "Analysis", analysis_content, {"image_id": image_id})
-            self.add_memory_edge(user_id, img_node.id, analysis_node.id, "analyzed_as")
+            analysis_node = self._add_memory_node_db(db, user_id, "Analysis", analysis_content, {"image_id": image_id})
+            self._add_memory_edge_db(db, user_id, img_node.id, analysis_node.id, "analyzed_as")
             
         except Exception as e:
             logger.error(f"Failed to update memory graph with image: {e}")
 
     def get_session_images(self, session_id: str):
         """Retrieve all images for a session, decrypted."""
+        db = self._get_db()
         try:
-            images = self.db.query(MedicalImage).filter(MedicalImage.session_id == session_id).all()
+            images = db.query(MedicalImage).filter(MedicalImage.session_id == session_id).all()
             result = []
             for img in images:
                 result.append({
@@ -382,9 +431,12 @@ class PersistenceAgent:
         except Exception as e:
             logger.error(f"Failed to fetch session images: {e}")
             return []
+        finally:
+            db.close()
 
     def save_user_action(self, session_id: str, action_type: str, element_id: str, details: dict = None, audit_tag: str = "UX"):
         """Save a granular user UI action."""
+        db = self._get_db()
         try:
             action = UserAction(
                 session_id=session_id,
@@ -393,16 +445,17 @@ class PersistenceAgent:
                 details=details or {},
                 audit_tag=audit_tag
             )
-            self.db.add(action)
-            self.db.commit()
+            db.add(action)
+            db.commit()
             return True
         except Exception as e:
             logger.error(f"Failed to save user action: {e}")
-            self.db.rollback()
+            db.rollback()
             return False
+        finally:
+            db.close()
 
     def close(self):
-        self.db.close()
         self.governance.close()
 
     # --- IDENTITY & AUTHENTICATION ---
@@ -410,11 +463,18 @@ class PersistenceAgent:
                       role: str = "patient", gender: str = None, age: int = None, 
                       country: str = None, meta: dict = None):
         """Create a new user account securely with role and demographic data."""
+        db = self._get_db()
         try:
             user_id = str(uuid.uuid4())
             hashed_pwd = self.governance.hash_password(password)
             enc_name = self.governance.encrypt(full_name)
             enc_meta = self.governance.encrypt(str(meta or {}))
+            
+            # Coerce role string to UserRole enum
+            try:
+                user_role = UserRole(role)
+            except ValueError:
+                user_role = UserRole.PATIENT
             
             user = UserAccount(
                 id=user_id,
@@ -423,65 +483,81 @@ class PersistenceAgent:
                 phone=phone,
                 full_name_encrypted=enc_name,
                 password_hash=hashed_pwd,
-                role=role,
+                role=user_role,
                 gender=gender,
                 age=age,
                 country=country,
                 interaction_mode=role if role in ["patient", "doctor"] else "patient",
                 profile_metadata_encrypted=enc_meta
             )
-            self.db.add(user)
-            self.db.commit()
+            db.add(user)
+            db.commit()
             
             # Auto-create patient profile
-            self.upsert_patient_profile(user_id, full_name, age or 0, gender or "Unknown", "{}")
+            self._upsert_patient_profile_db(db, user_id, full_name, age or 0, gender or "Unknown", "{}")
             
             return user_id
         except Exception as e:
             logger.error(f"Registration failed: {e}")
-            self.db.rollback()
+            db.rollback()
             return None
+        finally:
+            db.close()
 
     def update_interaction_mode(self, user_id: str, mode: str):
         """Update user's default interaction mode."""
+        db = self._get_db()
         try:
-            user = self.db.query(UserAccount).filter(UserAccount.id == user_id).first()
+            user = db.query(UserAccount).filter(UserAccount.id == user_id).first()
             if user:
                 user.interaction_mode = mode
-                self.db.commit()
+                db.commit()
                 return True
             return False
         except Exception as e:
             logger.error(f"Failed to update interaction mode: {e}")
-            self.db.rollback()
+            db.rollback()
             return False
+        finally:
+            db.close()
 
     def verify_doctor(self, user_id: str, license_number: str, specialization: str):
         """Verify doctor credentials and update account."""
+        db = self._get_db()
         try:
-            user = self.db.query(UserAccount).filter(UserAccount.id == user_id).first()
+            user = db.query(UserAccount).filter(UserAccount.id == user_id).first()
             if user and user.role == "doctor":
                 user.license_number = license_number
                 user.specialization = specialization
                 user.doctor_verified = True
-                self.db.commit()
+                db.commit()
                 return True
             return False
         except Exception as e:
             logger.error(f"Failed to verify doctor: {e}")
-            self.db.rollback()
+            db.rollback()
             return False
+        finally:
+            db.close()
 
     def get_user_by_login(self, login_id: str):
         """Find user by username, email, or phone."""
-        return self.db.query(UserAccount).filter(
-            (UserAccount.username == login_id) | 
-            (UserAccount.email == login_id) | 
-            (UserAccount.phone == login_id)
-        ).first()
+        db = self._get_db()
+        try:
+            return db.query(UserAccount).filter(
+                (UserAccount.username == login_id) | 
+                (UserAccount.email == login_id) | 
+                (UserAccount.phone == login_id)
+            ).first()
+        except Exception as e:
+            logger.error(f"User lookup failed: {e}")
+            return None
+        finally:
+            db.close()
 
     def log_user_activity(self, user_id: str, session_id: str, status: str, ip: str = None):
         """Record login/logout activity."""
+        db = self._get_db()
         try:
             activity = UserActivity(
                 user_id=user_id,
@@ -489,23 +565,26 @@ class PersistenceAgent:
                 status=status,
                 ip_address=ip
             )
-            self.db.add(activity)
+            db.add(activity)
             if status == "success":
-                user = self.db.query(UserAccount).filter(UserAccount.id == user_id).first()
+                user = db.query(UserAccount).filter(UserAccount.id == user_id).first()
                 if user:
                     user.last_login = datetime.datetime.utcnow()
-            self.db.commit()
+            db.commit()
         except Exception as e:
             logger.error(f"Activity logging failed: {e}")
-            self.db.rollback()
+            db.rollback()
+        finally:
+            db.close()
 
     # --- ADVANCED MEMORY & CASE TRACKING ---
     def get_or_create_case(self, user_id: str, title: str = "New Case"):
         """Manage persistent medical cases."""
         if user_id == "guest": return None
+        db = self._get_db()
         try:
             # Find open case
-            active_case = self.db.query(MedicalCase).filter(
+            active_case = db.query(MedicalCase).filter(
                 MedicalCase.user_id == user_id,
                 MedicalCase.status == "open"
             ).order_by(MedicalCase.updated_at.desc()).first()
@@ -516,40 +595,57 @@ class PersistenceAgent:
             # Create new
             case_id = str(uuid.uuid4())
             new_case = MedicalCase(id=case_id, user_id=user_id, title=title)
-            self.db.add(new_case)
-            self.db.commit()
+            db.add(new_case)
+            db.commit()
             return case_id
         except Exception as e:
             logger.error(f"Case management failed: {e}")
             return None
+        finally:
+            db.close()
 
     def add_memory_node(self, user_id, node_type, content, meta=None):
+        db = self._get_db()
+        try:
+            return self._add_memory_node_db(db, user_id, node_type, content, meta)
+        finally:
+            db.close()
+
+    def _add_memory_node_db(self, db, user_id, node_type, content, meta=None):
         try:
             enc_content = self.governance.encrypt(content)
             node = MemoryNode(user_id=user_id, node_type=node_type, content_encrypted=enc_content, metadata_json=meta or {})
-            self.db.add(node)
-            self.db.commit()
+            db.add(node)
+            db.commit()
             return node
         except Exception as e:
             logger.error(f"Failed to add memory node: {e}")
-            self.db.rollback()
+            db.rollback()
             return None
 
     def add_memory_edge(self, user_id, source_id, target_id, relation):
+        db = self._get_db()
+        try:
+            return self._add_memory_edge_db(db, user_id, source_id, target_id, relation)
+        finally:
+            db.close()
+
+    def _add_memory_edge_db(self, db, user_id, source_id, target_id, relation):
         try:
             edge = MemoryEdge(user_id=user_id, source_node_id=source_id, target_node_id=target_id, relation_type=relation)
-            self.db.add(edge)
-            self.db.commit()
+            db.add(edge)
+            db.commit()
         except Exception as e:
             logger.error(f"Failed to add memory edge: {e}")
-            self.db.rollback()
+            db.rollback()
 
     def get_memory_graph_context(self, user_id: str):
         """Retrieve and format the memory graph as contextual text."""
         if user_id == "guest": return ""
+        db = self._get_db()
         try:
             # For brevity, we'll get the last 10 nodes and their relationships
-            nodes = self.db.query(MemoryNode).filter(MemoryNode.user_id == user_id).order_by(MemoryNode.created_at.desc()).limit(15).all()
+            nodes = db.query(MemoryNode).filter(MemoryNode.user_id == user_id).order_by(MemoryNode.created_at.desc()).limit(15).all()
             graph_text = "\n[USER MEMORY GRAPH - RELEVANT NODES]:\n"
             for node in nodes:
                 content = self.governance.decrypt(node.content_encrypted)
@@ -558,9 +654,12 @@ class PersistenceAgent:
         except Exception as e:
             logger.error(f"Graph retrieval failed: {e}")
             return ""
+        finally:
+            db.close()
 
     # --- MEDICATION & REMINDER PERSISTENCE ---
     def add_medication(self, user_id: str, name: str, dosage: str, frequency: str):
+        db = self._get_db()
         try:
             from database.models import Medication
             med = Medication(
@@ -569,18 +668,21 @@ class PersistenceAgent:
                 dosage_encrypted=self.governance.encrypt(dosage),
                 frequency_encrypted=self.governance.encrypt(frequency)
             )
-            self.db.add(med)
-            self.db.commit()
+            db.add(med)
+            db.commit()
             return True
         except Exception as e:
             logger.error(f"Failed to add medication: {e}")
-            self.db.rollback()
+            db.rollback()
             return False
+        finally:
+            db.close()
 
     def get_medications(self, user_id: str):
+        db = self._get_db()
         try:
             from database.models import Medication
-            meds = self.db.query(Medication).filter(Medication.user_id == user_id, Medication.is_active == True).all()
+            meds = db.query(Medication).filter(Medication.user_id == user_id, Medication.is_active == True).all()
             results = []
             for m in meds:
                 results.append({
@@ -593,8 +695,11 @@ class PersistenceAgent:
         except Exception as e:
             logger.error(f"Failed to get medications: {e}")
             return []
+        finally:
+            db.close()
 
     def add_reminder(self, user_id: str, title: str, time_str: str, med_id: int = None):
+        db = self._get_db()
         try:
             from database.models import Reminder
             rem = Reminder(
@@ -603,30 +708,87 @@ class PersistenceAgent:
                 title_encrypted=self.governance.encrypt(title),
                 reminder_time=time_str
             )
-            self.db.add(rem)
-            self.db.commit()
+            db.add(rem)
+            db.commit()
             return True
         except Exception as e:
             logger.error(f"Failed to add reminder: {e}")
-            self.db.rollback()
+            db.rollback()
             return False
+        finally:
+            db.close()
+
+    def get_reminders(self, user_id: str):
+        db = self._get_db()
+        try:
+            from database.models import Reminder
+            rems = db.query(Reminder).filter(Reminder.user_id == user_id).all()
+            results = []
+            for r in rems:
+                results.append({
+                    "id": r.id,
+                    "title": self.governance.decrypt(r.title_encrypted),
+                    "time": r.reminder_time,
+                    "medication_id": r.medication_id,
+                    "is_enabled": r.is_enabled
+                })
+            return results
+        finally:
+            db.close()
+
+    def get_all_active_reminders(self):
+        """Used by the background scheduler to fetch all enabled reminders."""
+        db = self._get_db()
+        try:
+            from database.models import Reminder, UserAccount
+            rems = db.query(Reminder, UserAccount.email).join(
+                UserAccount, Reminder.user_id == UserAccount.id
+            ).filter(Reminder.is_enabled == True).all()
+            
+            results = []
+            for r, email in rems:
+                results.append({
+                    "id": r.id,
+                    "user_id": r.user_id,
+                    "email": email,
+                    "title": self.governance.decrypt(r.title_encrypted),
+                    "time": r.reminder_time,
+                    "last_triggered": r.last_triggered
+                })
+            return results
+        finally:
+            db.close()
+
+    def mark_reminder_triggered(self, reminder_id: int):
+        db = self._get_db()
+        try:
+            from database.models import Reminder
+            rem = db.query(Reminder).filter(Reminder.id == reminder_id).first()
+            if rem:
+                rem.last_triggered = datetime.datetime.utcnow()
+                db.commit()
+        finally:
+            db.close()
 
     # --- ACCOUNT MANAGEMENT ---
     def delete_account(self, user_id: str):
         """Perform a safe account depletion (Soft delete for audit compliance)."""
+        db = self._get_db()
         try:
-            user = self.db.query(UserAccount).filter(UserAccount.id == user_id).first()
+            user = db.query(UserAccount).filter(UserAccount.id == user_id).first()
             if user:
                 user.account_status = "deleted"
                 # Anonymize sensitive fields
                 user.username = f"deleted_{user_id[:8]}"
                 user.email = f"deleted_{user_id[:8]}@medagent.org"
                 user.phone = f"deleted_{user_id[:8]}"
-                self.db.commit()
+                db.commit()
                 return True
             return False
         except Exception as e:
             logger.error(f"Account deletion failed: {e}")
-            self.db.rollback()
+            db.rollback()
             return False
+        finally:
+            db.close()
 

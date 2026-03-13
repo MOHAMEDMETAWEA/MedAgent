@@ -2,6 +2,7 @@
 Database Models - Enhanced for Feedback, Human Review, and Self-Improvement.
 """
 import datetime
+from contextlib import contextmanager
 import enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean, Enum, Float
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
@@ -309,8 +310,21 @@ class Reminder(Base):
     medication = relationship("Medication", back_populates="reminders")
 
 def init_db(db_url="sqlite:///./medagent.db"):
-    engine = create_engine(db_url, connect_args={"check_same_thread": False})
+    engine = create_engine(
+        db_url,
+        connect_args={"check_same_thread": False},
+        pool_pre_ping=True,
+    )
     Base.metadata.create_all(engine)
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 SessionLocal = init_db()
+
+@contextmanager
+def get_db():
+    """Context manager that yields a fresh DB session and ensures cleanup."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

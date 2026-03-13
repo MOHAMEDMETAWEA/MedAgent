@@ -113,18 +113,35 @@ class PatientAgent:
             # or pass all if this is a conversation. System uses single-turn usually.
             response = self.llm.invoke([system_msg, HumanMessage(content=user_input)])
             
-            is_sufficient = "PATIENT SUMMARY:" in response.content
+            # The prompt now instructs returning JSON block for context alongside the summary.
+            # We will try to parse out the context elements if the LLM provided them, 
+            # otherwise fallback to defaults.
+            content = response.content
             
-            # If profile existed, we might update it? 
-            # For now, we just pass the info downstream.
+            education_level = "unknown"
+            medical_literacy_level = "moderate"
+            emotional_state = "calm"
+            
+            # Simple heuristic extraction if structured output wasn't perfectly formatted
+            if "EDUCATION:" in content:
+                education_level = content.split("EDUCATION:")[1].split("\n")[0].strip().lower()
+            if "LITERACY:" in content:
+                medical_literacy_level = content.split("LITERACY:")[1].split("\n")[0].strip().lower()
+            if "EMOTION:" in content:
+                emotional_state = content.split("EMOTION:")[1].split("\n")[0].strip().lower()
+
+            is_sufficient = "PATIENT SUMMARY:" in content
             
             return {
                 "patient_info": {
-                    "summary": response.content, 
+                    "summary": content, 
                     "status": "complete" if is_sufficient else "incomplete",
                     "history_context": history_context,
                     "profile_id": user_id
                 },
+                "education_level": education_level,
+                "medical_literacy_level": medical_literacy_level,
+                "emotional_state": emotional_state,
                 "long_term_memory": long_term_memory,
                 "conversation_state": {
                     "active_case_id": case_id,

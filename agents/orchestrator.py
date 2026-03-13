@@ -190,16 +190,20 @@ class MedAgentOrchestrator:
         if user_id != "guest":
             # Direct query to get full account details including role
             from database.models import UserAccount
-            user_acc = self.persistence.db.query(UserAccount).filter(UserAccount.id == user_id).first()
-            if user_acc:
-                user_profile = {
-                    "role": user_acc.role,
-                    "gender": user_acc.gender,
-                    "age": user_acc.age,
-                    "country": user_acc.country,
-                    "interaction_mode": user_acc.interaction_mode,
-                    "doctor_verified": user_acc.doctor_verified
-                }
+            db = self.persistence._get_db()
+            try:
+                user_acc = db.query(UserAccount).filter(UserAccount.id == user_id).first()
+                if user_acc:
+                    user_profile = {
+                        "role": user_acc.role,
+                        "gender": user_acc.gender,
+                        "age": user_acc.age,
+                        "country": user_acc.country,
+                        "interaction_mode": user_acc.interaction_mode,
+                        "doctor_verified": user_acc.doctor_verified
+                    }
+            finally:
+                db.close()
         
         # Default mode logic
         final_mode = interaction_mode or user_profile.get("interaction_mode", "patient")

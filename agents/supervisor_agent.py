@@ -53,12 +53,15 @@ class SupervisorAgent:
         }
         
         # Check DB
+        db = self.persistence._get_db()
         try:
             # Simple query to check connectivity
             from database.models import SystemLog
-            self.persistence.db.query(SystemLog).first()
+            db.query(SystemLog).first()
             status["database"] = "Healthy"
         except Exception:
             status["database"] = "Unhealthy"
+        finally:
+            db.close()
             
         return status

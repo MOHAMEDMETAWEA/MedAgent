@@ -4,10 +4,6 @@ Medical RAG Retriever with Configurable Paths and Enhanced Error Handling.
 import os
 import json
 from pathlib import Path
-from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.documents import Document
 from config import settings
 import logging
 
@@ -21,28 +17,33 @@ class MedicalRetriever:
     def __init__(self, data_path=None, index_path=None):
         self.data_path = Path(data_path) if data_path else settings.MEDICAL_GUIDELINES_PATH
         self.index_path = Path(index_path) if index_path else settings.INDEX_DIR
-        self.embeddings = OpenAIEmbeddings(
-            model=settings.EMBEDDING_MODEL,
-            api_key=settings.OPENAI_API_KEY
-        )
+        self._embeddings = None
         self.vector_db = None
-        self._initialize_db()
+        # Lazy initialization: do not call _initialize_db() here
 
     def _initialize_db(self):
         """Initialize the vector database with medical guidelines."""
         # Ensure index directory exists
         self.index_path.mkdir(parents=True, exist_ok=True)
         
+        if self._embeddings is None:
+            from langchain_openai import OpenAIEmbeddings
+            self._embeddings = OpenAIEmbeddings(
+                model=settings.EMBEDDING_MODEL,
+                api_key=settings.OPENAI_API_KEY
+            )
+
         # Check if index already exists to avoid re-embedding
         index_file = self.index_path / "index.faiss"
         if index_file.exists():
             try:
+                from langchain_community.vectorstores import FAISS
                 # SECURITY: allow_dangerous_deserialization=True is required by FAISS for pickle load.
                 # Only load indexes built in a trusted environment. Do not load FAISS index from
                 # untrusted sources (risk of arbitrary code execution). See DEPLOYMENT.md.
                 self.vector_db = FAISS.load_local(
                     str(self.index_path),
-                    self.embeddings,
+                    self._embeddings,
                     allow_dangerous_deserialization=True,
                 )
                 logger.info("Loaded existing FAISS index.")
@@ -55,6 +56,9 @@ class MedicalRetriever:
             return
 
         try:
+            from langchain_text_splitters import RecursiveCharacterTextSplitter
+            from langchain_core.documents import Document
+            
             with open(self.data_path, 'r', encoding='utf-8') as f:
                 guidelines = json.load(f)
 
@@ -86,7 +90,8 @@ class MedicalRetriever:
                     documents.append(doc)
 
             if documents:
-                self.vector_db = FAISS.from_documents(documents, self.embeddings)
+                from langchain_community.vectorstores import FAISS
+                self.vector_db = FAISS.from_documents(documents, self._embeddings)
                 self.vector_db.save_local(str(self.index_path))
                 logger.info(f"Medical RAG Database initialized with {len(documents)} document chunks.")
             else:
@@ -105,6 +110,9 @@ class MedicalRetriever:
         Returns:
             Retrieved medical context or error message
         """
+        if not self.vector_db:
+            self._initialize_db()
+        
         if not self.vector_db:
             return "No medical data available. Please ensure the medical guidelines database is initialized."
         

@@ -15,21 +15,21 @@ class SelfImprovementAgent:
     Monitors system performance via feedback and review logs.
     """
     def __init__(self):
-        self.db: Session = SessionLocal()
         self.governance = GovernanceAgent()
 
     def analyze_feedback(self):
         """Analyze low-rated interactions for patterns."""
+        db: Session = SessionLocal()
         try:
             # Find low ratings (1 or 2 stars)
-            poor_feedback = self.db.query(UserFeedback).filter(UserFeedback.rating <= 2).all()
+            poor_feedback = db.query(UserFeedback).filter(UserFeedback.rating <= 2).all()
             if not poor_feedback:
                 return "No negative feedback to analyze."
             
             report = "NEGATIVE FEEDBACK ANALYSIS:\n"
             for fb in poor_feedback:
                 # Retrieve validation/safety flags for context
-                assoc_interaction = self.db.query(Interaction).filter(Interaction.id == fb.interaction_id).first()
+                assoc_interaction = db.query(Interaction).filter(Interaction.id == fb.interaction_id).first()
                 flags = assoc_interaction.safety_flags if assoc_interaction else {}
                 report += f"- Session {fb.session_id}: Rating {fb.rating}, Comment: {fb.comment}, Flags: {flags}\n"
             
@@ -38,12 +38,15 @@ class SelfImprovementAgent:
         except Exception as e:
             logger.error(f"Feedback analysis failed: {e}")
             return "Error analyzing feedback."
+        finally:
+            db.close()
 
     def process_human_reviews(self):
         """Learn from rejected/corrected outputs."""
+        db: Session = SessionLocal()
         try:
             # Find Rejected interactions
-            rejected = self.db.query(Interaction).filter(Interaction.review_status == ReviewStatus.REJECTED).all()
+            rejected = db.query(Interaction).filter(Interaction.review_status == ReviewStatus.REJECTED).all()
             if not rejected:
                 return "No rejected interactions found."
             
@@ -56,6 +59,8 @@ class SelfImprovementAgent:
         except Exception as e:
             logger.error(f"Review processing failed: {e}")
             return "Error processing reviews."
+        finally:
+            db.close()
 
     def generate_improvement_report(self):
         """Aggregate all learnings."""

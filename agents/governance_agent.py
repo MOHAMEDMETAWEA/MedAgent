@@ -23,7 +23,7 @@ class GovernanceAgent:
     Enforces Data Governance policies: Encryption, RBAC, Auditing.
     """
     def __init__(self):
-        self.db: Session = SessionLocal()
+        self._db_factory = SessionLocal
         # Initialize Encryption Key
         self._key = os.getenv("DATA_ENCRYPTION_KEY")
         if not self._key:
@@ -64,6 +64,10 @@ class GovernanceAgent:
 
     def create_access_token(self, data: dict):
         to_encode = data.copy()
+        # Serialize enum values to strings for JSON compatibility
+        for key, val in to_encode.items():
+            if hasattr(val, 'value'):
+                to_encode[key] = val.value
         expire = datetime.utcnow() + timedelta(minutes=self.token_expire_minutes)
         to_encode.update({"exp": expire})
         return jwt.encode(to_encode, self.jwt_secret, algorithm=self.jwt_algorithm)
@@ -80,6 +84,7 @@ class GovernanceAgent:
     # --- AUDIT LOGGING ---
     def log_action(self, actor_id: str, role: str, action: str, target: str, status: str = "SUCCESS", ip: str = None):
         """Create an immutable audit record."""
+        db = self._db_factory()
         try:
             audit = AuditLog(
                 actor_id=actor_id,
@@ -89,11 +94,13 @@ class GovernanceAgent:
                 status=status,
                 ip_address=ip
             )
-            self.db.add(audit)
-            self.db.commit()
+            db.add(audit)
+            db.commit()
         except Exception as e:
             logger.critical(f"AUDIT FAILURE: {e}")
-            self.db.rollback()
+            db.rollback()
+        finally:
+            db.close()
 
     # --- RBAC ---
     def check_permission(self, role: str, action: str) -> bool:
@@ -115,8 +122,9 @@ class GovernanceAgent:
     def anonymize_data(self, days_retention: int = 30):
         """Anonymize data older than X days (GDPR/Compliance)."""
         cutoff = datetime.utcnow() - timedelta(days=days_retention)
+        db = self._db_factory()
         try:
-            sessions = self.db.query(UserSession).filter(
+            sessions = db.query(UserSession).filter(
                 UserSession.start_time < cutoff,
                 UserSession.is_anonymized == False
             ).all()
@@ -125,48 +133,59 @@ class GovernanceAgent:
             for s in sessions:
                 s.user_id = "ANONYMIZED"
                 s.is_anonymized = True
-                # We might also wipe specific interaction text if required
                 count += 1
             
-            self.db.commit()
+            db.commit()
             self.log_action("SYSTEM", "SYSTEM", "AUTO_ANONYMIZE", f"{count}_records")
         except Exception as e:
             logger.error(f"Anonymization fail: {e}")
+        finally:
+            db.close()
 
     def delete_user_data(self, user_id: str):
         """Right to be forgotten."""
+        db = self._db_factory()
         try:
-            # We don't delete logs, but we delete PII sessions
-            self.db.query(UserSession).filter(UserSession.user_id == user_id).delete()
-            self.db.commit()
+            db.query(UserSession).filter(UserSession.user_id == user_id).delete()
+            db.commit()
             self.log_action(user_id, "USER", "DELETE_ACCOUNT", "ALL_DATA")
             return True
         except Exception as e:
             logger.error(f"Delete user failed: {e}")
             return False
+        finally:
+            db.close()
 
     # --- SYSTEM CONFIG ---
     def get_config(self, key: str, default=None):
-        cfg = self.db.query(SystemConfig).filter(SystemConfig.key == key).first()
-        if cfg:
-            return json.loads(cfg.value)
-        return default
+        db = self._db_factory()
+        try:
+            cfg = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+            if cfg:
+                return json.loads(cfg.value)
+            return default
+        finally:
+            db.close()
 
     def set_config(self, key: str, value, actor_id: str):
-        current = self.db.query(SystemConfig).filter(SystemConfig.key == key).first()
-        val_str = json.dumps(value)
-        if current:
-            current.value = val_str
-            current.updated_at = datetime.utcnow()
-            current.updated_by = actor_id
-        else:
-            new_cfg = SystemConfig(key=key, value=val_str, updated_by=actor_id)
-            self.db.add(new_cfg)
-        self.db.commit()
-        self.log_action(actor_id, "ADMIN", "UPDATE_CONFIG", key)
+        db = self._db_factory()
+        try:
+            current = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+            val_str = json.dumps(value)
+            if current:
+                current.value = val_str
+                current.updated_at = datetime.utcnow()
+                current.updated_by = actor_id
+            else:
+                new_cfg = SystemConfig(key=key, value=val_str, updated_by=actor_id)
+                db.add(new_cfg)
+            db.commit()
+            self.log_action(actor_id, "ADMIN", "UPDATE_CONFIG", key)
+        finally:
+            db.close()
 
     def close(self):
-        self.db.close()
+        pass  # No persistent session to close
 
     # --- AUDIT EVIDENCE SIGNING ---
     def sign_evidence(self, payload: str) -> str:

@@ -26,10 +26,13 @@ class AuthenticationAgent:
                 self.persistence.log_user_activity(user.id, "none", "failed", ip=ip)
             return None, "Invalid credentials"
         
+        # Serialize role enum to string for JWT and JSON
+        role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
+        
         session_id = self.persistence.create_session(user_id=user.id, mode=user.interaction_mode)
         token = self.governance.create_access_token({
             "sub": user.id, 
-            "role": user.role, 
+            "role": role_str, 
             "mode": user.interaction_mode,
             "name": user.username
         })
@@ -41,7 +44,7 @@ class AuthenticationAgent:
             "user": {
                 "id": user.id,
                 "username": user.username,
-                "role": user.role,
+                "role": role_str,
                 "full_name": self.governance.decrypt(user.full_name_encrypted),
                 "gender": user.gender,
                 "age": user.age,

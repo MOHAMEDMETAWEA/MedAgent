@@ -42,6 +42,11 @@ class AgentState(TypedDict):
     user_country: str
     request_second_opinion: bool
     
+    # Adaptive Communication Context
+    education_level: str
+    medical_literacy_level: str
+    emotional_state: str
+    
     # Generative Report Agent outputs (RAG-grounded) - Compatibility
     report_medical: str
     report_doctor_summary: str
