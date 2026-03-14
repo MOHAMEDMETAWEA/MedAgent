@@ -45,13 +45,13 @@ class ValidationAgent:
             
             result = response.content
             if "VALID" in result and "ISSUE" not in result:
-                return {"validation_status": "valid", "next_step": "safety"}
+                return {"validation_status": "valid"}
             else:
+                logger.warning(f"VALIDATION ISSUE DETECTED: {result}")
                 return {
-                    "preliminary_diagnosis": diagnosis + "\n\n[VALIDATION WARNING]: " + result, 
-                    "validation_status": "warning", 
-                    "next_step": "safety"
+                    "validation_status": "invalid",
+                    "retry_reason": result
                 }
         except Exception as e:
             logger.error(f"Validation error: {e}")
-            return {"validation_status": "error", "next_step": "safety"}
+            return {"validation_status": "error"}

@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     JWT_SECRET_KEY: Optional[str] = None
+    CLERK_PUBLISHABLE_KEY: Optional[str] = None
+    CLERK_SECRET_KEY: Optional[str] = None
     
     # Paths
     BASE_DIR: Path = Path(__file__).parent
@@ -59,6 +61,9 @@ class Settings(BaseSettings):
     MLFLOW_TRACKING_URI: Optional[str] = None
     ENABLE_LOGGING: bool = True
     LOG_LEVEL: str = "INFO"
+    
+    # Database
+    DATABASE_URL: str = "sqlite:///./medagent.db"
     
     # API
     MEDAGENT_API_URL: str = "http://localhost:8000"

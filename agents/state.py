@@ -12,6 +12,7 @@ class AgentState(TypedDict):
     # Context
     user_id: str
     session_id: str
+    fhir_id: str # External EMR Identifier
     
     # Core Data
     patient_info: dict
@@ -62,3 +63,7 @@ class AgentState(TypedDict):
     # Advanced Memory & Tracking
     long_term_memory: str # Summarized past history/conversations
     conversation_state: dict # Active case tracking (risk_level, pending_actions, etc.)
+
+    # Self-Correction (Reflexion)
+    retry_reason: str
+    correction_count: int

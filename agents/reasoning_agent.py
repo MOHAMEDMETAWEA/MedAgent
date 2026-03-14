@@ -54,7 +54,8 @@ class ReasoningAgent:
         
         try:
             base_template = self._load_prompt("clinical_cognitive_layer.txt")
-            context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}"
+            retry_context = f"\n\n[SELF-CORRECTION FEEDBACK]: Your previous response had issues: {state.get('retry_reason')}. PLEASE CORRECT THESE." if state.get("retry_reason") else ""
+            context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}{retry_context}"
             routing_prompt = base_template.format(
                 mode=mode.upper(),
                 role=role.upper(),
@@ -109,7 +110,8 @@ class ReasoningAgent:
                 "preliminary_diagnosis": diag,
                 "confidence_score": conf,
                 "next_step": "validation",
-                "status": "Reasoning Complete"
+                "status": "Reasoning Complete",
+                "correction_count": state.get("correction_count", 0) + (1 if state.get("retry_reason") else 0)
             }
 
         except Exception as e:

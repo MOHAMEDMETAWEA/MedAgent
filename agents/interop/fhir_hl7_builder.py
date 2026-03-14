@@ -94,3 +94,47 @@ class InteropBuilder:
         elif format == "hl7":
             return "MSH|" in data and "PID|" in data
         return False
+
+class FHIRClient:
+    """
+    Client for interacting with external FHIR R4 servers (e.g. Hapi FHIR, Epic, Cerner).
+    """
+    def __init__(self, base_url: str = None, token: str = None):
+        import os
+        from config import settings
+        self.base_url = base_url or os.getenv("FHIR_BASE_URL", "https://hapi.fhir.org/baseR4")
+        self.token = token or os.getenv("FHIR_TOKEN")
+        
+    def fetch_patient_background(self, patient_fhir_id: str):
+        """
+        Fetches Patient, Conditions, and Medications from a FHIR server.
+        """
+        import httpx
+        logger.info(f"--- FHIR CLIENT: FETCHING DATA FOR {patient_fhir_id} ---")
+        
+        headers = {"Accept": "application/fhir+json"}
+        if self.token: headers["Authorization"] = f"Bearer {self.token}"
+        
+        try:
+            # 1. Fetch Patient Resource
+            p_res = httpx.get(f"{self.base_url}/Patient/{patient_fhir_id}", headers=headers, timeout=10.0)
+            p_data = p_res.json() if p_res.status_code == 200 else {}
+            
+            # 2. Fetch Conditions (Differential Diagnostic Context)
+            c_res = httpx.get(f"{self.base_url}/Condition?patient={patient_fhir_id}", headers=headers, timeout=10.0)
+            c_data = c_res.json() if c_res.status_code == 200 else {"entry": []}
+            
+            # 3. Fetch Medications
+            m_res = httpx.get(f"{self.base_url}/MedicationRequest?patient={patient_fhir_id}", headers=headers, timeout=10.0)
+            m_data = m_res.json() if m_res.status_code == 200 else {"entry": []}
+            
+            summary = {
+                "fhir_id": patient_fhir_id,
+                "name": p_data.get("name", [{}])[0].get("text", "Unknown"),
+                "conditions": [e["resource"]["code"]["text"] for e in c_data.get("entry", []) if "resource" in e],
+                "medications": [e["resource"]["medicationCodeableConcept"]["text"] for e in m_data.get("entry", []) if "resource" in e and "medicationCodeableConcept" in e]
+            }
+            return summary
+        except Exception as e:
+            logger.error(f"FHIR fetch failed: {e}")
+            return {"error": str(e)}

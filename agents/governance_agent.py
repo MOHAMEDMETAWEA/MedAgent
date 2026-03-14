@@ -82,7 +82,7 @@ class GovernanceAgent:
             return None
 
     # --- AUDIT LOGGING ---
-    def log_action(self, actor_id: str, role: str, action: str, target: str, status: str = "SUCCESS", ip: str = None):
+    def log_action(self, actor_id: str, role: str, action: str, target: str, status: str = "SUCCESS", details: dict = None, ip: str = None):
         """Create an immutable audit record."""
         db = self._db_factory()
         try:
@@ -92,6 +92,7 @@ class GovernanceAgent:
                 action=action,
                 resource_target=target,
                 status=status,
+                details=details or {},
                 ip_address=ip
             )
             db.add(audit)

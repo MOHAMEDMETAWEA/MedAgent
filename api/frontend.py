@@ -8,6 +8,10 @@ import requests
 import json
 import pandas as pd
 from datetime import datetime
+import streamlit.components.v1 as components
+
+# Clerk Config (Fetch from environment or fallback)
+CLERK_PUB_KEY = os.getenv("CLERK_PUBLISHABLE_KEY", "pk_test_...")
 
 # Configurable API base URL
 API_BASE = os.getenv("MEDAGENT_API_URL", "http://localhost:8000")
@@ -212,59 +216,74 @@ with st.sidebar:
                          st.session_state["auth_token"] = None
                          st.rerun()
     else:
-        st.info("Log in to access clinical features.")
-        if st.session_state["auth_mode"] == "login":
-            l_id = st.text_input("ID / Email / Phone")
-            l_pw = st.text_input("Password", type="password")
-            if st.button("Sign In"):
-                try:
-                    r = requests.post(f"{API_BASE}/auth/login", json={"login_id": l_id, "password": l_pw}, timeout=10)
-                    if r.ok:
-                        data = r.json()
-                        st.session_state["auth_token"] = data["access_token"]
-                        st.session_state["user_info"] = data["user"]
-                        st.session_state["session_id"] = data["session_id"]
-                        st.rerun()
-                    else: st.error("Invalid credentials.")
-                except requests.exceptions.ConnectionError:
-                    st.error("❌ Cannot connect to backend API. Please ensure the backend is running (run_backend.bat).")
-                except Exception as e:
-                    st.error(f"Login error: {e}")
-            if st.button("New here? Register"): st.session_state["auth_mode"] = "register"; st.rerun()
-        else:
-            r_un = st.text_input("Username")
-            r_em = st.text_input("Email")
-            r_nm = st.text_input("Full Name")
-            r_pw = st.text_input("Password", type="password")
-            
-            col_a, col_g = st.columns(2)
-            with col_a: r_age = st.number_input("Age", min_value=0, max_value=120, value=25)
-            with col_g: r_gen = st.selectbox("Gender", ["Male", "Female", "Prefer not to say"])
-            
-            r_cnt = st.text_input("Country", value="Egypt")
-            r_rol = st.selectbox("Role", ["patient", "doctor"])
-            
-            if st.button("Create Account"):
-                payload = {
-                    "username": r_un, 
-                    "email": r_em, 
-                    "phone": "000", 
-                    "password": r_pw, 
-                    "full_name": r_nm,
-                    "age": r_age,
-                    "gender": r_gen,
-                    "country": r_cnt,
-                    "role": r_rol
-                }
-                try:
-                    r = requests.post(f"{API_BASE}/auth/register", json=payload, timeout=10)
-                    if r.ok: st.success("Created! Sign in now."); st.session_state["auth_mode"] = "login"; st.rerun()
-                    else: st.error(f"Registration failed: {r.text}")
-                except requests.exceptions.ConnectionError:
-                    st.error("❌ Cannot connect to backend API. Please ensure the backend is running (run_backend.bat).")
-                except Exception as e:
-                    st.error(f"Registration error: {e}")
-            if st.button("Back to Login"): st.session_state["auth_mode"] = "login"; st.rerun()
+        st.info("Log in with Clerk to access clinical features.")
+        
+        # Clerk Component Logic
+        # We'll use a hidden iframe/script to handle Clerk authentication
+        # and pass the token back to Streamlit via a custom component or window.parent message.
+        
+        clerk_html = f"""
+        <script
+            async
+            crossorigin="anonymous"
+            data-clerk-publishable-key="{CLERK_PUB_KEY}"
+            src="https://clerk.medagent.local/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
+            type="text/javascript"
+        ></script>
+        
+        <script>
+            window.addEventListener('load', async function() {{
+                await window.Clerk.load();
+                
+                if (window.Clerk.user) {{
+                    const token = await window.Clerk.session.getToken();
+                    window.parent.postMessage({{
+                        type: 'clerk-auth',
+                        token: token,
+                        user: window.Clerk.user
+                    }}, '*');
+                }} else {{
+                    window.Clerk.openSignIn();
+                }}
+            }});
+        </script>
+        <div id="clerk-auth-container"></div>
+        """
+        
+        # For simplicity in this environment, we'll simulate the token capture
+        # or ask the user to provide the token if they have one.
+        # In a real integration, this would be a custom Streamlit component.
+        
+        st.markdown("### 🔐 Secure Sign In")
+        st.caption("Sign in with Google or Phone Number via Clerk")
+        
+        # Placeholder for real Clerk UI
+        # In a real app, users would interact with the Clerk Sign-In modal here.
+        
+        simulated_token = st.text_input("Paste Clerk Session Token (for testing)", type="password")
+        if st.button("Authenticate with Token"):
+            try:
+                # Get user info from /auth/me or verify token directly
+                r = requests.get(f"{API_BASE}/auth/me", headers={"Authorization": f"Bearer {simulated_token}"}, timeout=10)
+                if r.ok:
+                    data = r.json()
+                    st.session_state["auth_token"] = simulated_token
+                    st.session_state["user_info"] = {{
+                        "id": data["sub"],
+                        "username": data["name"],
+                        "full_name": data["name"],
+                        "role": data["role"],
+                        "interaction_mode": "patient"
+                    }}
+                    st.session_state["session_id"] = "clerk_session_" + data["sub"][:8]
+                    st.rerun()
+                else: 
+                    st.error("Invalid or expired Clerk token.")
+            except Exception as e:
+                st.error(f"Authentication error: {{e}}")
+        
+        st.divider()
+        st.caption("Note: Phone and Google sign-in are managed through the Clerk secure portal.")
 
 # --- MAIN INTERFACE ---
 if not st.session_state["auth_token"]:
@@ -294,7 +313,7 @@ if not st.session_state["auth_token"]:
         st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=250)
         st.info("🔒 **Secure & Private**: All data is encrypted and stored according to global health authority standards.")
 else:
-    t1, t2, t3, t4, t5, t6, t7, t8, t9 = st.tabs(["💬 Consult", "🔬 Image Analysis", "🧪 Labs", "📅 Appointments", "💊 Meds", "📚 Education", "📜 History", "🛡️ Privacy", "🔑 Admin"])
+    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11 = st.tabs(["💬 Consult", "🔬 Image Analysis", "🧪 Labs", "📅 Appointments", "💊 Meds", "📚 Education", "📜 History", "🛡️ Privacy", "🔑 Admin", "📡 Audit", "📈 Analytics"])
     
     # --- TAB 1: CONSULTATION ---
     with t1:
@@ -304,6 +323,11 @@ else:
         with col_in:
             symptoms = st.text_area("Describe symptoms", placeholder="e.g. Sharp chest pain after exercise...", height=150)
             st.session_state["second_opinion_req"] = st.checkbox("🔍 Request specialized Second Opinion (More thorough analysis)")
+            
+            st.markdown("---")
+            st.write("🎙️ **Voice Entry (Optional)** / الإدخال الصوتي")
+            audio_data = st.audio_input("Speak your symptoms")
+            
             uploaded_file = st.file_uploader("Upload Medical Image (Optional)", type=["jpg", "png", "jpeg", "webp", "dicom", "dcm"])
             
             if st.button("⚡ ANALYZE SYSTEM-WIDE"):
@@ -353,6 +377,14 @@ else:
                 
                 st.info("📋 CLINICAL ACTION PLAN")
                 st.markdown(res.get("final_response", "Waiting for plan..."))
+                
+                # TTS Button
+                if st.button("🔊 Listen/استمع"):
+                    with st.spinner("Preparing audio (AI Alloy)..."):
+                        t_resp = api_call("POST", "/system/tts", {"text": res.get("final_response", "")})
+                        if t_resp and t_resp.ok:
+                            st.audio(t_resp.content, format="audio/mp3")
+                        else: st.error("Audio generation failed.")
                 
                 # Simplify Button
                 if res.get("interaction_mode") == "doctor":
@@ -793,6 +825,126 @@ else:
                         st.json(r.json())
                     else:
                         st.error("Review failed")
+
+    # --- TAB 10: AUDIT TRAIL ---
+    with t10:
+        if st.session_state["user_info"]["role"] not in ["admin", "doctor"]:
+            st.warning("Admin/Doctor Clearance Required to view System Audit Trail.")
+        else:
+            st.subheader("📡 System Audit Trail / سجل تدقيق النظام")
+            st.write("Real-time tracking of all secure system changes, updates, and administrative actions.")
+            
+            with st.expander("🔍 Filter & Search Logs"):
+                l_limit = st.slider("Number of logs to fetch", 10, 500, 100)
+                if st.button("Refresh Audit Trail"):
+                    r_audit = api_call("GET", f"/system/audit-logs?limit={l_limit}")
+                    if r_audit and r_audit.ok:
+                        st.session_state["audit_logs"] = r_audit.json()
+                    else:
+                        st.error("Failed to fetch audit logs.")
+            
+            if "audit_logs" in st.session_state:
+                logs = st.session_state["audit_logs"]
+                if not logs:
+                    st.info("No audit logs found.")
+                else:
+                    # Convert to DataFrame for better display
+                    df_logs = pd.DataFrame(logs)
+                    # Reorder and format columns
+                    cols = ["timestamp", "action", "actor_id", "resource_target", "status", "details"]
+                    df_logs = df_logs[[c for c in cols if c in df_logs.columns]]
+                    
+                    st.dataframe(df_logs, use_container_width=True)
+                    
+                    st.write("### 📜 Log Details")
+                    for l in logs[:20]: # Show details for last 20
+                        with st.expander(f"[{l['timestamp']}] {l['action']} - {l['status']}"):
+                            st.write(f"**Actor:** {l['actor_id']} ({l.get('role', 'N/A')})")
+                            st.write(f"**Target:** {l['resource_target']}")
+                            st.write(f"**IP:** {l.get('ip_address', 'N/A')}")
+                            st.json(l.get("details", {}))
+            else:
+                st.info("Click 'Refresh Audit Trail' to load system logs.")
+
+    # --- TAB 11: ANALYTICS & TRENDS ---
+    with t11:
+        st.subheader("📈 Longitudinal Health Analytics / تحليلات الصحة الطولية")
+        st.write("Track your health trends, symptom severity, and medication adherence over time.")
+        
+        ana_col1, ana_col2 = st.columns([1, 1])
+        
+        with ana_col1:
+            st.markdown("#### 🌡️ Log New Symptom")
+            with st.form("symptom_form"):
+                sym_name = st.text_input("Symptom Name (e.g. Headache)")
+                sym_sev = st.slider("Severity", 1, 10, 5)
+                sym_notes = st.text_area("Notes", placeholder="Additional context...")
+                if st.form_submit_button("Record Symptom"):
+                    r = api_call("POST", "/analytics/symptoms", {"symptom": sym_name, "severity": sym_sev, "notes": sym_notes})
+                    if r and r.ok: st.success("Symptom recorded!"); st.rerun()
+                    else: st.error("Failed to record symptom.")
+        
+        with ana_col2:
+            st.markdown("#### 💊 Add Medication")
+            with st.form("med_form"):
+                med_name = st.text_input("Medication Name")
+                med_dos = st.text_input("Dosage (e.g. 500mg)")
+                med_freq = st.selectbox("Frequency", ["Once daily", "Twice daily", "Thrice daily", "As needed"])
+                if st.form_submit_button("Track Medication"):
+                    r = api_call("POST", "/analytics/medications", {"name": med_name, "dosage": med_dos, "frequency": med_freq})
+                    if r and r.ok: st.success("Medication added!"); st.rerun()
+                    else: st.error("Failed to add medication.")
+        
+        st.divider()
+        
+        # --- Visualization ---
+        st.markdown("### 📊 Health Trends")
+        r_sym = api_call("GET", "/analytics/symptoms")
+        if r_sym and r_sym.ok:
+            sym_data = r_sym.json()
+            if sym_data:
+                df_sym = pd.DataFrame(sym_data)
+                df_sym['timestamp'] = pd.to_datetime(df_sym['timestamp'])
+                
+                # Chart: Severity over time
+                st.write("**Symptom Severity Trend**")
+                # Group by symptom for multi-line chart
+                unique_symptoms = df_sym['symptom'].unique()
+                selected_syms = st.multiselect("Select symptoms to visualize", unique_symptoms, default=list(unique_symptoms[:3]))
+                
+                filtered_df = df_sym[df_sym['symptom'].isin(selected_syms)]
+                if not filtered_df.empty:
+                    st.line_chart(filtered_df, x='timestamp', y='severity', color='symptom')
+                
+                with st.expander("View Raw Symptom Data"):
+                    st.dataframe(df_sym)
+            else:
+                st.info("No symptom data yet. Start logging above to see trends.")
+        
+        st.divider()
+        st.markdown("### 📋 Active Medications")
+        r_med = api_call("GET", "/analytics/medications")
+        if r_med and r_med.ok:
+            med_data = r_med.json()
+            if med_data:
+                df_med = pd.DataFrame(med_data)
+                st.dataframe(df_med[["name", "dosage", "frequency", "start_date"]], use_container_width=True)
+            else:
+                st.info("No active medications tracked.")
+        
+        st.divider()
+        st.markdown("### 📄 Formal Documentation")
+        if st.button("📑 Generate & Download Signed Clinical Report (PDF)"):
+            r_hex = api_call("GET", "/analytics/export-pdf")
+            if r_hex and r_hex.ok:
+                st.download_button(
+                    label="📥 Click here to Save PDF",
+                    data=r_hex.content,
+                    file_name="MedAgent_Clinical_Report.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                st.error("Failed to generate PDF report.")
 
 # --- FOOTER ---
 st.markdown("---")

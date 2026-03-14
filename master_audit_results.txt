@@ -1,0 +1,21 @@
+test_concurrent_sessions (tests.auth_verification.TestMedAgentAuthFlow.test_concurrent_sessions)
+Simulate multiple users logging in. ... ok
+test_full_auth_cycle (tests.auth_verification.TestMedAgentAuthFlow.test_full_auth_cycle)
+Test registration -> login -> profile -> delete account. ... ok
+test_vision_consultation (tests.vision_verification.TestMedAgentVision.test_vision_consultation)
+Test sending symptoms with an image. ... ok
+test_latency_consultation (tests.perf_benchmark.TestMedAgentPerformance.test_latency_consultation)
+Measure latency of a standard consultation with mocks. ... ok
+test_latency_health_check (tests.perf_benchmark.TestMedAgentPerformance.test_latency_health_check)
+Health check should be near-instant. ... ok
+test_critical_symptom_detection (tests.safety_verification.TestMedAgentSafety.test_critical_symptom_detection)
+Test for immediate emergency detection. ... ok
+test_medical_disclaimer_presence (tests.safety_verification.TestMedAgentSafety.test_medical_disclaimer_presence)
+Verify that every clinical response contains a disclaimer. ... ok
+test_prompt_injection_blocking (tests.safety_verification.TestMedAgentSafety.test_prompt_injection_blocking)
+Test if prompt injection triggers safety flags or is sanitized. ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 17.594s
+
+OK

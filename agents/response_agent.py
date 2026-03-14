@@ -28,6 +28,9 @@ class ResponseAgent:
         
         logger.info("--- RESPONSE AGENT: ADAPTIVE POLISH ---")
         final_response = state.get("final_response", "")
+        if not final_response:
+            final_response = state.get("preliminary_diagnosis", "")
+            
         mode = state.get("interaction_mode", "patient")
         role = state.get("user_role", "patient")
         verified = state.get("doctor_verified", False)

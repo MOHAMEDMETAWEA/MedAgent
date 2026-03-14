@@ -108,7 +108,23 @@ class MedAgentOrchestrator:
         workflow.add_edge("triage", "knowledge")
         workflow.add_edge("knowledge", "reasoning")
         workflow.add_edge("reasoning", "validation")
-        workflow.add_edge("validation", "safety")
+        
+        # Self-Correction Loop: Validation -> Reasoning (if invalid)
+        def route_validation(state: AgentState):
+            if state.get("validation_status") == "invalid" and state.get("correction_count", 0) < 2:
+                logger.warning(f"--- RE-ROUTING TO REASONING (Correction #{state.get('correction_count', 0) + 1}) ---")
+                return "retry"
+            return "continue"
+
+        workflow.add_conditional_edges(
+            "validation",
+            route_validation,
+            {
+                "retry": "reasoning",
+                "continue": "safety"
+            }
+        )
+
         workflow.add_edge("safety", "response")
         workflow.add_edge("response", END)
 
@@ -180,7 +196,9 @@ class MedAgentOrchestrator:
                 "visual_findings": {},
                 "long_term_memory": user_profile.get("medical_background", ""),
                 "medical_background": user_profile.get("medical_background", ""),
-                "conversation_state": {"active_case_id": None, "risk_level": "unknown", "pending_actions": []}
+                "conversation_state": {"active_case_id": None, "risk_level": "unknown", "pending_actions": []},
+                "retry_reason": "",
+                "correction_count": 0
             }
             
             final_state = self.graph.invoke(state)

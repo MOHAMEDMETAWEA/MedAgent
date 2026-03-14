@@ -6,6 +6,8 @@ import logging
 import re
 import json
 
+from agents.interop.fhir_hl7_builder import FHIRClient
+
 logger = logging.getLogger(__name__)
 
 class TriageAgent:
@@ -49,6 +51,17 @@ class TriageAgent:
             user_input += f"\n[VISUAL FINDINGS]: {visual_findings.get('visual_findings', '')}\n"
             user_input += f"Confidence: {visual_findings.get('confidence', 0.5)}, Severity: {visual_findings.get('severity_level', 'unknown')}"
         
+        # FHIR EMR Integration
+        fhir_id = state.get("fhir_id")
+        if fhir_id:
+            logger.info(f"--- TRIAGE AGENT: PULLING EMR DATA FOR {fhir_id} ---")
+            fhir_client = FHIRClient()
+            bg = fhir_client.fetch_patient_background(fhir_id)
+            if "error" not in bg:
+                emr_text = f"\n[EMR BACKGROUND]: Conditions: {', '.join(bg['conditions'])}, Medications: {', '.join(bg['medications'])}"
+                user_input += emr_text
+                logger.info("Successfully integrated EMR background.")
+
         # Validation
         user_input = sanitize_input(user_input)
         is_valid, error = validate_medical_input(user_input)

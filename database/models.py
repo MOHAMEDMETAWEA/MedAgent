@@ -114,6 +114,7 @@ class AuditLog(Base):
     action = Column(String)
     resource_target = Column(String)
     status = Column(String)
+    details = Column(JSON, nullable=True) # Specific details of the change
     ip_address = Column(String, nullable=True)
 
 class SystemLog(Base):
@@ -141,6 +142,8 @@ class PatientProfile(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
     reports = relationship("MedicalReport", back_populates="patient")
+    symptoms = relationship("SymptomLog", back_populates="patient")
+    medications = relationship("MedicationRecord", back_populates="patient")
 
 class MedicalReport(Base):
     __tablename__ = "medical_reports"
@@ -192,6 +195,7 @@ class UserAccount(Base):
     
     # Metadata for optional fields (encrypted JSON)
     profile_metadata_encrypted = Column(Text) 
+    clerk_id = Column(String, unique=True, index=True, nullable=True)
 
 class UserActivity(Base):
     """Tracks login/logout and session activity."""
@@ -246,6 +250,41 @@ class MedicalImage(Base):
     # Analysis results
     visual_findings_encrypted = Column(Text)
     possible_conditions_json = Column(JSON)
+    
+    requires_human_review = Column(Boolean, default=False)
+
+class SymptomLog(Base):
+    """Tracks patient symptoms and severity over time."""
+    __tablename__ = "symptom_logs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id = Column(String, ForeignKey("patient_profiles.id"))
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    symptom_name_encrypted = Column(Text)
+    severity = Column(Integer) # 1-10
+    notes_encrypted = Column(Text, nullable=True)
+    
+    patient = relationship("PatientProfile", back_populates="symptoms")
+
+class MedicationRecord(Base):
+    """Tracks patient medications and adherence."""
+    __tablename__ = "medication_records"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id = Column(String, ForeignKey("patient_profiles.id"))
+    medication_name_encrypted = Column(Text)
+    dosage_encrypted = Column(Text)
+    frequency = Column(String) # daily, twice a day, etc.
+    
+    start_date = Column(DateTime, default=datetime.datetime.utcnow)
+    end_date = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)
+    
+    session_id = Column(String, ForeignKey("user_sessions.id"), nullable=True)
+    case_id = Column(String, ForeignKey("medical_cases.id"), nullable=True)
+    
+    patient = relationship("PatientProfile", back_populates="medications")
     confidence_score = Column(Integer) # Percentage 0-100 or 0.0-1.0
     severity_level = Column(String)    # low, moderate, high
     requires_human_review = Column(Boolean, default=False)

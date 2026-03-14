@@ -8,8 +8,9 @@ import datetime
 import os
 import logging
 from sqlalchemy.orm import Session
-from database.models import SessionLocal, get_db, UserSession, Interaction, SystemLog, PatientProfile, MedicalReport, UserAction, MedicalImage, UserAccount, UserActivity, MedicalCase, MemoryNode, MemoryEdge, UserRole
+from database.models import SessionLocal, get_db, UserSession, Interaction, SystemLog, PatientProfile, MedicalReport, UserAction, MedicalImage, UserAccount, UserActivity, MedicalCase, MemoryNode, MemoryEdge, UserRole, SymptomLog, MedicationRecord
 from agents.governance_agent import GovernanceAgent
+from agents.audit_agent import AuditAgent
 from config import settings
 import hashlib
 import json
@@ -23,6 +24,7 @@ class PersistenceAgent:
     """
     def __init__(self):
         self.governance = GovernanceAgent()
+        self.audit = AuditAgent()
 
     def _get_db(self):
         """Create a fresh DB session for each operation."""
@@ -288,6 +290,7 @@ class PersistenceAgent:
                 profile.medical_history_encrypted = enc_history
             
             db.commit()
+            self.audit.log_change(user_id, "SYSTEM", "UPDATE_PROFILE", f"Profile#{user_id}", details={"age": age, "gender": gender})
             return True
         except Exception as e:
             logger.error(f"Failed to upsert profile: {e}")
@@ -461,7 +464,7 @@ class PersistenceAgent:
     # --- IDENTITY & AUTHENTICATION ---
     def register_user(self, username: str, email: str, phone: str, password: str, full_name: str, 
                       role: str = "patient", gender: str = None, age: int = None, 
-                      country: str = None, meta: dict = None):
+                      country: str = None, meta: dict = None, clerk_id: str = None):
         """Create a new user account securely with role and demographic data."""
         db = self._get_db()
         try:
@@ -488,10 +491,13 @@ class PersistenceAgent:
                 age=age,
                 country=country,
                 interaction_mode=role if role in ["patient", "doctor"] else "patient",
-                profile_metadata_encrypted=enc_meta
+                profile_metadata_encrypted=enc_meta,
+                clerk_id=clerk_id
             )
             db.add(user)
             db.commit()
+            
+            self.audit.log_change(user_id, role, "REGISTER_USER", f"User#{user_id}", details={"username": username, "email": email, "clerk_id": clerk_id})
             
             # Auto-create patient profile
             self._upsert_patient_profile_db(db, user_id, full_name, age or 0, gender or "Unknown", "{}")
@@ -551,6 +557,17 @@ class PersistenceAgent:
             ).first()
         except Exception as e:
             logger.error(f"User lookup failed: {e}")
+            return None
+        finally:
+            db.close()
+
+    def get_user_by_clerk_id(self, clerk_id: str):
+        """Find user by their Clerk ID."""
+        db = self._get_db()
+        try:
+            return db.query(UserAccount).filter(UserAccount.clerk_id == clerk_id).first()
+        except Exception as e:
+            logger.error(f"User lookup by Clerk ID failed: {e}")
             return None
         finally:
             db.close()
@@ -789,6 +806,76 @@ class PersistenceAgent:
             logger.error(f"Account deletion failed: {e}")
             db.rollback()
             return False
+        finally:
+            db.close()
+
+    # --- ANALYTICS: SYMPTOMS & MEDICATIONS ---
+    def log_symptom(self, patient_id: str, symptom: str, severity: int, notes: str = None):
+        """Record a patient symptom with severity."""
+        db = self._get_db()
+        try:
+            log = SymptomLog(
+                patient_id=patient_id,
+                symptom_name_encrypted=self.governance.encrypt(symptom),
+                severity=severity,
+                notes_encrypted=self.governance.encrypt(notes) if notes else None
+            )
+            db.add(log)
+            db.commit()
+            self.audit.log_change(patient_id, "PATIENT", "LOG_SYMPTOM", f"Symptom#{symptom}", details={"severity": severity})
+            return True
+        finally:
+            db.close()
+
+    def get_symptoms(self, patient_id: str, limit: int = 50):
+        """Retrieve symptom history for a patient."""
+        db = self._get_db()
+        try:
+            logs = db.query(SymptomLog).filter(SymptomLog.patient_id == patient_id).order_by(SymptomLog.timestamp.desc()).limit(limit).all()
+            results = []
+            for l in logs:
+                results.append({
+                    "timestamp": l.timestamp.isoformat(),
+                    "symptom": self.governance.decrypt(l.symptom_name_encrypted),
+                    "severity": l.severity,
+                    "notes": self.governance.decrypt(l.notes_encrypted) if l.notes_encrypted else ""
+                })
+            return results
+        finally:
+            db.close()
+
+    def log_medication(self, patient_id: str, name: str, dosage: str, frequency: str):
+        """Record a new medication for a patient."""
+        db = self._get_db()
+        try:
+            med = MedicationRecord(
+                patient_id=patient_id,
+                medication_name_encrypted=self.governance.encrypt(name),
+                dosage_encrypted=self.governance.encrypt(dosage),
+                frequency=frequency
+            )
+            db.add(med)
+            db.commit()
+            self.audit.log_change(patient_id, "PATIENT", "ADD_MEDICATION", f"Med#{name}", details={"frequency": frequency})
+            return True
+        finally:
+            db.close()
+
+    def get_medications(self, patient_id: str):
+        """Retrieve active medications for a patient."""
+        db = self._get_db()
+        try:
+            meds = db.query(MedicationRecord).filter(MedicationRecord.patient_id == patient_id, MedicationRecord.is_active == True).all()
+            results = []
+            for m in meds:
+                results.append({
+                    "id": m.id,
+                    "name": self.governance.decrypt(m.medication_name_encrypted),
+                    "dosage": self.governance.decrypt(m.dosage_encrypted),
+                    "frequency": m.frequency,
+                    "start_date": m.start_date.isoformat()
+                })
+            return results
         finally:
             db.close()
 
