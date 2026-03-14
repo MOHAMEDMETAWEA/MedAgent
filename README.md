@@ -262,15 +262,6 @@ python tests/stress_test_audit.py
 
 ---
 
-## 🗺️ Roadmap & Future Improvements
-
-- [ ] Support for native DICOM 3D rendering in UI.
-- [x] Integration with EHR systems (Epic/Cerner via HL7 FHIR).
-- [ ] Local model hosting (Ollama/vLLM) for ultra-private clinical environments.
-- [ ] Advanced pediatric visual-aid modules.
-
----
-
 ## 📄 License & Certification
 
 This project is licensed under the MIT License.
