@@ -335,7 +335,9 @@ else:
                 with c1:
                     st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=60)
                 with c2:
-                    st.markdown("### Medical Specialist Analysis")
+                    current_interaction_mode = res.get("interaction_mode", "patient").upper()
+                    mode_color = "#2e7d32" if current_interaction_mode == "PATIENT" else "#1e3c72"
+                    st.markdown(f"### Medical Specialist Analysis <span style='background-color: {mode_color}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; vertical-align: middle;'>MODE: {current_interaction_mode}</span>", unsafe_allow_html=True)
                     st.caption(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
                 # Vision Findings
@@ -351,6 +353,22 @@ else:
                 
                 st.info("📋 CLINICAL ACTION PLAN")
                 st.markdown(res.get("final_response", "Waiting for plan..."))
+                
+                # Simplify Button
+                if res.get("interaction_mode") == "doctor":
+                    if st.button("✨ Explain in simpler terms (Patient Mode)"):
+                        with st.spinner("Simplifying clinical analysis..."):
+                            payload = {
+                                "symptoms": symptoms, 
+                                "image_path": res.get("image_path"), 
+                                "patient_id": st.session_state["user_info"]["id"], 
+                                "language": st.session_state["language"],
+                                "interaction_mode": "patient"
+                            }
+                            sr = api_call("POST", "/consult", data=payload)
+                            if sr and sr.ok:
+                                st.session_state["last_result"] = sr.json()
+                                st.rerun()
                 
                 if res.get("critical_alert"):
                     st.error("🚨 EMERGENCY ESCALATION DETECTED")

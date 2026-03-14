@@ -1,20 +1,23 @@
 """
 Knowledge Agent - Wrapper around Medical Retriever.
+Optimized for performance with lazy imports.
 """
-from rag.retriever import MedicalRetriever
-from .state import AgentState
 import logging
 
 logger = logging.getLogger(__name__)
 
 class KnowledgeAgent:
-    """
-    Retrieves verified medical information to ground the reasoning.
-    """
     def __init__(self):
-        self.retriever = MedicalRetriever()
+        # retriever is initialized only when needed
+        self._retriever = None
 
-    def process(self, state: AgentState):
+    def get_retriever(self):
+        if not self._retriever:
+            from rag.retriever import MedicalRetriever
+            self._retriever = MedicalRetriever()
+        return self._retriever
+
+    def process(self, state: dict):
         logger.info("--- KNOWLEDGE AGENT: RETRIEVING CLINICAL GUIDELINES ---")
         patient_summary = state.get('patient_info', {}).get('summary', '')
         
@@ -22,8 +25,8 @@ class KnowledgeAgent:
             return {"retrieved_docs": "", "next_step": "reasoning"}
 
         try:
-            # We can refine the query here if needed
-            knowledge = self.retriever.retrieve(patient_summary)
+            retriever = self.get_retriever()
+            knowledge = retriever.retrieve(patient_summary)
             return {
                 "retrieved_docs": knowledge,
                 "next_step": "reasoning"

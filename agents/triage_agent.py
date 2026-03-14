@@ -1,11 +1,7 @@
 """
 Triage Agent - Classifies Urgency and Extracts Symptoms.
+Optimized for performance with lazy imports.
 """
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage
-from .state import AgentState
-from config import settings, get_prompt_path
-from utils.safety import sanitize_input, validate_medical_input, detect_critical_symptoms
 import logging
 import re
 import json
@@ -17,20 +13,27 @@ class TriageAgent:
     Analyzes symptoms to determine urgency and structure patient data.
     """
     def __init__(self, model=None):
+        from config import settings
         self.default_model = model or settings.OPENAI_MODEL
     
-    def _get_llm(self, state: AgentState):
+    def _get_llm(self, state: dict):
+        from langchain_openai import ChatOpenAI
+        from config import settings
         model = state.get("model_used") or self.default_model
         return ChatOpenAI(model=model, temperature=0.0, api_key=settings.OPENAI_API_KEY)
 
     def _load_prompt(self, filename: str) -> str:
+        from config import get_prompt_path
         try:
             return get_prompt_path(filename).read_text(encoding='utf-8')
         except Exception as e:
             logger.error(f"Error loading prompt {filename}: {e}")
             raise
 
-    def process(self, state: AgentState):
+    def process(self, state: dict):
+        from langchain_core.messages import SystemMessage
+        from utils.safety import sanitize_input, validate_medical_input, detect_critical_symptoms
+        
         logger.info("--- TRIAGE AGENT: ANALYZING SYMPTOMS & URGENCY ---")
         messages = state.get('messages', [])
         
@@ -40,7 +43,7 @@ class TriageAgent:
             if hasattr(msg, 'content'):
                 user_input += str(msg.content) + " "
         
-        # Multimodal Integration: Add visual findings to triage context
+        # Multimodal Integration
         visual_findings = state.get("visual_findings", {})
         if visual_findings:
             user_input += f"\n[VISUAL FINDINGS]: {visual_findings.get('visual_findings', '')}\n"
@@ -55,7 +58,7 @@ class TriageAgent:
                 "next_step": "end"
             }
 
-        # Check for critical keywords heuristic first (Safety Layer 0)
+        # Check for critical keywords
         is_critical, keywords = detect_critical_symptoms(user_input)
         
         try:
@@ -65,7 +68,7 @@ class TriageAgent:
             response = llm.invoke([system_msg] + list(messages))
             content = response.content
             
-            # Parse Layer 2 Output
+            # Parse Urgency
             urgency = "LOW"
             if "URGENCY: EMERGENCY" in content or is_critical:
                 urgency = "EMERGENCY"

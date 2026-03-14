@@ -1,7 +1,3 @@
-"""
-Global Configuration System for MedAgent - Generic & Safe
-Ensures the system is generic, global, and not tied to any specific hospital/provider/region.
-"""
 from pathlib import Path
 from typing import Optional, List
 from pydantic_settings import BaseSettings

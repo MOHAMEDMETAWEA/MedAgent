@@ -1,6 +1,3 @@
-"""
-Database Models - Enhanced for Feedback, Human Review, and Self-Improvement.
-"""
 import datetime
 from contextlib import contextmanager
 import enum

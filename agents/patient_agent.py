@@ -1,34 +1,29 @@
 """
-Patient Agent with Enhanced Input Validation and Global Support.
+Patient Agent - Personalized Assistant & Intake Manager
+Optimized for performance with lazy imports.
 """
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from .state import AgentState
-from config import settings, get_prompt_path
-from utils.safety import sanitize_input, validate_medical_input, detect_prompt_injection
-from agents.persistence_agent import PersistenceAgent
 import logging
 import json
 
 logger = logging.getLogger(__name__)
 
 class PatientAgent:
-    """
-    Patient Agent: Personalized Assistant & Intake Manager.
-    - Loads patient profile/history from persistence.
-    - Validates new symptom input.
-    - Updates context for downstream agents.
-    """
     def __init__(self, model=None):
-        model = model or settings.OPENAI_MODEL
-        self.llm = ChatOpenAI(
-            model=model, 
-            temperature=settings.LLM_TEMPERATURE_PATIENT,
+        from config import settings
+        self.model = model or settings.OPENAI_MODEL
+        self.temperature = settings.LLM_TEMPERATURE_PATIENT
+
+    def _get_llm(self):
+        from langchain_openai import ChatOpenAI
+        from config import settings
+        return ChatOpenAI(
+            model=self.model, 
+            temperature=self.temperature,
             api_key=settings.OPENAI_API_KEY
         )
-        self.persistence = PersistenceAgent()
 
     def _load_prompt(self, filename: str) -> str:
+        from config import get_prompt_path
         try:
             prompt_path = get_prompt_path(filename)
             with open(prompt_path, 'r', encoding='utf-8') as f:
@@ -37,17 +32,21 @@ class PatientAgent:
             logger.error(f"Error loading prompt {filename}: {e}")
             return ""
 
-    def process(self, state: AgentState):
+    def process(self, state: dict):
+        from langchain_core.messages import SystemMessage, HumanMessage
+        from utils.safety import sanitize_input, validate_medical_input
+        from agents.persistence_agent import PersistenceAgent
+        
         logger.info("--- PATIENT AGENT: LOADING PROFILE & VALIDATING INTAKE ---")
         
         user_id = state.get('user_id', 'GUEST')
         messages = state.get('messages', [])
         
-        # 1. Load Profile, Memory & Case
-        profile = self.persistence.get_patient_profile(user_id)
-        long_term_memory = self.persistence.get_long_term_memory(user_id) if user_id != "GUEST" else "First-time Guest"
-        memory_graph = self.persistence.get_memory_graph_context(user_id)
-        case_id = self.persistence.get_or_create_case(user_id)
+        persistence = PersistenceAgent()
+        profile = persistence.get_patient_profile(user_id)
+        long_term_memory = persistence.get_long_term_memory(user_id) if user_id != "GUEST" else "First-time Guest"
+        memory_graph = persistence.get_memory_graph_context(user_id)
+        case_id = persistence.get_or_create_case(user_id)
         
         role = state.get("user_role", "patient")
         mode = state.get("interaction_mode", "patient")
@@ -71,12 +70,10 @@ class PatientAgent:
                     "status": "incomplete",
                     "history": history_context
                 },
-                "next_step": "triage" # Determine next step
+                "next_step": "triage"
             }
         
-        # 2. Extract and Validate Input
         user_input = messages[-1].content if messages else ""
-        
         user_input = sanitize_input(user_input)
         is_valid, error_msg = validate_medical_input(user_input)
         
@@ -90,15 +87,12 @@ class PatientAgent:
                 "next_step": "end"
             }
         
-        # 3. Contextual Analysis (LLM)
-        # We use strict prompt to summarize symptoms, now including history context
         prompt_template = self._load_prompt('patient_agent.txt')
         if not prompt_template:
-             # Fallback
              prompt_template = "Summarize the patient symptoms from the following input: {input}\nContext: {context}"
              
         lang = state.get('language', 'en')
-        lang_instruction = "IMPORTANT: Respond in English." if lang == "en" else "IMPORTANT: Respond in Arabic (اللغة العربية). Keep 'PATIENT SUMMARY:' tag in English for parsing."
+        lang_instruction = "IMPORTANT: Respond in English." if lang == "en" else "IMPORTANT: Respond in Arabic. Keep 'PATIENT SUMMARY:' tag in English."
         
         full_prompt = f"Patient History Context: {history_context}\n"
         full_prompt += f"Long-Term Conversation Memory:\n{long_term_memory}\n"
@@ -108,27 +102,30 @@ class PatientAgent:
         full_prompt += prompt_template
         
         try:
+            llm = self._get_llm()
             system_msg = SystemMessage(content=full_prompt)
-            # Pass only the last message to avoid context window bloat, 
-            # or pass all if this is a conversation. System uses single-turn usually.
-            response = self.llm.invoke([system_msg, HumanMessage(content=user_input)])
-            
-            # The prompt now instructs returning JSON block for context alongside the summary.
-            # We will try to parse out the context elements if the LLM provided them, 
-            # otherwise fallback to defaults.
+            response = llm.invoke([system_msg, HumanMessage(content=user_input)])
             content = response.content
             
-            education_level = "unknown"
-            medical_literacy_level = "moderate"
-            emotional_state = "calm"
+            edu = "unknown"
+            lit = "moderate"
+            emo = "calm"
             
-            # Simple heuristic extraction if structured output wasn't perfectly formatted
             if "EDUCATION:" in content:
-                education_level = content.split("EDUCATION:")[1].split("\n")[0].strip().lower()
+                edu = content.split("EDUCATION:")[1].split("\n")[0].strip().lower()
             if "LITERACY:" in content:
-                medical_literacy_level = content.split("LITERACY:")[1].split("\n")[0].strip().lower()
+                lit = content.split("LITERACY:")[1].split("\n")[0].strip().lower()
             if "EMOTION:" in content:
-                emotional_state = content.split("EMOTION:")[1].split("\n")[0].strip().lower()
+                emo = content.split("EMOTION:")[1].split("\n")[0].strip().lower()
+
+            # Intent Detection: Check for simplification requests
+            user_input_lower = user_input.lower()
+            simplification_keywords = ["simplify", "simpler", "easier", "plain english", "explain like I'm 5", "eli5"]
+            requested_simplification = any(kw in user_input_lower for kw in simplification_keywords)
+            
+            if requested_simplification:
+                lit = "low" # Force low literacy mode
+                logger.info("User explicitly requested simplification.")
 
             is_sufficient = "PATIENT SUMMARY:" in content
             
@@ -137,11 +134,12 @@ class PatientAgent:
                     "summary": content, 
                     "status": "complete" if is_sufficient else "incomplete",
                     "history_context": history_context,
-                    "profile_id": user_id
+                    "profile_id": user_id,
+                    "requested_simplification": requested_simplification
                 },
-                "education_level": education_level,
-                "medical_literacy_level": medical_literacy_level,
-                "emotional_state": emotional_state,
+                "education_level": edu,
+                "medical_literacy_level": lit,
+                "emotional_state": emo,
                 "long_term_memory": long_term_memory,
                 "conversation_state": {
                     "active_case_id": case_id,

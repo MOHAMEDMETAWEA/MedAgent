@@ -1,28 +1,20 @@
 """
 Reasoning Agent with Tree-of-Thought (ToT) Architecture.
-Evaluates multiple diagnostic paths and selects the safest, most consistent one.
+Optimized for performance with lazy imports.
 """
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from .state import AgentState
-from config import settings, get_prompt_path
 import logging
 import json
 
 logger = logging.getLogger(__name__)
 
 class ReasoningAgent:
-    """
-    Advanced Reasoning Agent:
-    - Generates 3 unique Tree-of-Thought branches.
-    - Evaluates branches for safety, consistency, and evidence.
-    - Selects final outcome.
-    """
     def __init__(self, model=None):
-        model = model or settings.OPENAI_MODEL
-        self.default_model = model
-    
-    def _get_llm(self, state: AgentState):
+        from config import settings
+        self.default_model = model or settings.OPENAI_MODEL
+
+    def _get_llm(self, state: dict):
+        from langchain_openai import ChatOpenAI
+        from config import settings
         model = state.get("model_used") or self.default_model
         return ChatOpenAI(
             model=model, 
@@ -31,11 +23,15 @@ class ReasoningAgent:
         )
 
     def _load_prompt(self, filename: str) -> str:
+        from config import get_prompt_path
         try:
             return get_prompt_path(filename).read_text(encoding='utf-8')
         except: return "Diagnose the following symptoms based on knowledge: {knowledge}\nSymptoms: {patient_summary}"
 
-    def process(self, state: AgentState):
+    def process(self, state: dict):
+        from langchain_core.messages import SystemMessage, HumanMessage
+        from config import settings
+        
         logger.info("--- REASONING AGENT: TREE-OF-THOUGHT ANALYSIS ---")
         patient_summary = state.get('patient_info', {}).get('summary', '')
         knowledge = state.get('retrieved_docs', '')
@@ -45,7 +41,6 @@ class ReasoningAgent:
         if not patient_summary:
             return {"preliminary_diagnosis": "Insufficient data for reasoning.", "next_step": "validation"}
 
-        # Metadata for Adaptive Reasoning
         mode = state.get("interaction_mode", "patient")
         verified = state.get("doctor_verified", False)
         role = state.get("user_role", "patient")
@@ -58,10 +53,7 @@ class ReasoningAgent:
         emo = state.get("emotional_state", "calm")
         
         try:
-            # 1. Load Unified Clinical Cognitive Engine Layer
             base_template = self._load_prompt("clinical_cognitive_layer.txt")
-            
-            # Format the component prompt with deeply integrated context
             context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}"
             routing_prompt = base_template.format(
                 mode=mode.upper(),
@@ -77,116 +69,49 @@ class ReasoningAgent:
                 knowledge_base=knowledge
             )
 
-            # Specialty adapters
-            adapters = state.get("specialty_adapters", [])
-            if adapters:
-                routing_prompt += f"\n\n[Specialty Adapters Engaged]: {', '.join(adapters)}. Adjust reasoning accordingly."
             llm = self._get_llm(state)
             risk_level = state.get("risk_level", "low").lower()
             
-            # --- FAST PATH OPTIMIZATION ---
             if risk_level not in ["high", "emergency"]:
-                logger.info("--- REASONING AGENT: FAST PATH (Bypassing ToT) ---")
-                direct_prompt = f"""
-                SYSTEM: You are a Cognitive Medical Reasoning Core. 
-                
-                INSTRUCTION FROM ROUTING SYSTEM:
-                {routing_prompt}
-
-                TASK: Provide a clear, evidence-based clinical reasoning response based strictly on the provided context and knowledge. 
-                Do not generate multiple branches. Provide the final diagnostic impression directly.
-                """
+                logger.info("--- REASONING AGENT: FAST PATH ---")
+                direct_prompt = f"SYSTEM: You are a Cognitive Medical Reasoning Core. {routing_prompt}"
                 response = llm.invoke([
                     SystemMessage(content="You are a direct Clinical Reasoning AI."),
                     HumanMessage(content=direct_prompt)
                 ])
                 diag = response.content
                 conf = 0.8
-                
             else:
-                # 2. Generate Multiple Thought Paths (ToT Stage)
-                tot_prompt = f"""
-                SYSTEM: You are a Cognitive Medical Reasoning Core. 
-                
-                INSTRUCTION FROM ROUTING SYSTEM:
-                {routing_prompt}
-    
-                TASK: Generate 3 distinct medical reasoning branches.
-                - BRANCH 1: Conservative/Direct evidence only.
-                - BRANCH 2: Contextual/History-linked (look for trends in past sessions).
-                - BRANCH 3: Differential/Rare cases (edge cases or high-risk possibilities).
-    
-                Format each branch as:
-                [BRANCH 1]: ...
-                [BRANCH 2]: ...
-                [BRANCH 3]: ...
-                """
-                
+                tot_prompt = f"TASK: Generate 3 distinct medical reasoning branches.\n{routing_prompt}"
                 paths_response = llm.invoke([
                     SystemMessage(content="You are a Tree-of-Thought Medical Orchestrator."),
                     HumanMessage(content=tot_prompt)
                 ])
                 
-                eval_prompt = f"""
-                Review the following 3 Reasoning Branches:
-                {paths_response.content}
-    
-                Evaluate each for:
-                1. Medical Consistency (Alignment with knowledge)
-                2. Safety (Addressing high-risk indicators)
-                3. Evidence Alignment (Clarity and direct mapping)
-    
-                Select the BEST branch. 
-                Format your response as a JSON:
-                {{
-                    "diagnosis": "The full reasoning of the best branch",
-                    "confidence_score": 0.0 to 1.0
-                }}
-                Do not mention that you are a tree of thought. Output final clinical reasoning.
-                """
-                
-                try:
-                    final_selection = llm.invoke([
-                        SystemMessage(content="You are a Medical Expert Board Auditor."),
-                        HumanMessage(content=eval_prompt)
-                    ])
-                except Exception as e:
-                    # Fallback to secondary model if available
-                    sec = state.get("secondary_model")
-                    if not sec:
-                        raise e
-                    llm_sec = ChatOpenAI(model=sec, temperature=settings.LLM_TEMPERATURE_DIAGNOSIS, api_key=settings.OPENAI_API_KEY)
-                    final_selection = llm_sec.invoke([
+                eval_prompt = f"Select the BEST branch from:\n{paths_response.content}\nReturn JSON: {{'diagnosis': '...', 'confidence_score': 0.0}}"
+                final_selection = llm.invoke([
                     SystemMessage(content="You are a Medical Expert Board Auditor."),
                     HumanMessage(content=eval_prompt)
                 ])
                 
-                try:
-                    # Attempt to parse JSON
-                    content = final_selection.content
-                    if "{" in content:
-                        start = content.find("{")
-                        end = content.rfind("}") + 1
-                        data = json.loads(content[start:end])
-                        diag = data.get("diagnosis", content)
-                        conf = data.get("confidence_score", 0.7)
-                    else:
-                        diag = content
-                        conf = 0.65
-                except:
-                    diag = final_selection.content
-                    conf = 0.6
+                content = final_selection.content
+                if "{" in content:
+                    start = content.find("{")
+                    end = content.rfind("}") + 1
+                    data = json.loads(content[start:end])
+                    diag = data.get("diagnosis", content)
+                    conf = data.get("confidence_score", 0.7)
+                else:
+                    diag = content
+                    conf = 0.65
             
             return {
                 "preliminary_diagnosis": diag,
                 "confidence_score": conf,
                 "next_step": "validation",
-                "status": "Tree-of-Thought Analysis Complete"
+                "status": "Reasoning Complete"
             }
 
         except Exception as e:
-            logger.error(f"ToT Reasoning error: {e}")
-            return {
-                "preliminary_diagnosis": "Critical error during cognitive reasoning phase.",
-                "next_step": "validation"
-            }
+            logger.error(f"Reasoning error: {e}")
+            return {"preliminary_diagnosis": "Critical error during reasoning phase.", "next_step": "validation"}

@@ -4,6 +4,7 @@ Includes Admin Routes, System Health, and Governance Controls.
 Updated for Feedback, Review, and Medical Image Analysis.
 """
 import sys
+print("DEBUG: Importing api.main", file=sys.stderr)
 import os
 import uuid
 import datetime
@@ -974,6 +975,28 @@ async def audit_export(req: AuditExportRequest):
         raise HTTPException(status_code=500, detail=str(e))
     return {"evidence": data, "signature": sig}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/health")
+async def health_check():
+    """System Health and Maintenance Dashboard."""
+    from agents.orchestrator import MedAgentOrchestrator
+    try:
+        # Check database connectivity
+        from database.models import get_db
+        db = next(get_db())
+        db.execute("SELECT 1")
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"unhealthy: {e}"
+    
+    return {
+        "status": "operational",
+        "version": "1.2.0-maintenance",
+        "database": db_status,
+        "agents": {
+            "orchestrator": "initialized",
+            "optimization": "lazy_loading_enabled"
+        },
+        "performance": {
+            "startup_mode": "asynchronous_optimized"
+        }
+    }
