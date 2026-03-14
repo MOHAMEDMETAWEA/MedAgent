@@ -48,6 +48,7 @@ from agents.audit_agent import AuditAgent
 from agents.export_agent import ExportAgent
 from agents.interop.fhir_hl7_builder import InteropBuilder
 from config import settings
+from api.routes import imaging
 from utils.safety import validate_medical_input, sanitize_input
 from utils.rate_limit import check_rate_limit, get_client_identifier
 import time
@@ -134,6 +135,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+from api.routes import auth, clinical, patient, governance, system, imaging
+
 app = FastAPI(title="MedAgent Global System", version="5.3.0-PRODUCTION")
 
 @app.on_event("startup")
@@ -148,11 +151,17 @@ async def startup_event():
     if not settings.DATA_ENCRYPTION_KEY:
         logger.critical("PRODUCTION BLOCKER: DATA_ENCRYPTION_KEY is missing.")
 
+# Register Modular Routers
+app.include_router(auth.router)
+app.include_router(clinical.router)
+app.include_router(patient.router)
+app.include_router(governance.router)
+app.include_router(system.router)
+app.include_router(imaging.router)
 
-# Restrictive CORS by default (can be widened via env in future)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:8501"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# Observability: Prometheus metrics
+# Observability (Retained in main for global context)
 REQUEST_LATENCY = Histogram("medagent_request_latency_ms", "Request latency in ms", buckets=[50,100,200,500,1000,2000,5000])
 REQUEST_ERRORS = Counter("medagent_request_errors_total", "Total request errors")
 ESCALATIONS = Counter("medagent_escalations_total", "Total critical escalations")
@@ -720,6 +729,30 @@ async def send_health_alerts(user_id: str, message: str):
     # In a real system, integrate with Twilio/SendGrid here.
 
 # --- PUBLIC ROUTES ---
+
+# --- EHR / FHIR ENDPOINTS ---
+@app.get("/ehr/patient/{patient_id}")
+async def get_ehr_patient(patient_id: str, token: str = Depends(oauth2_scheme)):
+    """Fetch patient demographics from EMR."""
+    from integrations.fhir_connector import FHIRConnector
+    fhir = FHIRConnector(base_url=settings.FHIR_BASE_URL)
+    return await fhir.get_patient(patient_id)
+
+@app.get("/ehr/history/{patient_id}")
+async def get_ehr_history(patient_id: str, token: str = Depends(oauth2_scheme)):
+    """Fetch patient clinical history from EMR."""
+    from integrations.fhir_connector import FHIRConnector
+    fhir = FHIRConnector(base_url=settings.FHIR_BASE_URL)
+    conditions = await fhir.get_conditions(patient_id)
+    meds = await fhir.get_medications(patient_id)
+    return {"conditions": conditions, "medications": meds}
+
+@app.post("/ehr/report")
+async def push_ehr_report(report_data: dict, token: str = Depends(oauth2_scheme)):
+    """Sync MEDAgent report back to Hospital EMR."""
+    from integrations.fhir_connector import FHIRConnector
+    fhir = FHIRConnector(base_url=settings.FHIR_BASE_URL)
+    return await fhir.push_diagnostic_report(report_data)
 @app.post("/consult")
 async def consult(request: PatientRequest, background_tasks: BackgroundTasks, req: Request = None):
     try:
@@ -1178,3 +1211,47 @@ async def text_to_speech(req: TTSRequest, user: dict = Depends(get_current_user)
     except Exception as e:
         logger.error(f"TTS failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- PEDIATRIC / CHILD-FRIENDLY ENDPOINTS ---
+@app.post("/pediatric/explain")
+async def pediatric_explain(clinical_finding: str, age: int = 8, token: str = Depends(oauth2_scheme)):
+    """Translate clinical results into Theo's child-friendly explanation."""
+    from agents.pediatric_agent import PediatricAgent
+    agent = PediatricAgent()
+    return agent.process_explanation(clinical_finding, age)
+
+@app.post("/pediatric/visualize")
+async def pediatric_visualize(prompt: str, token: str = Depends(oauth2_scheme)):
+    """Generate a Theo-style visual aid for the child."""
+    # Placeholder for DALL-E/StableDiffusion integration
+    return {"visual_prompt": prompt, "status": "Ready for generation"}
+
+# --- CLINICAL GOVERNANCE & AUDIT ENDPOINTS ---
+@app.get("/governance/audit-logs")
+async def get_audit_logs(limit: int = 50, token: str = Depends(oauth2_scheme)):
+    """Retrieve high-fidelity AI audit logs for clinical compliance."""
+    from database.models import AIAuditLog, SessionLocal
+    with SessionLocal() as db:
+        logs = db.query(AIAuditLog).order_by(AIAuditLog.timestamp.desc()).limit(limit).all()
+        return logs
+
+@app.post("/governance/review/approve")
+async def approve_case(interaction_id: int, comment: str, token: str = Depends(oauth2_scheme)):
+    """Doctor approval for a high-risk AI suggestion."""
+    from database.models import Interaction, SessionLocal, ReviewStatus
+    with SessionLocal() as db:
+        interaction = db.query(Interaction).filter(Interaction.id == interaction_id).first()
+        if interaction:
+            interaction.review_status = ReviewStatus.APPROVED
+            interaction.reviewer_comment = comment
+            db.commit()
+            return {"status": "Case approved"}
+        raise HTTPException(status_code=404, detail="Interaction not found")
+
+@app.get("/governance/compliance/export")
+async def export_compliance_report(format: str = "fhir", token: str = Depends(oauth2_scheme)):
+    """Export clinical logs in regulated formats (FHIR AuditEvent)."""
+    from utils.audit_logger import AuditLogger
+    if format == "fhir":
+        return AuditLogger.export_fhir_audit_event(log_id=0) # Placeholder for batch export
+    return {"error": "Unsupported format"}

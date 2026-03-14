@@ -117,6 +117,21 @@ class AuditLog(Base):
     details = Column(JSON, nullable=True) # Specific details of the change
     ip_address = Column(String, nullable=True)
 
+class AIAuditLog(Base):
+    """System-level audit trail for AI decisions."""
+    __tablename__ = "ai_audit_logs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    user_id = Column(String, index=True)
+    agent_name = Column(String, index=True)
+    input_summary = Column(Text)
+    output_summary = Column(Text)
+    model_used = Column(String, nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    risk_level = Column(String, nullable=True) # Low, Medium, High, Critical
+    audit_hash = Column(String, nullable=True) # Integrity check
+
 class SystemLog(Base):
     __tablename__ = "system_logs"
     
@@ -345,22 +360,44 @@ class Reminder(Base):
     
     medication = relationship("Medication", back_populates="reminders")
 
-def init_db(db_url="sqlite:///./medagent.db"):
-    engine = create_engine(
-        db_url,
-        connect_args={"check_same_thread": False},
-        pool_pre_ping=True,
-    )
-    Base.metadata.create_all(engine)
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
-SessionLocal = init_db()
+DATABASE_URL = "sqlite+aiosqlite:///./medagent.db"
+
+engine = create_async_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    pool_pre_ping=True,
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+# Synchronous legacy support (for migration phase if needed)
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from contextlib import contextmanager
+
+sync_engine = create_engine("sqlite:///./medagent.db", connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 
 @contextmanager
 def get_db():
-    """Context manager that yields a fresh DB session and ensures cleanup."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+async def get_async_db():
+    async with AsyncSessionLocal() as session:
+        yield session

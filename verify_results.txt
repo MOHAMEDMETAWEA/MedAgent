@@ -1,3 +1,0 @@
-Test 1: The patient has severe High blood pressure and Fast heart rate.
-Test 2: The patient has severe Hypertension (high blood pressure) and Tachycardia (fast heart rate).
-Test 3: high blood pressure is bad, but High blood pressure is worse.

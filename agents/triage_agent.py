@@ -19,10 +19,9 @@ class TriageAgent:
         self.default_model = model or settings.OPENAI_MODEL
     
     def _get_llm(self, state: dict):
-        from langchain_openai import ChatOpenAI
-        from config import settings
+        from models.model_router import get_model
         model = state.get("model_used") or self.default_model
-        return ChatOpenAI(model=model, temperature=0.0, api_key=settings.OPENAI_API_KEY)
+        return get_model(model_name=model, temperature=0.0)
 
     def _load_prompt(self, filename: str) -> str:
         from config import get_prompt_path
@@ -34,7 +33,9 @@ class TriageAgent:
 
     def process(self, state: dict):
         from langchain_core.messages import SystemMessage
-        from utils.safety import sanitize_input, validate_medical_input, detect_critical_symptoms
+        from utils.safety import sanitize_input, validate_medical_input
+        from utils.medical_safety_framework import MedicalSafetyFramework
+        from utils.audit_logger import AuditLogger
         
         logger.info("--- TRIAGE AGENT: ANALYZING SYMPTOMS & URGENCY ---")
         messages = state.get('messages', [])
@@ -71,8 +72,9 @@ class TriageAgent:
                 "next_step": "end"
             }
 
-        # Check for critical keywords
-        is_critical, keywords = detect_critical_symptoms(user_input)
+        # Regulatory Risk Classification
+        risk_level = MedicalSafetyFramework.classify_risk(user_input)
+        mandatory_disclaimer = MedicalSafetyFramework.get_mandatory_disclaimer(risk_level)
         
         try:
             prompt_template = self._load_prompt('triage_agent.txt')
@@ -81,14 +83,10 @@ class TriageAgent:
             response = llm.invoke([system_msg] + list(messages))
             content = response.content
             
-            # Parse Urgency
-            urgency = "LOW"
-            if "URGENCY: EMERGENCY" in content or is_critical:
-                urgency = "EMERGENCY"
-            elif "URGENCY: HIGH" in content:
-                urgency = "HIGH"
-            elif "URGENCY: MEDIUM" in content:
-                urgency = "MEDIUM"
+            # Parse Urgency (Map framework risk to agent urgency)
+            urgency = risk_level.upper()
+            if urgency == "EMERGENCY":
+                logger.warning("!!! CRITICAL EMERGENCY DETECTED BY SAFETY FRAMEWORK !!!")
 
             is_sufficient = "STRUCTURED_CASE:" in content
             
@@ -101,20 +99,32 @@ class TriageAgent:
                 except:
                     structured_data = {"summary": content}
 
-            questions = []
-            if "QUESTIONS:" in content:
-                q_block = content.split("QUESTIONS:")[1].strip()
-                questions = [q.strip() for q in q_block.split("\n") if q.strip()]
+            # Inject mandatory disclaimer into summary if emergency
+            summary = structured_data.get("chief_complaint", content)
+            if risk_level in ["Emergency", "High"]:
+                summary = f"{mandatory_disclaimer}\n\n{summary}"
+
+            # AUDIT LOGGING
+            AuditLogger.log_agent_interaction(
+                user_id=state.get("user_id", "unknown"),
+                agent_name="TriageAgent",
+                input_data=user_input,
+                output_data=summary,
+                model_used=self.default_model,
+                risk_level=risk_level
+            )
 
             return {
                 "patient_info": {
-                    "summary": structured_data.get("chief_complaint", content),
+                    "summary": summary,
                     "structured_case": structured_data,
                     "status": "complete" if is_sufficient else "incomplete",
                     "urgency": urgency,
-                    "clarification_questions": questions
+                    "risk_level": risk_level,
+                    "safety_disclaimer": mandatory_disclaimer
                 },
                 "critical_alert": (urgency == "EMERGENCY"),
+                "risk_level": risk_level,
                 "next_step": "knowledge" if is_sufficient else "end"
             }
         except Exception as e:

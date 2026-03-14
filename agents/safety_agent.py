@@ -13,10 +13,9 @@ class SafetyAgent:
         self.default_model = model or settings.OPENAI_MODEL
     
     def _get_llm(self, state: dict):
-        from langchain_openai import ChatOpenAI
-        from config import settings
+        from models.model_router import get_model
         model = state.get("model_used") or self.default_model
-        return ChatOpenAI(model=model, temperature=0.0, api_key=settings.OPENAI_API_KEY)
+        return get_model(model_name=model, temperature=0.0)
 
     def _load_prompt(self, filename: str) -> str:
         from config import get_prompt_path

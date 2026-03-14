@@ -26,33 +26,32 @@ class PersistenceAgent:
         self.governance = GovernanceAgent()
         self.audit = AuditAgent()
 
-    def _get_db(self):
-        """Create a fresh DB session for each operation."""
-        return SessionLocal()
+    async def _get_db(self):
+        """Yield a fresh async DB session."""
+        async with AsyncSessionLocal() as session:
+            yield session
 
-    def create_session(self, user_id: str = "guest", mode: str = "patient") -> str:
-        """Start a new tracking session."""
+    async def create_session(self, user_id: str = "guest", mode: str = "patient") -> str:
+        """Start a new tracking session (Async)."""
         session_id = str(uuid.uuid4())
-        db = self._get_db()
-        try:
-            new_session = UserSession(
-                id=session_id,
-                user_id=user_id,
-                status="active",
-                interaction_mode=mode
-            )
-            db.add(new_session)
-            db.commit()
-            return session_id
-        except Exception as e:
-            logger.error(f"Failed to create session: {e}")
-            db.rollback()
-            return session_id
-        finally:
-            db.close()
+        async with AsyncSessionLocal() as db:
+            try:
+                new_session = UserSession(
+                    id=session_id,
+                    user_id=user_id,
+                    status="active",
+                    interaction_mode=mode
+                )
+                db.add(new_session)
+                await db.commit()
+                return session_id
+            except Exception as e:
+                logger.error(f"Failed to create session: {e}")
+                await db.rollback()
+                return session_id
 
-    def _save_interaction_db(self, db, session_id: str, user_input: str, result: dict, case_id: str = None):
-        """Internal helper to save interaction using provided DB session."""
+    async def _save_interaction_db(self, db: AsyncSession, session_id: str, user_input: str, result: dict, case_id: str = None):
+        """Internal helper to save interaction using provided async DB session."""
         try:
             # Encrypt sensitive fields
             enc_input = self.governance.encrypt(user_input)
@@ -69,7 +68,10 @@ class PersistenceAgent:
             
             # 4. Compute chainable audit hash
             # Fetch previous interaction hash in this session for chaining
-            prev_interaction = db.query(Interaction).filter(Interaction.session_id == session_id).order_by(Interaction.timestamp.desc()).first()
+            # Need to use await for query in async session
+            stmt = select(Interaction).filter(Interaction.session_id == session_id).order_by(Interaction.timestamp.desc())
+            exec_res = await db.execute(stmt)
+            prev_interaction = exec_res.scalars().first()
             prev_hash = prev_interaction.audit_hash if prev_interaction else "GENESIS"
             
             base_str = f"{session_id}|{enc_input}|{enc_response}|{model_used or ''}|{prompt_version or ''}|{prev_hash}|{datetime.datetime.utcnow().isoformat()}"
@@ -96,137 +98,154 @@ class PersistenceAgent:
             
             # Update case risk score if applicable
             if case_id:
-                case = db.query(MedicalCase).filter(MedicalCase.id == case_id).first()
+                case_stmt = select(MedicalCase).filter(MedicalCase.id == case_id)
+                case_res = await db.execute(case_stmt)
+                case = case_res.scalars().first()
                 if case:
                     # Update risk based on critical alert
                     if result.get("critical_alert"):
                         case.risk_score = 100
                     case.updated_at = datetime.datetime.utcnow()
             
-            db.commit()
+            await db.commit()
             
             # Update Memory Graph
-            self._update_memory_graph_with_db(db, session_id, user_input, result, case_id)
+            await self._update_memory_graph_with_db(db, session_id, user_input, result, case_id)
             
         except Exception as e:
             logger.error(f"Failed to save interaction: {e}")
-            db.rollback()
+            await db.rollback()
 
-    def save_interaction(self, session_id: str, user_input: str, result: dict, case_id: str = None):
-        """Save a complete interaction flow with ENCRYPTION and Case linking."""
-        db = self._get_db()
-        return self._save_interaction_db(db, session_id, user_input, result, case_id)
+    async def save_interaction(self, session_id: str, user_input: str, result: dict, case_id: str = None):
+        """Save a complete interaction flow (Async)."""
+        async with AsyncSessionLocal() as db:
+            return await self._save_interaction_db(db, session_id, user_input, result, case_id)
 
-    def _update_memory_graph_with_db(self, db, session_id, user_input, result, case_id):
-        """Internal helper to populate memory nodes and edges from an interaction."""
-        user_session = db.query(UserSession).filter(UserSession.id == session_id).first()
+    async def _update_memory_graph_with_db(self, db: AsyncSession, session_id, user_input, result, case_id):
+        """Internal helper to populate memory nodes and edges from an interaction (Async)."""
+        stmt = select(UserSession).filter(UserSession.id == session_id)
+        res = await db.execute(stmt)
+        user_session = res.scalars().first()
         if not user_session: return
         user_id = user_session.user_id
         if user_id == "guest": return
 
         # 1. Create/Find Symptom Node
         symptom_summary = result.get("patient_info", {}).get("summary", "New Symptoms")
-        s_node = self._add_memory_node_db(db, user_id, "Symptom", symptom_summary, {"session_id": session_id})
+        s_node = await self._add_memory_node_db(db, user_id, "Symptom", symptom_summary, {"session_id": session_id})
         
         # 2. Link to Case Node
         c_node = None
         if case_id:
-            c_node = db.query(MemoryNode).filter(
-                MemoryNode.user_id == user_id, 
-                MemoryNode.node_type == "Case"
-            ).all() # Filter manually for JSON field in SQLite
-            c_node = next((n for n in c_node if n.metadata_json.get("case_id") == case_id), None)
+            case_node_stmt = select(MemoryNode).filter(MemoryNode.user_id == user_id, MemoryNode.node_type == "Case")
+            case_node_res = await db.execute(case_node_stmt)
+            nodes = case_node_res.scalars().all()
+            c_node = next((n for n in nodes if (n.metadata_json or {}).get("case_id") == case_id), None)
             
             if not c_node:
-                c_node = self._add_memory_node_db(db, user_id, "Case", f"Case: {case_id}", {"case_id": case_id})
+                c_node = await self._add_memory_node_db(db, user_id, "Case", f"Case: {case_id}", {"case_id": case_id})
             
-            self._add_memory_edge_db(db, user_id, s_node.id, c_node.id, "relates_to")
+            await self._add_memory_edge_db(db, user_id, s_node.id, c_node.id, "relates_to")
             
         # 3. Create Diagnosis & Reasoning Nodes
         diag = result.get("preliminary_diagnosis")
         if diag:
-            d_node = self._add_memory_node_db(db, user_id, "Diagnosis", diag, {"session_id": session_id})
-            self._add_memory_edge_db(db, user_id, s_node.id, d_node.id, "diagnosed_as")
-            if c_node: self._add_memory_edge_db(db, user_id, d_node.id, c_node.id, "relates_to")
+            d_node = await self._add_memory_node_db(db, user_id, "Diagnosis", diag, {"session_id": session_id})
+            await self._add_memory_edge_db(db, user_id, s_node.id, d_node.id, "diagnosed_as")
+            if c_node: await self._add_memory_edge_db(db, user_id, d_node.id, c_node.id, "relates_to")
 
         # 4. Reason (Tree of Thought) node
         tot = result.get("doctor_notes")
         if tot:
-            r_node = self._add_memory_node_db(db, user_id, "Reasoning", tot, {"session_id": session_id})
-            if c_node: self._add_memory_edge_db(db, user_id, r_node.id, c_node.id, "explains")
+            r_node = await self._add_memory_node_db(db, user_id, "Reasoning", tot, {"session_id": session_id})
+            if c_node: await self._add_memory_edge_db(db, user_id, r_node.id, c_node.id, "explains")
 
         # 5. Report Node
         report_id = result.get("report_id")
         if report_id:
-            rp_node = self._add_memory_node_db(db, user_id, "Report", f"Clinical Report #{report_id}", {"report_id": report_id, "session_id": session_id})
-            if c_node: self._add_memory_edge_db(db, user_id, rp_node.id, c_node.id, "documented_in")
+            rp_node = await self._add_memory_node_db(db, user_id, "Report", f"Clinical Report #{report_id}", {"report_id": report_id, "session_id": session_id})
+            if c_node: await self._add_memory_edge_db(db, user_id, rp_node.id, c_node.id, "documented_in")
 
-    def log_system_event(self, level: str, component: str, message: str, details: dict = None, session_id: str = None):
-        """Log a system event or error."""
-        db = self._get_db()
-        try:
-            # Optional PHI redaction of message/details
-            redacted_message = message
-            redacted_details = details or {}
+    async def log_system_event(self, level: str, component: str, message: str, details: dict = None, session_id: str = None):
+        """Log a system event or error (Async)."""
+        async with AsyncSessionLocal() as db:
             try:
-                from agents.safety.privacy_audit import PrivacyAuditLayer
-                pal = PrivacyAuditLayer()
-                redacted_message = pal.redact_phi(message) if message else message
-                # Best-effort redaction of details dict stringified
-                if redacted_details:
-                    redacted_details = {"_redacted": pal.redact_phi(str(redacted_details))}
-            except Exception:
-                pass
-            log_entry = SystemLog(
-                level=level,
-                component=component,
-                message=redacted_message,
-                details=redacted_details,
-                session_id=session_id
-            )
-            db.add(log_entry)
-            db.commit()
-        except Exception as e:
-            logger.error(f"DB Logging failed: {e}")
-            db.rollback()
-        finally:
-            db.close()
+                # Optional PHI redaction of message/details
+                redacted_message = message
+                redacted_details = details or {}
+                try:
+                    from agents.safety.privacy_audit import PrivacyAuditLayer
+                    pal = PrivacyAuditLayer()
+                    redacted_message = pal.redact_phi(message) if message else message
+                    if redacted_details:
+                        redacted_details = {"_redacted": pal.redact_phi(str(redacted_details))}
+                except Exception:
+                    pass
+                log_entry = SystemLog(
+                    level=level,
+                    component=component,
+                    message=redacted_message,
+                    details=redacted_details,
+                    session_id=session_id
+                )
+                db.add(log_entry)
+                await db.commit()
+            except Exception as e:
+                logger.error(f"DB Logging failed: {e}")
+                await db.rollback()
+                    if redacted_details:
+                        redacted_details = {"_redacted": pal.redact_phi(str(redacted_details))}
+                except Exception:
+                    pass
+                log_entry = SystemLog(
+                    level=level,
+                    component=component,
+                    message=redacted_message,
+                    details=redacted_details,
+                    session_id=session_id
+                )
+                db.add(log_entry)
+                await db.commit()
+            except Exception as e:
+                logger.error(f"DB Logging failed: {e}")
+                await db.rollback()
 
-    def get_user_history(self, user_id: str, limit: int = 10):
-        """Retrieve past sessions for a user, DECRYPTING data."""
-        db = self._get_db()
-        try:
-            # This just gets sessions. To get interactions, we need to query interactions.
-            sessions = db.query(UserSession).filter(
-                UserSession.user_id == user_id
-            ).order_by(UserSession.start_time.desc()).limit(limit).all()
-            return sessions
-        except Exception as e:
-            logger.error(f"Failed to retrieve history: {e}")
-            return []
-        finally:
-            db.close()
+    async def get_user_history(self, user_id: str, limit: int = 10):
+        """Retrieve past sessions for a user (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                # This just gets sessions. To get interactions, we need to query interactions.
+                stmt = select(UserSession).filter(
+                    UserSession.user_id == user_id
+                ).order_by(UserSession.start_time.desc()).limit(limit)
+                res = await db.execute(stmt)
+                return res.scalars().all()
+            except Exception as e:
+                logger.error(f"Failed to retrieve history: {e}")
+                return []
 
-    def get_long_term_memory(self, user_id: str, limit_sessions: int = 3):
-        """Fetch and format past interactions for LLM context."""
-        db = self._get_db()
-        try:
-            sessions = db.query(UserSession).filter(UserSession.user_id == user_id).order_by(UserSession.start_time.desc()).limit(limit_sessions).all()
-            memory_text = ""
-            for s in sessions:
-                interactions = db.query(Interaction).filter(Interaction.session_id == s.id).all()
-                if not interactions: continue
-                memory_text += f"\n--- PAST SESSION: {s.id} ({s.start_time.strftime('%Y-%m-%d')}) ---\n"
-                for i in interactions:
-                    u_in = self.governance.decrypt(i.user_input_encrypted)
-                    diag = self.governance.decrypt(i.diagnosis_output_encrypted)
-                    memory_text += f"User: {u_in}\nAI Diagnosis: {diag}\n"
-            return memory_text if memory_text else "No previous medical history found."
-        except Exception as e:
-            logger.error(f"Failed to fetch long term memory: {e}")
-            return "Error loading history."
-        finally:
-            db.close()
+    async def get_long_term_memory(self, user_id: str, limit_sessions: int = 3):
+        """Fetch and format past interactions for LLM context (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = select(UserSession).filter(UserSession.user_id == user_id).order_by(UserSession.start_time.desc()).limit(limit_sessions)
+                res = await db.execute(stmt)
+                sessions = res.scalars().all()
+                memory_text = ""
+                for s in sessions:
+                    int_stmt = select(Interaction).filter(Interaction.session_id == s.id)
+                    int_res = await db.execute(int_stmt)
+                    interactions = int_res.scalars().all()
+                    if not interactions: continue
+                    memory_text += f"\n--- PAST SESSION: {s.id} ({s.start_time.strftime('%Y-%m-%d')}) ---\n"
+                    for i in interactions:
+                        u_in = self.governance.decrypt(i.user_input_encrypted)
+                        diag = self.governance.decrypt(i.diagnosis_output_encrypted)
+                        memory_text += f"User: {u_in}\nAI Diagnosis: {diag}\n"
+                return memory_text if memory_text else "No previous medical history found."
+            except Exception as e:
+                logger.error(f"Failed to fetch long term memory: {e}")
+                return "Error loading history."
 
     
     # -----------------------------------------------------
@@ -294,105 +313,93 @@ class PersistenceAgent:
             return True
         except Exception as e:
             logger.error(f"Failed to upsert profile: {e}")
-            db.rollback()
+            await db.rollback()
             return False
 
-    def save_medical_report(self, session_id: str, patient_id: str, content_json: str, report_type: str = "comprehensive", lang: str = "en", status: str = "pending"):
-        """Save a new version of a generated medical report."""
-        db = self._get_db()
-        try:
-            # Check if profile exists; if not, create a placeholder? Best logic: ensure profile created by PatientAgent first.
-            # Assuming profile exists or we handle FK error.
-            if not db.query(PatientProfile).filter(PatientProfile.id == patient_id).first():
-                # Auto-create minimal profile if missing (Guest)
-                self._upsert_patient_profile_db(db, patient_id, "Guest Patient", 0, "Unknown", "{}")
-            
-            # Encrypt report content
-            enc_content = self.governance.encrypt(content_json)
-            
-            # Get latest version
-            last_report = db.query(MedicalReport).filter(
-                MedicalReport.patient_id == patient_id
-            ).order_by(MedicalReport.version.desc()).first()
-            
-            new_version = (last_report.version + 1) if last_report else 1
-            
-            new_report = MedicalReport(
-                patient_id=patient_id,
-                session_id=session_id,
-                report_content_encrypted=enc_content,
-                report_type=report_type,
-                language=lang,
-                version=new_version,
-                status=status # pending review or approved
-            )
-            db.add(new_report)
-            db.commit()
-            return new_report.id
-        except Exception as e:
-            logger.error(f"Failed to save medical report: {e}")
-            db.rollback()
-            return None
-        finally:
-            db.close()
+    async def save_medical_report(self, session_id: str, patient_id: str, content_json: str, report_type: str = "comprehensive", lang: str = "en", status: str = "pending"):
+        """Save a new version of a generated medical report (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                # Check profile
+                prof_stmt = select(PatientProfile).filter(PatientProfile.id == patient_id)
+                prof_res = await db.execute(prof_stmt)
+                if not prof_res.scalars().first():
+                    await self._upsert_patient_profile_db(db, patient_id, "Guest Patient", 0, "Unknown", "{}")
+                
+                enc_content = self.governance.encrypt(content_json)
+                
+                last_stmt = select(MedicalReport).filter(MedicalReport.patient_id == patient_id).order_by(MedicalReport.version.desc())
+                last_res = await db.execute(last_stmt)
+                last_report = last_res.scalars().first()
+                
+                new_version = (last_report.version + 1) if last_report else 1
+                
+                new_report = MedicalReport(
+                    patient_id=patient_id,
+                    session_id=session_id,
+                    report_content_encrypted=enc_content,
+                    report_type=report_type,
+                    language=lang,
+                    version=new_version,
+                    status=status
+                )
+                db.add(new_report)
+                await db.commit()
+                return new_report.id
+            except Exception as e:
+                logger.error(f"Failed to save medical report: {e}")
+                await db.rollback()
+                return None
 
-    def get_reports_by_patient(self, user_id: str):
-        """Retrieve all medical reports for a patient, decrypted."""
-        db = self._get_db()
-        try:
-            reports = db.query(MedicalReport).filter(MedicalReport.patient_id == user_id).order_by(MedicalReport.generated_at.desc()).all()
-            results = []
-            for r in reports:
-                results.append({
-                    "id": r.id,
-                    "generated_at": r.generated_at,
-                    "report_type": r.report_type,
-                    "language": r.language,
-                    "version": r.version,
-                    "status": r.status,
-                    "content": json.loads(self.governance.decrypt(r.report_content_encrypted))
-                })
-            return results
-        except Exception as e:
-            logger.error(f"Failed to fetch reports: {e}")
-            return []
-        finally:
-            db.close()
+    async def get_reports_by_patient(self, user_id: str):
+        """Retrieve all medical reports for a patient (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = select(MedicalReport).filter(MedicalReport.patient_id == user_id).order_by(MedicalReport.generated_at.desc())
+                res = await db.execute(stmt)
+                reports = res.scalars().all()
+                results = []
+                for r in reports:
+                    results.append({
+                        "id": r.id,
+                        "generated_at": r.generated_at,
+                        "report_type": r.report_type,
+                        "language": r.language,
+                        "version": r.version,
+                        "status": r.status,
+                        "content": json.loads(self.governance.decrypt(r.report_content_encrypted))
+                    })
+                return results
+            except Exception as e:
+                logger.error(f"Failed to fetch reports: {e}")
+                return []
 
-    def save_medical_image(self, session_id: str, image_path: str, findings: dict, patient_id: str = None, case_id: str = None):
-        """Save medical image metadata and analysis securely with Case linking."""
-        db = self._get_db()
-        try:
-            # Encrypt sensitive fields
-            enc_path = self.governance.encrypt(image_path)
-            enc_findings = self.governance.encrypt(str(findings.get("visual_findings", "")))
-            
-            new_image = MedicalImage(
-                session_id=session_id,
-                patient_id=patient_id,
-                case_id=case_id,
-                image_path_encrypted=enc_path,
-                original_filename=os.path.basename(image_path),
-                visual_findings_encrypted=enc_findings,
-                possible_conditions_json=findings.get("possible_conditions", []),
-                confidence_score=int(findings.get("confidence", 0) * 100),
-                severity_level=findings.get("severity_level", "low"),
-                requires_human_review=findings.get("requires_human_review", False)
-            )
-            db.add(new_image)
-            db.commit()
-            
-            # Update memory graph with Image node
-            if patient_id and patient_id != "guest":
-                self._update_memory_graph_with_image_db(db, patient_id, session_id, new_image.id, findings, case_id)
-            
-            return new_image.id
-        except Exception as e:
-            logger.error(f"Failed to save medical image: {e}")
-            db.rollback()
-            return None
-        finally:
-            db.close()
+    async def save_medical_image(self, session_id: str, image_path: str, findings: dict, patient_id: str = None, case_id: str = None):
+        """Save medical image metadata (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                enc_path = self.governance.encrypt(image_path)
+                enc_findings = self.governance.encrypt(str(findings.get("visual_findings", "")))
+                
+                new_image = MedicalImage(
+                    session_id=session_id,
+                    patient_id=patient_id,
+                    case_id=case_id,
+                    image_path_encrypted=enc_path,
+                    original_filename=os.path.basename(image_path),
+                    visual_findings_encrypted=enc_findings,
+                    possible_conditions_json=findings.get("possible_conditions", []),
+                    confidence_score=int(findings.get("confidence", 0) * 100),
+                    severity_level=findings.get("severity_level", "low"),
+                    requires_human_review=findings.get("requires_human_review", False)
+                )
+                db.add(new_image)
+                await db.commit()
+                return new_image.id
+            except Exception as e:
+                logger.error(f"Failed to save medical image: {e}")
+                await db.rollback()
+                return None
 
     def _update_memory_graph_with_image_db(self, db, user_id, session_id, image_id, findings, case_id):
         """Link image to case and findings in the memory graph using provided DB session."""
@@ -621,40 +628,38 @@ class PersistenceAgent:
         finally:
             db.close()
 
-    def add_memory_node(self, user_id, node_type, content, meta=None):
-        db = self._get_db()
-        try:
-            return self._add_memory_node_db(db, user_id, node_type, content, meta)
-        finally:
-            db.close()
+    async def add_memory_node(self, user_id, node_type, content, meta=None):
+        """Public async wrapper for adding a memory node."""
+        async with AsyncSessionLocal() as db:
+            return await self._add_memory_node_db(db, user_id, node_type, content, meta)
 
-    def _add_memory_node_db(self, db, user_id, node_type, content, meta=None):
+    async def _add_memory_node_db(self, db: AsyncSession, user_id, node_type, content, meta=None):
+        """Internal helper to add memory node (Async)."""
         try:
             enc_content = self.governance.encrypt(content)
             node = MemoryNode(user_id=user_id, node_type=node_type, content_encrypted=enc_content, metadata_json=meta or {})
             db.add(node)
-            db.commit()
+            await db.commit()
             return node
         except Exception as e:
             logger.error(f"Failed to add memory node: {e}")
-            db.rollback()
+            await db.rollback()
             return None
 
-    def add_memory_edge(self, user_id, source_id, target_id, relation):
-        db = self._get_db()
-        try:
-            return self._add_memory_edge_db(db, user_id, source_id, target_id, relation)
-        finally:
-            db.close()
+    async def add_memory_edge(self, user_id, source_id, target_id, relation):
+        """Public async wrapper for adding a memory edge."""
+        async with AsyncSessionLocal() as db:
+            return await self._add_memory_edge_db(db, user_id, source_id, target_id, relation)
 
-    def _add_memory_edge_db(self, db, user_id, source_id, target_id, relation):
+    async def _add_memory_edge_db(self, db: AsyncSession, user_id, source_id, target_id, relation):
+        """Internal helper to add memory edge (Async)."""
         try:
             edge = MemoryEdge(user_id=user_id, source_node_id=source_id, target_node_id=target_id, relation_type=relation)
             db.add(edge)
-            db.commit()
+            await db.commit()
         except Exception as e:
             logger.error(f"Failed to add memory edge: {e}")
-            db.rollback()
+            await db.rollback()
 
     def get_memory_graph_context(self, user_id: str):
         """Retrieve and format the memory graph as contextual text."""

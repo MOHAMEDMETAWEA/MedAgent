@@ -30,12 +30,9 @@ class VisionAnalysisAgent:
     using GPT-4o Vision with clinical-grade structured prompts.
     """
     def __init__(self, model=None):
+        from models.model_router import get_model
         self.model_name = model or "gpt-4o"
-        self.llm = ChatOpenAI(
-            model=self.model_name,
-            temperature=0.0,
-            api_key=settings.OPENAI_API_KEY
-        )
+        self.llm = get_model(model_name=self.model_name, temperature=0.0)
 
     def _load_prompt(self, filename: str) -> str:
         try:

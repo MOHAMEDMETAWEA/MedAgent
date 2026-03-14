@@ -22,31 +22,46 @@ class MedAgentOrchestrator:
             logger.error(f"Error initializing orchestrator: {e}")
             raise
 
-    def get_agent(self, name):
-        """Lazy loader for internal agents."""
-        if name in self._agents:
-            return self._agents[name]
+    def get_agent(self, name: str):
+        """Standard mapping of nodes to agent instances."""
+        # All agent imports are now centralized here for direct instantiation
+        from .patient_agent import PatientAgent
+        from .triage_agent import TriageAgent
+        from .knowledge_agent import KnowledgeAgent
+        from .reasoning_agent import ReasoningAgent
+        from .validation_agent import ValidationAgent
+        from .safety_agent import SafetyAgent
+        from .response_agent import ResponseAgent
+        from .persistence_agent import PersistenceAgent
+        from .supervisor_agent import SupervisorAgent
+        from .vision_agent import VisionAnalysisAgent # Original name was VisionAnalysisAgent
+        from .diagnosis_agent import DiagnosisAgent
+        from .report_agent import ReportAgent
+        from .clinical_review_agent import ClinicalReviewAgent
+        from .safety_guardrail_agent import SafetyGuardrailAgent # New agent
+
+        agents_map = {
+            "patient": PatientAgent,
+            "triage": TriageAgent,
+            "knowledge": KnowledgeAgent,
+            "reasoning": ReasoningAgent,
+            "validation": ValidationAgent,
+            "safety": SafetyAgent,
+            "response": ResponseAgent,
+            "persistence": PersistenceAgent,
+            "supervisor": SupervisorAgent,
+            "vision": VisionAnalysisAgent, # Map to VisionAnalysisAgent
+            "diagnosis": DiagnosisAgent,
+            "report": ReportAgent,
+            "clinical_review": ClinicalReviewAgent,
+            "safety_guardrail": SafetyGuardrailAgent # New mapping
+        }
         
-        # Explicit lazy mappings (Safest)
-        if name == "patient":
-            from .patient_agent import PatientAgent
-            self._agents[name] = PatientAgent()
-        elif name == "triage":
-            from .triage_agent import TriageAgent
-            self._agents[name] = TriageAgent()
-        elif name == "knowledge":
-            from .knowledge_agent import KnowledgeAgent
-            self._agents[name] = KnowledgeAgent()
-        elif name == "reasoning":
-            from .reasoning_agent import ReasoningAgent
-            self._agents[name] = ReasoningAgent()
-        elif name == "validation":
-            from .validation_agent import ValidationAgent
-            self._agents[name] = ValidationAgent()
-        elif name == "safety":
-            from .safety_agent import SafetyAgent
-            self._agents[name] = SafetyAgent()
-        elif name == "response":
+        if name in agents_map:
+            # Instantiate and return the agent
+            if name not in self._agents: # Cache instantiated agents
+                self._agents[name] = agents_map[name]()
+            return self._agents[name]
             from .response_agent import ResponseAgent
             self._agents[name] = ResponseAgent()
         elif name == "persistence":
@@ -64,6 +79,9 @@ class MedAgentOrchestrator:
         elif name == "report":
             from .report_agent import ReportAgent
             self._agents[name] = ReportAgent()
+        elif name == "clinical_review":
+            from .clinical_review_agent import ClinicalReviewAgent
+            self._agents[name] = ClinicalReviewAgent()
         # Add any others that are used in the graph or run()
         return self._agents.get(name)
 
@@ -72,11 +90,13 @@ class MedAgentOrchestrator:
 
         def wrap_node(node_name):
             def wrapper(state: AgentState):
-                logger.info(f"--- AGENT: {node_name.upper()} ---")
                 agent = self.get_agent(node_name)
                 if not agent:
                     logger.error(f"Agent {node_name} not found!")
                     return state
+                # Use standardized run() if it exists (BaseAgent), else fallback to process()
+                if hasattr(agent, "run"):
+                    return agent.run(state)
                 return agent.process(state)
             return wrapper
 
@@ -88,6 +108,7 @@ class MedAgentOrchestrator:
         workflow.add_node("validation", wrap_node("validation"))
         workflow.add_node("safety", wrap_node("safety"))
         workflow.add_node("response", wrap_node("response"))
+        workflow.add_node("review", wrap_node("clinical_review"))
 
         # Conditional Entry: If image exists, start with vision, else patient
         def route_start(state: AgentState):
@@ -105,7 +126,23 @@ class MedAgentOrchestrator:
 
         workflow.add_edge("vision", "patient")
         workflow.add_edge("patient", "triage")
-        workflow.add_edge("triage", "knowledge")
+
+        # Conditional Edge after Triage: Route to Knowledge or Review
+        def route_triage(state: AgentState):
+            if state.get("risk_level") in ["High", "Emergency"] and not state.get("doctor_verified"):
+                return "review"
+            return "knowledge"
+
+        workflow.add_conditional_edges(
+            "triage",
+            route_triage,
+            {
+                "review": "review",
+                "knowledge": "knowledge"
+            }
+        )
+
+        workflow.add_edge("review", END) # Pause for human review
         workflow.add_edge("knowledge", "reasoning")
         workflow.add_edge("reasoning", "validation")
         
@@ -125,8 +162,13 @@ class MedAgentOrchestrator:
             }
         )
 
+        workflow.add_node("safety_guardrail", wrap_node("safety_guardrail"))
+
+        # Original safety (Layer 5) flows into response
         workflow.add_edge("safety", "response")
-        workflow.add_edge("response", END)
+        # Final Guardrail check after response generation
+        workflow.add_edge("response", "safety_guardrail")
+        workflow.add_edge("safety_guardrail", END)
 
         return workflow.compile()
 
@@ -137,7 +179,7 @@ class MedAgentOrchestrator:
         except:
             return "en"
 
-    def run(self, initial_input: str, user_id: str = "guest", image_path: str = None, request_second_opinion: bool = False, interaction_mode: str = None):
+    async def run(self, initial_input: str, user_id: str = "guest", image_path: str = None, request_second_opinion: bool = False, interaction_mode: str = None):
         persistence = self.get_agent("persistence")
         sanitized = sanitize_input(initial_input)
         is_valid, error_msg = validate_medical_input(sanitized)
@@ -147,26 +189,31 @@ class MedAgentOrchestrator:
         user_profile = {}
         if user_id != "guest":
             from database.models import UserAccount, PatientProfile
-            db = persistence._get_db()
-            try:
-                user_acc = db.query(UserAccount).filter(UserAccount.id == user_id).first()
-                if user_acc:
-                    user_profile = {
-                        "role": user_acc.role if hasattr(user_acc.role, 'value') else user_acc.role,
-                        "gender": user_acc.gender,
-                        "age": user_acc.age,
-                        "country": user_acc.country,
-                        "interaction_mode": user_acc.interaction_mode,
-                        "doctor_verified": user_acc.doctor_verified
-                    }
-                    patient_p = db.query(PatientProfile).filter(PatientProfile.id == user_id).first()
-                    if patient_p and patient_p.medical_history_encrypted:
-                        user_profile["medical_background"] = patient_p.medical_history_encrypted
-            finally:
-                db.close()
+            # Need to use async DB in async run
+            async with AsyncSessionLocal() as db:
+                try:
+                    stmt = select(UserAccount).filter(UserAccount.id == user_id)
+                    res = await db.execute(stmt)
+                    user_acc = res.scalars().first()
+                    if user_acc:
+                        user_profile = {
+                            "role": user_acc.role if hasattr(user_acc.role, 'value') else user_acc.role,
+                            "gender": user_acc.gender,
+                            "age": user_acc.age,
+                            "country": user_acc.country,
+                            "interaction_mode": user_acc.interaction_mode,
+                            "doctor_verified": user_acc.doctor_verified
+                        }
+                        p_stmt = select(PatientProfile).filter(PatientProfile.id == user_id)
+                        p_res = await db.execute(p_stmt)
+                        patient_p = p_res.scalars().first()
+                        if patient_p and patient_p.medical_history_encrypted:
+                            user_profile["medical_background"] = patient_p.medical_history_encrypted
+                except Exception as e:
+                    logger.error(f"Error fetching user profile in async run: {e}")
         
         final_mode = interaction_mode or user_profile.get("interaction_mode", "patient")
-        session_id = persistence.create_session(user_id=user_id, mode=final_mode)
+        session_id = await persistence.create_session(user_id=user_id, mode=final_mode)
         lang = self.detect_language(sanitized)
         
         try:
@@ -201,9 +248,10 @@ class MedAgentOrchestrator:
                 "correction_count": 0
             }
             
-            final_state = self.graph.invoke(state)
+            # Since LangGraph 0.1+ supports async natively if nodes are synchronous (handled by LangGraph threadpool)
+            final_state = await self.graph.ainvoke(state)
             
-            persistence.save_interaction(
+            await persistence.save_interaction(
                 session_id=session_id,
                 user_input=sanitized,
                 result=final_state

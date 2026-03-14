@@ -62,6 +62,17 @@ class Settings(BaseSettings):
     ENABLE_LOGGING: bool = True
     LOG_LEVEL: str = "INFO"
     
+    # --- MODEL ROUTING ---
+    MODEL_MODE: str = "cloud"  # cloud | local
+    LOCAL_MODEL_NAME: str = "meditron"
+    OLLAMA_URL: str = "http://localhost:11434"
+    VLLM_URL: str = "http://localhost:8000/v1"
+    
+    # --- EHR / FHIR INTEGRATION ---
+    FHIR_BASE_URL: str = "https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4"
+    FHIR_CLIENT_ID: Optional[str] = None
+    FHIR_CLIENT_SECRET: Optional[str] = None
+    
     # Database
     DATABASE_URL: str = "sqlite:///./medagent.db"
     

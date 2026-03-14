@@ -13,13 +13,8 @@ class ResponseAgent:
         self.temperature = settings.LLM_TEMPERATURE_PATIENT
 
     def _get_llm(self):
-        from langchain_openai import ChatOpenAI
-        from config import settings
-        return ChatOpenAI(
-            model=self.model,
-            temperature=self.temperature,
-            api_key=settings.OPENAI_API_KEY
-        )
+        from models.model_router import get_model
+        return get_model(model_name=self.model, temperature=self.temperature)
 
     def process(self, state: dict):
         """Final polish of the system response for the user based on Interaction Mode."""

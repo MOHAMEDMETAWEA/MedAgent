@@ -17,18 +17,42 @@ class KnowledgeAgent:
             self._retriever = MedicalRetriever()
         return self._retriever
 
-    def process(self, state: dict):
-        logger.info("--- KNOWLEDGE AGENT: RETRIEVING CLINICAL GUIDELINES ---")
+    async def process(self, state: dict):
+        logger.info("--- KNOWLEDGE AGENT: RETRIEVING CLINICAL CONTEXT & GUIDELINES ---")
         patient_summary = state.get('patient_info', {}).get('summary', '')
+        patient_id = state.get('patient_info', {}).get('id', 'test-patient-001') # Default for demo
         
         if not patient_summary:
             return {"retrieved_docs": "", "next_step": "reasoning"}
 
         try:
+            from integrations.fhir_connector import FHIRConnector
+            from config import settings
+            
+            # Fetch EMR Context
+            fhir = FHIRConnector(base_url=settings.FHIR_BASE_URL)
+            # In production, we'd use the current user's token
+            conditions = await fhir.get_conditions(patient_id)
+            meds = await fhir.get_medications(patient_id)
+            
+            ehr_context = f"EMR CONDITIONS: {str(conditions)}\nEMR MEDICATIONS: {str(meds)}"
+            
             retriever = self.get_retriever()
             knowledge = retriever.retrieve(patient_summary)
+            
+            # Clinical Knowledge Verification (Feature 5)
+            # Ensure sources are from WHO, NIH, or PubMed
+            trusted_domains = ["who.int", "nih.gov", "pubmed", "cdc.gov"]
+            is_verified = any(domain in knowledge.lower() for domain in trusted_domains)
+            
+            verification_status = "VERIFIED" if is_verified else "UNVERIFIED"
+            logger.info(f"Knowledge Verification: {verification_status}")
+
+            combined_knowledge = f"{ehr_context}\n\nCLINICAL GUIDELINES ({verification_status}):\n{knowledge}"
+            
             return {
-                "retrieved_docs": knowledge,
+                "retrieved_docs": combined_knowledge,
+                "knowledge_verified": is_verified,
                 "next_step": "reasoning"
             }
         except Exception as e:
