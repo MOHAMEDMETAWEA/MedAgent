@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class PromptRegistry:
     def __init__(self):
-        self.prompt_dir = settings.PROMPT_DIR
+        self.prompt_dir = settings.PROMPTS_DIR
         self._prompts: Dict[str, str] = {}
         self._versions: Dict[str, str] = {}
         self.refresh()

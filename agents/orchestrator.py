@@ -136,8 +136,9 @@ class MedAgentOrchestrator:
         workflow.add_node("safety", wrap_node("safety"))
         workflow.add_node("response", wrap_node("response"))
         workflow.add_node("review", wrap_node("clinical_review"))
+        workflow.add_node("safety_guardrail", wrap_node("safety_guardrail"))
         
-        # Cycle 5: Specialty Adapters
+        # Cycle 5: Specialty Adapters + Safety + Documentation
         workflow.add_node("pediatric", wrap_node("pediatric"))
         workflow.add_node("maternity", wrap_node("maternity"))
         workflow.add_node("mental_health", wrap_node("mental_health"))
@@ -145,14 +146,14 @@ class MedAgentOrchestrator:
         workflow.add_node("calibrator", wrap_node("calibrator"))
         workflow.add_node("soap", wrap_node("soap"))
 
-        # Cycle 5: Parallel Start (Vision & Patient)
+        # ===== EDGE STRUCTURE (No Conflicts) =====
+        
+        # 1. Parallel Entry: Vision + Patient
         def route_start(state: AgentState):
-            # We now run both if image exists, or just patient
             if state.get("image_path"):
                 return ["vision", "patient"]
             return ["patient"]
             
-        # Note: LangGraph allows multiple outputs from a conditional entry point for branching
         workflow.set_conditional_entry_point(
             route_start,
             {
@@ -161,11 +162,11 @@ class MedAgentOrchestrator:
             }
         )
 
-        # Both converge into Triage
+        # 2. Both converge into Triage
         workflow.add_edge("vision", "triage")
         workflow.add_edge("patient", "triage")
 
-        # Conditional Edge after Triage: Route to Knowledge or Review
+        # 3. Triage → Knowledge or Human Review
         def route_triage(state: AgentState):
             if state.get("risk_level") in ["High", "Emergency"] and not state.get("doctor_verified"):
                 return "review"
@@ -180,11 +181,13 @@ class MedAgentOrchestrator:
             }
         )
 
-        workflow.add_edge("review", END) # Pause for human review
+        workflow.add_edge("review", END)  # Pause for human review
+        
+        # 4. Core reasoning pipeline
         workflow.add_edge("knowledge", "reasoning")
         workflow.add_edge("reasoning", "validation")
         
-        # Self-Correction Loop: Validation -> Reasoning (if invalid)
+        # 5. Self-Correction Loop
         def route_validation(state: AgentState):
             if state.get("validation_status") == "invalid" and state.get("correction_count", 0) < 2:
                 logger.warning(f"--- RE-ROUTING TO REASONING (Correction #{state.get('correction_count', 0) + 1}) ---")
@@ -200,13 +203,13 @@ class MedAgentOrchestrator:
             }
         )
 
+        # 6. Safety Pipeline: Hallucination → Calibrator → Safety
         workflow.add_edge("hallucination", "calibrator")
         workflow.add_edge("calibrator", "safety")
 
-        # Cycle 5: Specialty Routing Logic
+        # 7. Specialty Routing (after Safety)
         def route_specialty(state: AgentState):
-            # Dynamic routing based on patient profile
-            if state.get("user_age", 0) > 0 and state.get("user_age", 0) < 18:
+            if state.get("user_age", 0) and 0 < state.get("user_age", 0) < 18:
                 return "pediatric"
             if state.get("patient_info", {}).get("is_pregnant"):
                 return "maternity"
@@ -225,24 +228,16 @@ class MedAgentOrchestrator:
             }
         )
 
-        # All specialties converge back to response or bypass it if they generate final_response
-        workflow.add_edge("pediatric", "soap")
-        workflow.add_edge("maternity", "soap")
-        workflow.add_edge("mental_health", "soap")
+        # 8. All paths converge into Safety Guardrail (final check)
+        workflow.add_edge("pediatric", "safety_guardrail")
+        workflow.add_edge("maternity", "safety_guardrail")
+        workflow.add_edge("mental_health", "safety_guardrail")
+        workflow.add_edge("response", "safety_guardrail")
         
-        # Standard flow also goes to SOAP for documentation
-        workflow.add_edge("response", "soap")
-        
-        # SOAP is the final clinical documentation step before END
+        # 9. Safety Guardrail → SOAP → END
+        workflow.add_edge("safety_guardrail", "soap")
         workflow.add_edge("soap", END)
 
-        workflow.add_node("safety_guardrail", wrap_node("safety_guardrail"))
-
-        # Original safety (Layer 5) flows into response
-        workflow.add_edge("safety", "response")
-        # Final Guardrail check after response generation
-        workflow.add_edge("response", "safety_guardrail")
-        workflow.add_edge("safety_guardrail", END)
 
         return workflow.compile()
 

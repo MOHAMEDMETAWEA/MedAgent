@@ -24,7 +24,7 @@ class ReasoningAgent:
             return get_prompt_path(filename).read_text(encoding='utf-8')
         except: return "Diagnose the following symptoms based on knowledge: {knowledge}\nSymptoms: {patient_summary}"
 
-    def process(self, state: dict):
+    async def process(self, state: dict):
         from langchain_core.messages import SystemMessage, HumanMessage
         from config import settings
         

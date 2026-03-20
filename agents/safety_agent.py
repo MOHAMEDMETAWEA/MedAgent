@@ -27,13 +27,13 @@ class SafetyAgent:
 
     def process(self, state: dict):
         from langchain_core.messages import SystemMessage, HumanMessage
-        from utils.safety import detect_critical_symptoms, detect_prompt_injection
+        from utils.safety import detect_critical_symptoms, _detect_injection_patterns
         
         logger.info("--- SAFETY AGENT: LAYER 5 RISK STRATIFICATION ---")
         diagnosis = state.get('preliminary_diagnosis', '')
         
         is_critical, keywords = detect_critical_symptoms(diagnosis)
-        is_injection, _ = detect_prompt_injection(diagnosis)
+        is_injection, injection_patterns = _detect_injection_patterns(diagnosis)
         
         if is_injection:
             return {

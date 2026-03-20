@@ -4,7 +4,7 @@ Strips names, emails, phones, and clinical identifiers from logs and outputs.
 """
 import re
 import logging
-from typing import str
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 

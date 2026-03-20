@@ -2,6 +2,7 @@
 Diagnosis Agent - Specialized Clinical Mapping.
 Focuses on ICD-10 mapping and specific medical condition identification.
 """
+from typing import Dict
 from .state import AgentState
 from config import settings
 import logging

@@ -3,13 +3,20 @@ Clinical Review Agent - Manages Human-in-the-Loop (HITL) validation for high-ris
 """
 import logging
 import json
-from database.models import AIAuditLog, SessionLocal, ReviewStatus
+from database.models import AIAuditLog, Interaction, SessionLocal, ReviewStatus
 
 logger = logging.getLogger(__name__)
 
 class ClinicalReviewAgent:
     def __init__(self):
         pass
+
+    def process(self, state: dict):
+        """
+        Standard entry point for the LangGraph orchestrator.
+        Flags any case routed here for mandatory human review.
+        """
+        return self.process_high_risk_case(state)
 
     def process_high_risk_case(self, state: dict):
         """
@@ -38,11 +45,33 @@ class ClinicalReviewAgent:
         return {
             "status": "Awaiting Clinical Review",
             "next_step": "end", # Pause execution until manual intervention
-            "hitl_active": True
+            "hitl_active": True,
+            "requires_human_review": True,
+            "final_response": f"⚠️ This case has been flagged for clinical review due to high risk ({state.get('risk_level', 'High')}). A qualified clinician will review before any recommendations are released."
         }
 
     def submit_review(self, interaction_id: int, action: str, comment: str):
-        """Updates the status based on human doctor feedback."""
+        """Updates the interaction status based on human doctor feedback."""
         with SessionLocal() as db:
-            # logic to update interaction/audit log
-            pass
+            try:
+                interaction = db.query(Interaction).filter(Interaction.id == interaction_id).first()
+                if not interaction:
+                    return {"status": "error", "message": f"Interaction {interaction_id} not found"}
+                
+                if action == "approve":
+                    interaction.review_status = ReviewStatus.APPROVED
+                elif action == "reject":
+                    interaction.review_status = ReviewStatus.REJECTED
+                elif action == "escalate":
+                    interaction.review_status = ReviewStatus.ESCALATED
+                
+                interaction.review_notes = comment
+                db.commit()
+                
+                logger.info(f"HITL Review: Interaction {interaction_id} -> {action} by clinician.")
+                return {"status": "success", "action": action, "interaction_id": interaction_id}
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Submit review error: {e}")
+                return {"status": "error", "message": str(e)}
+

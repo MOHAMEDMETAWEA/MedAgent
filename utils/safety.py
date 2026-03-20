@@ -80,9 +80,10 @@ def sanitize_input(text: str, max_length: Optional[int] = None) -> str:
     
     return text
 
-def detect_prompt_injection(text: str) -> Tuple[bool, List[str]]:
+def _detect_injection_patterns(text: str) -> Tuple[bool, List[str]]:
     """
-    Detect potential prompt injection attacks.
+    Legacy pattern-based injection detection (Tuple return).
+    Internal use only — primary API is detect_prompt_injection().
     """
     detected = []
     
@@ -117,7 +118,7 @@ def validate_medical_input(text: str) -> Tuple[bool, Optional[str]]:
         return False, f"Input exceeds maximum length of {settings.MAX_INPUT_LENGTH}"
     
     # Check for prompt injection
-    is_injection, patterns = detect_prompt_injection(text)
+    is_injection, patterns = _detect_injection_patterns(text)
     if is_injection:
         logger.warning(f"Blocked input due to injection patterns: {patterns}")
         return False, "Unsafe input detected"
