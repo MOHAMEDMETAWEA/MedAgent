@@ -12,6 +12,7 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict
+from contextlib import asynccontextmanager
 
 import bcrypt
 # Monkeypatch bcrypt for passlib compatibility in newer versions
@@ -52,7 +53,14 @@ from api.routes import imaging
 from utils.safety import validate_medical_input, sanitize_input
 from utils.rate_limit import check_rate_limit, get_client_identifier
 import time
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+
+# Hospital Performance Metrics
+HOSPITAL_LOAD = Gauge("medagent_hospital_concurrent_users", "Number of concurrent clinical sessions")
+SAFETY_INCIDENTS = Counter("medagent_safety_blocks_total", "Total count of unsafe advice blocks")
+EHR_SYNC_LATENCY = Histogram("medagent_ehr_sync_seconds", "Latency of FHIR data synchronization")
+CLINICAL_ERROR_RATE = Counter("medagent_clinical_errors_total", "Total clinical exceptions tracked")
+
 from fastapi.responses import Response
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -60,96 +68,29 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExpor
 
 logger = logging.getLogger(__name__)
 
-# API Key Auth (Hardened)
-API_KEY_NAME = "X-Admin-Key"
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+from api.deps import (
+    get_orchestrator, get_persistence, get_governance, get_auth_agent, 
+    get_improver, get_developer_agent, get_review_agent, get_medication_agent, 
+    get_report_agent, get_calendar_agent, get_verification_agent, 
+    get_generative_engine, get_interop_builder, get_audit_agent, 
+    get_export_agent, get_current_user, oauth2_scheme, check_admin_auth
+)
+from api.routes import auth, clinical, patient, governance, system, imaging, feedback, learning, ehr
 
-def check_admin_auth(api_key: str = Depends(api_key_header)):
-    expected_key = settings.ADMIN_API_KEY
-    if not expected_key:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server misconfigured: ADMIN_API_KEY missing")
-    if api_key != expected_key:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Auth Failed")
-    return True
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
-
-async def verify_clerk_token(token: str):
-    """Verify Clerk JWT token using Clerk's JWKS."""
-    if not settings.CLERK_SECRET_KEY:
-        return None
-        
-    try:
-        # Simplified: In production, you'd fetch JWKS from Clerk and verify signatures.
-        # For this implementation, we'll assume Clerk provides a payload if we can decode it with their public key or if we use their API.
-        # Here we'll simulate verification or use a simplified secret-based check if configured, 
-        # but the standard is RSA public key verification.
-        
-        # Clerk JWTs are typically RS256. 
-        # We'll use a placeholder for the actual JWKS fetching logic for brevity but keep it functional.
-        payload = jwt.get_unverified_claims(token)
-        # Check expiration, issuer, etc.
-        return payload
-    except Exception as e:
-        logger.error(f"Clerk token verification failed: {e}")
-        return None
-
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
-        
-    # Try local JWT first
-    gov = get_governance()
-    payload = gov.verify_token(token)
-    if payload:
-        return payload
-        
-    # Try Clerk token
-    clerk_payload = await verify_clerk_token(token)
-    if clerk_payload:
-        # Sync Clerk user with local DB
-        pers = get_persistence()
-        clerk_id = clerk_payload.get("sub")
-        email = clerk_payload.get("email") or clerk_payload.get("email_address")
-        
-        user = pers.get_user_by_clerk_id(clerk_id)
-        if not user:
-            # Auto-register if not found
-            username = clerk_payload.get("username") or f"user_{clerk_id[:8]}"
-            full_name = clerk_payload.get("name") or username
-            user_id = pers.register_user(
-                username=username,
-                email=email or f"{clerk_id}@clerk.local",
-                phone="000", # Phone sync requires more specific claims
-                password=str(uuid.uuid4()), # Non-usable password
-                full_name=full_name,
-                clerk_id=clerk_id
-            )
-            return {"sub": user_id, "role": "patient", "name": full_name}
-        
-        return {
-            "sub": user.id, 
-            "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
-            "name": user.username
-        }
-        
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
-from api.routes import auth, clinical, patient, governance, system, imaging
-
-app = FastAPI(title="MedAgent Global System", version="5.3.0-PRODUCTION")
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting MedAgent Global System...")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting MedAgent Global System (Modern Lifespan)...")
     # Strict Secret Verification
     if not settings.OPENAI_API_KEY or "your-openai-key" in settings.OPENAI_API_KEY:
         logger.critical("PRODUCTION BLOCKER: OPENAI_API_KEY is missing or invalid.")
-        # We don't exit(1) to allow the process to stay alive for metrics/logs, but routes will fail.
     if not settings.JWT_SECRET_KEY:
         logger.critical("PRODUCTION BLOCKER: JWT_SECRET_KEY is missing.")
     if not settings.DATA_ENCRYPTION_KEY:
         logger.critical("PRODUCTION BLOCKER: DATA_ENCRYPTION_KEY is missing.")
+    yield
+    logger.info("Shutting down MedAgent Global System...")
+
+app = FastAPI(title="MedAgent Global System", version="5.3.0-PRODUCTION", lifespan=lifespan)
 
 # Register Modular Routers
 app.include_router(auth.router)
@@ -158,8 +99,17 @@ app.include_router(patient.router)
 app.include_router(governance.router)
 app.include_router(system.router)
 app.include_router(imaging.router)
+app.include_router(feedback.router)
+app.include_router(learning.router)
+app.include_router(ehr.router)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=settings.CORS_ALLOWED_ORIGINS, 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"]
+)
 
 # Observability (Retained in main for global context)
 REQUEST_LATENCY = Histogram("medagent_request_latency_ms", "Request latency in ms", buckets=[50,100,200,500,1000,2000,5000])
@@ -247,101 +197,7 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-from agents.verification_agent import VerificationAgent
-from agents.interop.fhir_hl7_builder import InteropBuilder
-
-# Global Singletons
-_orchestrator = None
-_persistence = None
-_governance = None
-_improver = None
-_developer_agent = None
-_auth_agent = None
-_review_agent = None
-_medication_agent = None
-_report_agent = None
-_calendar_agent = None
-_verification_agent = None
-_generative_engine = None
-_interop_builder = None
-_audit_agent = None
-_export_agent = None
-
-def get_export_agent():
-    global _export_agent
-    if _export_agent is None: _export_agent = ExportAgent()
-    return _export_agent
-
-def get_audit_agent():
-    global _audit_agent
-    if _audit_agent is None: _audit_agent = AuditAgent()
-    return _audit_agent
-
-def get_generative_engine():
-    global _generative_engine
-    if _generative_engine is None: _generative_engine = GenerativeEngineAgent()
-    return _generative_engine
-
-def get_interop_builder():
-    global _interop_builder
-    if _interop_builder is None: _interop_builder = InteropBuilder()
-    return _interop_builder
-
-def get_verification_agent():
-    global _verification_agent
-    if _verification_agent is None: _verification_agent = VerificationAgent()
-    return _verification_agent
-
-def get_orchestrator():
-    global _orchestrator
-    if _orchestrator is None:
-         _orchestrator = MedAgentOrchestrator()
-    return _orchestrator
-
-def get_persistence():
-    global _persistence
-    if _persistence is None: _persistence = PersistenceAgent()
-    return _persistence
-
-def get_governance():
-    global _governance
-    if _governance is None: _governance = GovernanceAgent()
-    return _governance
-
-def get_improver():
-    global _improver
-    if _improver is None: _improver = SelfImprovementAgent()
-    return _improver
-
-def get_developer_agent():
-    global _developer_agent
-    if _developer_agent is None: _developer_agent = DeveloperControlAgent()
-    return _developer_agent
-
-def get_auth_agent():
-    global _auth_agent
-    if _auth_agent is None: _auth_agent = AuthenticationAgent()
-    return _auth_agent
-
-def get_review_agent():
-    global _review_agent
-    if _review_agent is None: _review_agent = HumanReviewAgent()
-    return _review_agent
-
-def get_medication_agent():
-    global _medication_agent
-    if _medication_agent is None: _medication_agent = MedicationAgent()
-    return _medication_agent
-
-def get_report_agent():
-    global _report_agent
-    if _report_agent is None: _report_agent = ReportAgent()
-    return _report_agent
-
-def get_calendar_agent():
-    global _calendar_agent
-    if _calendar_agent is None: _calendar_agent = CalendarAgent()
-    return _calendar_agent
+# Dependencies are now imported from api.deps
 
 # --- DEVELOPER/SYSTEM ROUTES ---
 @app.get("/system/health", dependencies=[Depends(check_admin_auth)])
@@ -391,9 +247,12 @@ async def get_capabilities():
             {"name": "Verification Agent / عميل التحقق", "role": "Validates doctor licenses / يتحقق من تراخيص الأطباء"},
             {"name": "Authentication Agent / عميل الهوية", "role": "Secure JWT management / إدارة الهوية الآمنة"},
             {"name": "Persistence Agent / عميل الاستمرارية", "role": "Manages medical memory graph / يدير سجل الذاكرة الطبية"},
-            {"name": "Governance Agent / عميل الحوكمة", "role": "AES-256 encryption authority / سلطة التشفير والحوكمة"}
+            {"name": "Governance Agent / عميل الحوكمة", "role": "AES-256 encryption authority / سلطة التشفير والحوكمة"},
+            {"name": "Evolution Agent / عميل التطور", "role": "Autonomous medical model fine-tuning / التطوير الذاتي للنماذج الطبية"}
         ],
         "capabilities": [
+            {"id": "AUTONOMOUS_LEARNING", "label": "Autonomous Model Evolution / التطور الذاتي للنماذج", "generative": True},
+            {"id": "EHR_INTEROPERABILITY", "label": "EHR/FHIR Integration / التكامل مع السجلات الإلكترونية", "generative": False},
             {"id": "IMAGE_ANALYSIS", "label": "Medical Image Analysis / تحليل الصور الطبية", "generative": True},
             {"id": "GENERATE_REPORT", "label": "Generate Report / إنشاء تقرير", "generative": True},
             {"id": "GENERATE_RECOMMENDATION", "label": "Generate Recommendation / إنشاء توصية", "generative": True},
@@ -723,10 +582,7 @@ class AdminReviewAction(BaseModel):
     comment: Optional[str] = None
 
 # --- BACKGROUND TASKS ---
-async def send_health_alerts(user_id: str, message: str):
-    """Simulate push notifications or email alerts."""
-    logger.info(f"ALERTS QUEUED for {user_id}: {message}")
-    # In a real system, integrate with Twilio/SendGrid here.
+# Helper functions imported from api.deps
 
 # --- PUBLIC ROUTES ---
 
@@ -768,7 +624,7 @@ async def consult(request: PatientRequest, background_tasks: BackgroundTasks, re
             with tracer.start_as_current_span("consult") as span:
                 span.set_attribute("request.id", request_id)
                 span.set_attribute("user.id", request.patient_id)
-                result = orch.run(
+                result = await orch.run(
                     request.symptoms, 
                     user_id=request.patient_id, 
                     image_path=request.image_path,
@@ -776,7 +632,7 @@ async def consult(request: PatientRequest, background_tasks: BackgroundTasks, re
                     interaction_mode=request.interaction_mode
                 )
         else:
-            result = orch.run(
+            result = await orch.run(
                 request.symptoms, 
                 user_id=request.patient_id, 
                 image_path=request.image_path,

@@ -49,12 +49,19 @@ class ReasoningAgent:
         emo = state.get("emotional_state", "calm")
         
         try:
-            from utils.explainability_engine import ExplainabilityEngine
-            from utils.audit_logger import AuditLogger
+            from intelligence.cdss_engine import cdss_engine
+            from explainability.clinical_explainer import clinical_explainer
             
+            # Phase 5: Integrate CDSS Risk Analysis
+            cdss_data = await cdss_engine.generate_cdss_payload(state)
+            state["risk_level"] = cdss_data["cdss_risk"]
+            state["cdss_score"] = cdss_data["cdss_score"]
+            state["guideline_ref"] = cdss_data["guideline_ref"]
+
             base_template = self._load_prompt("clinical_cognitive_layer.txt")
             retry_context = f"\n\n[SELF-CORRECTION FEEDBACK]: Your previous response had issues: {state.get('retry_reason')}. PLEASE CORRECT THESE." if state.get("retry_reason") else ""
-            context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}{retry_context}"
+            context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}\nCDSS_RISK: {state['risk_level']}\nGUIDELINES: {state['guideline_ref']}{retry_context}"
+            
             routing_prompt = base_template.format(
                 mode=mode.upper(),
                 role=role.upper(),
@@ -70,13 +77,12 @@ class ReasoningAgent:
             )
 
             llm = self._get_llm(state)
-            risk_level = state.get("risk_level", "low").lower()
+            risk_level = state["risk_level"].lower()
             
             if risk_level not in ["high", "emergency"]:
                 logger.info("--- REASONING AGENT: FAST PATH ---")
-                # Structure prompt for explainability
                 explainable_prompt = f"{routing_prompt}\n\nIMPORTANT: Return a JSON object with: diagnosis, confidence, reasoning_steps (list), supporting_symptoms (list), evidence_sources (list), alternative_diagnoses (list)."
-                response = llm.invoke([
+                response = await llm.ainvoke([
                     SystemMessage(content="You are a Clinical Explainability Core. Always provide structured reasoning."),
                     HumanMessage(content=explainable_prompt)
                 ])
@@ -84,44 +90,44 @@ class ReasoningAgent:
             else:
                 logger.info("--- REASONING AGENT: TREE-OF-THOUGHT (ToT) PATH ---")
                 tot_prompt = f"TASK: Generate 3 distinct medical reasoning branches.\n{routing_prompt}"
-                paths_response = llm.invoke([
+                paths_response = await llm.ainvoke([
                     SystemMessage(content="You are a Tree-of-Thought Medical Orchestrator."),
                     HumanMessage(content=tot_prompt)
                 ])
                 
                 eval_prompt = f"Select the BEST branch from:\n{paths_response.content}\nReturn a JSON object with: diagnosis, confidence, reasoning_steps (list), supporting_symptoms (list), evidence_sources (list), alternative_diagnoses (list)."
-                final_selection = llm.invoke([
+                final_selection = await llm.ainvoke([
                     SystemMessage(content="You are a Medical Expert Board Auditor."),
                     HumanMessage(content=eval_prompt)
                 ])
                 content = final_selection.content
             
-            # Parse JSON and Wrap with ExplainabilityEngine
+            # Parse JSON and Wrap with ClinicalExplainer (Phase 8)
+            diag = "Uncertain"
+            conf = 0.5
             if "{" in content:
-                start = content.find("{")
-                end = content.rfind("}") + 1
-                raw_data = json.loads(content[start:end])
-                
-                explainable_output = ExplainabilityEngine.generate_explainable_summary(
-                    diagnosis=raw_data.get("diagnosis", "Uncertain"),
-                    confidence=raw_data.get("confidence", 0.5),
-                    evidence=raw_data.get("evidence_sources", []),
-                    symptoms=raw_data.get("supporting_symptoms", []),
-                    alternatives=raw_data.get("alternative_diagnoses", [])
-                )
-                diag = explainable_output["diagnosis"]
-                conf = explainable_output["confidence"]
-                
-                # Attach the full trace
-                explainable_output["reasoning_trace"] = ExplainabilityEngine.generate_reasoning_trace(
-                    raw_data.get("reasoning_steps", ["Analyzing clinical input"])
-                )
+                try:
+                    start = content.find("{")
+                    end = content.rfind("}") + 1
+                    raw_data = json.loads(content[start:end])
+                    
+                    diag = raw_data.get("diagnosis", "Uncertain")
+                    conf = raw_data.get("confidence", 0.5)
+                    state["reasoning_trace"] = raw_data.get("reasoning_steps", [])
+                    state["retrieved_docs"] = "\n".join(raw_data.get("evidence_sources", []))
+                    state["confidence_score"] = conf
+                except Exception as e:
+                    logger.warning(f"Failed to parse inner reasoning JSON: {e}")
+                    diag = content
             else:
                 diag = content
-                conf = 0.5
-                explainable_output = {"diagnosis": diag, "confidence": conf}
 
-            # AUDIT LOGGING
+            # Generate Final Explanation (Role-Adapted)
+            explanation = await clinical_explainer.generate_explanation(state, target_role=role)
+            state["clinical_explanation"] = explanation
+
+            # AUDIT LOGGING (Hospital-Grade)
+            from utils.audit_logger import AuditLogger
             AuditLogger.log_agent_interaction(
                 user_id=state.get("user_id", "unknown"),
                 agent_name="ReasoningAgent",
@@ -135,7 +141,8 @@ class ReasoningAgent:
             return {
                 "preliminary_diagnosis": diag,
                 "confidence_score": conf,
-                "explainability_trace": explainable_output,
+                "clinical_explanation": explanation,
+                "risk_level": state["risk_level"],
                 "next_step": "validation",
                 "status": "Reasoning Complete",
                 "correction_count": state.get("correction_count", 0) + (1 if state.get("retry_reason") else 0)
@@ -143,4 +150,4 @@ class ReasoningAgent:
 
         except Exception as e:
             logger.error(f"Reasoning error: {e}")
-            return {"preliminary_diagnosis": "Critical error during reasoning phase.", "next_step": "validation"}
+            return {"preliminary_diagnosis": f"Reasoning failure: {str(e)}", "next_step": "validation"}

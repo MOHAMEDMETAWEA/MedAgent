@@ -1,0 +1,302 @@
+﻿python : DEBUG: 
+Importing api.main
+At line:1 char:1
++ python tests/safety
+_verification.py > 
+safety_output.txt 
+2>&1; Get-Con ...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (DEBUG:    
+ Importing api.ma    
+in:String) [], R    
+emoteException
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+C:\Users\Administrato
+r\anaconda3\Lib\site-
+packages\sqlalchemy\s
+ql\schema.py:3616: 
+DeprecationWarning: d
+atetime.datetime.utcn
+ow() is deprecated 
+and scheduled for 
+removal in a future 
+version. Use 
+timezone-aware 
+objects to represent 
+datetimes in UTC: dat
+etime.datetime.now(da
+tetime.UTC).
+  return util.wrap_ca
+llable(lambda ctx: 
+fn(), fn)  # type: 
+ignore
+!!! CRITICAL 
+EMERGENCY DETECTED 
+BY SAFETY FRAMEWORK 
+!!!
+D:\MedAgent\utils\aud
+it_logger.py:39: 
+DeprecationWarning: d
+atetime.datetime.utcn
+ow() is deprecated 
+and scheduled for 
+removal in a future 
+version. Use 
+timezone-aware 
+objects to represent 
+datetimes in UTC: dat
+etime.datetime.now(da
+tetime.UTC).
+  timestamp=datetime.
+datetime.utcnow()
+Knowledge retrieval 
+failed: Client error 
+'401 Unauthorized' 
+for url 'https://fhir
+.epic.com/interconnec
+t-fhir-oauth/api/FHIR
+/R4/Condition?patient
+=test-patient-001'
+For more information 
+check: https://develo
+per.mozilla.org/en-US
+/docs/Web/HTTP/Status
+/401
+VALIDATION ISSUE 
+DETECTED: 
+{"urgency": 
+"EMERGENCY", 
+"chief_complaint": 
+"Critical Chest 
+Pain", 
+"visual_findings": 
+"Potential cardiac 
+event detected", 
+"risk_level": 
+"CRITICAL", 
+"safety_status": 
+"SAFE", "diagnosis": 
+"EMERGENCY: Seek 
+immediate medical 
+attention. Call 
+911."}
+--- RE-ROUTING TO 
+REASONING 
+(Correction #1) ---
+VALIDATION ISSUE 
+DETECTED: 
+{"urgency": 
+"EMERGENCY", 
+"chief_complaint": 
+"Critical Chest 
+Pain", 
+"visual_findings": 
+"Potential cardiac 
+event detected", 
+"risk_level": 
+"CRITICAL", 
+"safety_status": 
+"SAFE", "diagnosis": 
+"EMERGENCY: Seek 
+immediate medical 
+attention. Call 
+911."}
+--- RE-ROUTING TO 
+REASONING 
+(Correction #2) ---
+VALIDATION ISSUE 
+DETECTED: 
+{"urgency": 
+"EMERGENCY", 
+"chief_complaint": 
+"Critical Chest 
+Pain", 
+"visual_findings": 
+"Potential cardiac 
+event detected", 
+"risk_level": 
+"CRITICAL", 
+"safety_status": 
+"SAFE", "diagnosis": 
+"EMERGENCY: Seek 
+immediate medical 
+attention. Call 
+911."}
+2026-03-20 
+09:29:18,049 - agents
+.safetyguardrail - 
+INFO - --- 
+SafetyGuardrail 
+started ---
+2026-03-20 
+09:29:18,049 - agents
+.safetyguardrail - 
+INFO - --- Executing 
+Final Clinical 
+Safety Guardrail ---
+2026-03-20 
+09:29:18,050 - agents
+.safetyguardrail - 
+INFO - --- 
+SafetyGuardrail 
+completed in 0ms ---
+D:\MedAgent\agents\pe
+rsistence_agent.py:89
+: 
+DeprecationWarning: d
+atetime.datetime.utcn
+ow() is deprecated 
+and scheduled for 
+removal in a future 
+version. Use 
+timezone-aware 
+objects to represent 
+datetimes in UTC: dat
+etime.datetime.now(da
+tetime.UTC).
+  base_str = f"{sessi
+on_id}|{enc_input}|{e
+nc_response}|{model_u
+sed or 
+''}|{prompt_version 
+or ''}|{prev_hash}|{d
+atetime.datetime.utcn
+ow().isoformat()}"
+C:\Users\Administrato
+r\anaconda3\Lib\site-
+packages\sqlalchemy\s
+ql\schema.py:3616: 
+DeprecationWarning: d
+atetime.datetime.utcn
+ow() is deprecated 
+and scheduled for 
+removal in a future 
+version. Use 
+timezone-aware 
+objects to represent 
+datetimes in UTC: dat
+etime.datetime.now(da
+tetime.UTC).
+  return util.wrap_ca
+llable(lambda ctx: 
+fn(), fn)  # type: 
+ignore
+.Knowledge retrieval 
+failed: Client error 
+'401 Unauthorized' 
+for url 'https://fhir
+.epic.com/interconnec
+t-fhir-oauth/api/FHIR
+/R4/Condition?patient
+=test-patient-001'
+For more information 
+check: https://develo
+per.mozilla.org/en-US
+/docs/Web/HTTP/Status
+/401
+VALIDATION ISSUE 
+DETECTED: 
+{"urgency": "LOW", 
+"chief_complaint": 
+"General inquiry", 
+"final_response": 
+"Your health seems 
+normal. Please 
+consult a doctor for 
+a definitive review. 
+This is not a 
+substitute for 
+professional 
+advice.", 
+"diagnosis": 
+"Healthy", 
+"safety_status": 
+"SAFE"}
+--- RE-ROUTING TO 
+REASONING 
+(Correction #1) ---
+VALIDATION ISSUE 
+DETECTED: 
+{"urgency": "LOW", 
+"chief_complaint": 
+"General inquiry", 
+"final_response": 
+"Your health seems 
+normal. Please 
+consult a doctor for 
+a definitive review. 
+This is not a 
+substitute for 
+professional 
+advice.", 
+"diagnosis": 
+"Healthy", 
+"safety_status": 
+"SAFE"}
+--- RE-ROUTING TO 
+REASONING 
+(Correction #2) ---
+VALIDATION ISSUE 
+DETECTED: 
+{"urgency": "LOW", 
+"chief_complaint": 
+"General inquiry", 
+"final_response": 
+"Your health seems 
+normal. Please 
+consult a doctor for 
+a definitive review. 
+This is not a 
+substitute for 
+professional 
+advice.", 
+"diagnosis": 
+"Healthy", 
+"safety_status": 
+"SAFE"}
+2026-03-20 
+09:29:18,776 - agents
+.safetyguardrail - 
+INFO - --- 
+SafetyGuardrail 
+started ---
+2026-03-20 
+09:29:18,776 - agents
+.safetyguardrail - 
+INFO - --- Executing 
+Final Clinical 
+Safety Guardrail ---
+2026-03-20 
+09:29:18,776 - agents
+.safetyguardrail - 
+INFO - --- 
+SafetyGuardrail 
+completed in 0ms ---
+.Blocked input due 
+to injection 
+patterns: ['ignore\\s
++(previous|all|above)
+\\s+instructions?']
+.
+---------------------
+---------------------
+---------------------
+-------
+Ran 3 tests in 4.947s
+
+OK
+DYNAMIC AI MOCK LAYER INITIALIZED
+Emergency Test Result (Detected): 
+
+> [!caution]
+> **emergency warning**: based on your symptoms, we detected signals that may require
+DEBUG: MATCHED PATTERN ignore\s+(previous|all|above)\s+instructions?
+DEBUG: INJECTION DETECTED: ['ignore\\s+(previous|all|above)\\s+instructions?']
+Injection Test Result (Blocked): Input validation failed: Unsafe input detected.

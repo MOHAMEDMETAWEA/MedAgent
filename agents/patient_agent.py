@@ -32,7 +32,7 @@ class PatientAgent:
             logger.error(f"Error loading prompt {filename}: {e}")
             return ""
 
-    def process(self, state: dict):
+    async def process(self, state: dict):
         from langchain_core.messages import SystemMessage, HumanMessage
         from utils.safety import sanitize_input, validate_medical_input
         from agents.persistence_agent import PersistenceAgent
@@ -43,10 +43,10 @@ class PatientAgent:
         messages = state.get('messages', [])
         
         persistence = PersistenceAgent()
-        profile = persistence.get_patient_profile(user_id)
-        long_term_memory = persistence.get_long_term_memory(user_id) if user_id != "GUEST" else "First-time Guest"
-        memory_graph = persistence.get_memory_graph_context(user_id)
-        case_id = persistence.get_or_create_case(user_id)
+        profile = await persistence.get_patient_profile(user_id)
+        long_term_memory = await persistence.get_long_term_memory(user_id) if user_id != "GUEST" else "First-time Guest"
+        memory_graph = await persistence.get_memory_graph_context(user_id)
+        case_id = await persistence.get_or_create_case(user_id)
         
         role = state.get("user_role", "patient")
         mode = state.get("interaction_mode", "patient")

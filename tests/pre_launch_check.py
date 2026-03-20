@@ -35,6 +35,15 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# --- AI MOCKS (Crucial for CI/CD and pre-launch checks without real API keys) ---
+try:
+    import tests.ai_mocks
+    logger.info("Successfully enabled AI Mock Layer.")
+except ImportError:
+    logger.warning("tests.ai_mocks not found. Proceeding with real API calls.")
+
+import asyncio
+
 # --- LOGGING ---
 logging.basicConfig(
     level=logging.INFO,
@@ -172,40 +181,43 @@ def test_agent_loading():
 # ═══════════════════════════════════════════
 # 3. DATABASE
 # ═══════════════════════════════════════════
-def test_database():
+async def test_database():
     logger.info("═══ 3. DATABASE CONNECTION & SCHEMA ═══")
     try:
-        from database.models import SessionLocal, UserSession, Interaction, SystemLog, \
-            PatientProfile, MedicalReport, AuditLog, UserFeedback, SystemConfig
-        db = SessionLocal()
-
+        from database.models import AsyncSessionLocal, UserSession, Interaction, SystemLog, \
+            PatientProfile, MedicalReport, AuditLog, Feedback, SystemConfig
+        
         # Basic connectivity
-        session_count = db.query(UserSession).count()
-        record("Database connected", True, f"Sessions: {session_count}")
+        async with AsyncSessionLocal() as db:
+            from sqlalchemy import select, func
+            stmt = select(func.count(UserSession.id))
+            res = await db.execute(stmt)
+            session_count = res.scalar()
+            record("Database connected", True, f"Sessions: {session_count}")
 
-        # Table existence checks
-        tables_ok = True
-        for model_cls in [UserSession, Interaction, SystemLog, PatientProfile,
-                          MedicalReport, AuditLog, UserFeedback, SystemConfig]:
-            try:
-                db.query(model_cls).first()
-            except Exception as e:
-                record(f"Table: {model_cls.__tablename__}", False, str(e), critical=True)
-                tables_ok = False
-        record("All DB tables accessible", tables_ok)
+            # Table existence checks
+            tables_ok = True
+            for model_cls in [UserSession, Interaction, SystemLog, PatientProfile,
+                              MedicalReport, AuditLog, Feedback, SystemConfig]:
+                try:
+                    stmt = select(model_cls).limit(1)
+                    await db.execute(stmt)
+                except Exception as e:
+                    record(f"Table: {model_cls.__tablename__}", False, str(e), critical=True)
+                    tables_ok = False
+            record("All DB tables accessible", tables_ok)
 
         # Write test
         from agents.persistence_agent import PersistenceAgent
         p = PersistenceAgent()
-        sid = p.create_session(user_id="prelaunch_test_user")
+        sid = await p.create_session(user_id="prelaunch_test_user")
         record("DB write (create_session)", bool(sid), f"session_id={sid}")
 
         # Read back
-        sessions = p.get_user_history("prelaunch_test_user", limit=1)
+        sessions = await p.get_user_history("prelaunch_test_user", limit=1)
         record("DB read (get_user_history)", len(sessions) > 0)
 
         p.close()
-        db.close()
         return True
     except Exception as e:
         record("Database connection", False, str(e), critical=True)
@@ -215,7 +227,7 @@ def test_database():
 # ═══════════════════════════════════════════
 # 4 & 5. END-TO-END WORKFLOWS
 # ═══════════════════════════════════════════
-def test_e2e_workflow(agents_loaded: dict, api_key_available: bool):
+async def test_e2e_workflow(agents_loaded: dict, api_key_available: bool):
     logger.info("═══ 4. END-TO-END WORKFLOW (ENGLISH) ═══")
     orch = agents_loaded.get("Orchestrator")
     if not orch:
@@ -231,7 +243,7 @@ def test_e2e_workflow(agents_loaded: dict, api_key_available: bool):
     # --- English ---
     try:
         with timed("e2e_english"):
-            result_en = orch.run("I have a severe headache and sensitivity to light.", user_id="test_en")
+            result_en = await orch.run("I have a severe headache and sensitivity to light.", user_id="test_en")
         is_ok = result_en.get("status") != "error" and bool(result_en.get("final_response"))
         record("E2E English workflow", is_ok,
                f"Response length: {len(result_en.get('final_response', ''))}")
@@ -247,7 +259,7 @@ def test_e2e_workflow(agents_loaded: dict, api_key_available: bool):
     logger.info("═══ 5. END-TO-END WORKFLOW (ARABIC) ═══")
     try:
         with timed("e2e_arabic"):
-            result_ar = orch.run("أشعر بألم شديد في الصدر وضيق في التنفس", user_id="test_ar")
+            result_ar = await orch.run("أشعر بألم شديد في الصدر وضيق في التنفس", user_id="test_ar")
         is_ok = result_ar.get("status") != "error" and bool(result_ar.get("final_response"))
         record("E2E Arabic workflow", is_ok,
                f"Response length: {len(result_ar.get('final_response', ''))}")
@@ -638,15 +650,19 @@ def generate_report():
 
 
 
-if __name__ == "__main__":
+async def main():
     print("=" * 60)
     print("   MEDAgent PRE-LAUNCH SYSTEM CHECK v5.0 -- START     ")
     print("=" * 60)
 
     api_key_available = test_configuration()
+    # Force api_key_available to True if mocks are loaded to allow E2E tests to run
+    if "tests.ai_mocks" in sys.modules:
+        api_key_available = True
+
     agents_loaded = test_agent_loading()
-    test_database()
-    test_e2e_workflow(agents_loaded, api_key_available)
+    await test_database()
+    await test_e2e_workflow(agents_loaded, api_key_available)
     test_safety()
     test_generative_engine(agents_loaded, api_key_available)
     test_governance()
@@ -657,4 +673,8 @@ if __name__ == "__main__":
     test_report_parsing()
 
     is_ready = generate_report()
+    return is_ready
+
+if __name__ == "__main__":
+    is_ready = asyncio.run(main())
     sys.exit(0 if is_ready else 1)

@@ -15,23 +15,38 @@ class DiagnosisAgent:
 
     def process(self, state: AgentState):
         """Analyze symptoms and provide specific diagnostic possibilities."""
-        # Assuming 'symptoms' would be extracted from the state or patient_info
-        # For now, using patient_summary as a placeholder to avoid NameError
-        patient_summary = state.get("patient_info", {}).get("summary", "")
-        symptoms_for_log = patient_summary if patient_summary else "unknown symptoms"
-        logger.info(f"--- DIAGNOSIS AGENT: MAPPING ICD-10 FOR {symptoms_for_log[:30]}... ---")
-        
-        # In a generic system, this acts as a specialized filter for the Reasoning Agent
-        # It adds "clinical weight" to the ToT paths.
-        
-        if not patient_summary:
-            return state
+        patient_info = state.get("patient_info", {})
+        symptoms = patient_info.get("summary", "")
+        labs = state.get("lab_results", {})
 
+        logger.info(f"--- DIAGNOSIS AGENT: CORE CLINICAL ANALYSIS ---")
+        
+        # 1. Lab Interpretation (UX & Loop 3 requirement)
+        lab_analysis = self.interpret_labs(labs) if labs else None
+        
+        # 2. Condition Mapping
         # Logic to extract specific codes or condition clusters
-        # For audit purposes, we flag that this agent is contributing specialized mapping.
         state["diagnosis_metadata"] = {
             "mapped_codes": ["ICD-10-CM Z00.0"],
-            "vetted_by": "DiagnosisAgent"
+            "vetted_by": "DiagnosisAgent",
+            "lab_interpretation": lab_analysis
         }
         
+        if lab_analysis:
+            logger.info("Diagnosis: Integrated Lab Interpretation into clinical state.")
+        
         return state
+
+    def interpret_labs(self, labs: Dict) -> str:
+        """Technical interpretation of blood work/lab data."""
+        summary = []
+        for test, value in labs.items():
+            # Example logic for CBC/Metabolic
+            if "hemoglobin" in test.lower() and value < 13:
+                summary.append(f"Low Hemoglobin ({value}): Potential Anemia detected.")
+            if "glucose" in test.lower() and value > 125:
+                summary.append(f"Elevated Glucose ({value}): Markers for Hyperglycemia.")
+            if "tsh" in test.lower() and value > 4.5:
+                summary.append(f"High TSH ({value}): Indicators of Hypothyroidism.")
+        
+        return " | ".join(summary) if summary else "Labs within normal clinical range or uninterpretable."

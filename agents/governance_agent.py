@@ -64,7 +64,10 @@ class GovernanceAgent:
 
     def create_access_token(self, data: dict):
         to_encode = data.copy()
-        # Serialize enum values to strings for JSON compatibility
+        import uuid
+        jti = str(uuid.uuid4())
+        to_encode.update({"jti": jti}) # Added for revocation tracking
+        
         for key, val in to_encode.items():
             if hasattr(val, 'value'):
                 to_encode[key] = val.value
@@ -75,11 +78,39 @@ class GovernanceAgent:
     def verify_token(self, token: str):
         try:
             payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
-            return payload # user_id, role, etc.
+            
+            # Security Hardening: Check Redis Blacklist
+            jti = payload.get("jti")
+            if jti:
+                from intelligence.inference_cache import inference_cache
+                if inference_cache._enabled:
+                    if inference_cache._redis.exists(f"token_blacklist:{jti}"):
+                        logger.warning(f"SECURITY: Blocked attempt to use revoked token {jti}")
+                        return None
+            
+            return payload 
         except jwt.ExpiredSignatureError:
             return None
         except jwt.InvalidTokenError:
             return None
+
+    def revoke_token(self, token: str):
+        """Standard Logout: Add token to blacklist until it expires."""
+        try:
+            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            if jti and exp:
+                from intelligence.inference_cache import inference_cache
+                if inference_cache._enabled:
+                    # TTL = time remaining until expiration
+                    ttl = int(exp - datetime.utcnow().timestamp())
+                    if ttl > 0:
+                        inference_cache._redis.setex(f"token_blacklist:{jti}", ttl, "revoked")
+                        logger.info(f"SECURITY: Token {jti} revoked.")
+            return True
+        except:
+            return False
 
     # --- AUDIT LOGGING ---
     def log_action(self, actor_id: str, role: str, action: str, target: str, status: str = "SUCCESS", details: dict = None, ip: str = None):

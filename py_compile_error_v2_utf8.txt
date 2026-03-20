@@ -1,0 +1,38 @@
+﻿python :   File "agen
+ts/persistence_agent.
+py", line 31
+At line:1 char:1
++ python -m 
+py_compile agents/per
+sistence_agent.py > 
+py_compile_error_v 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (  File    
+ "agents/...nt.py    
+", line 31:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+    async def 
+create_session(self, 
+user_id: str = 
+\"guest\", mode: str 
+= \"patient\") -> 
+str:
+                     
+                     
+         ^
+SyntaxError: 
+unexpected character 
+after line 
+continuation 
+character

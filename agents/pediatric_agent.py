@@ -25,20 +25,25 @@ class PediatricAgent:
         4. Provide an 'Imagination Visual' - a descriptive scene that explains the condition.
         """
 
-    def process_explanation(self, clinical_finding: str, age: int = 8) -> Dict:
+    async def process(self, state: Dict) -> Dict:
         """Translate a clinical finding into a child-friendly story."""
+        clinical_finding = state.get("preliminary_diagnosis") or state.get("final_response", "")
+        age = state.get("user_age", 8)
+        
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             ("user", f"Explain this to a {age} year old child: {clinical_finding}")
         ])
         
         chain = prompt | self.llm
-        response = chain.invoke({})
+        response = await chain.ainvoke({})
         
-        return {
-            "theo_explanation": response.content,
-            "visual_description": self._generate_visual_prompt(response.content)
-        }
+        state["theo_explanation"] = response.content
+        state["visual_description"] = self._generate_visual_prompt(response.content)
+        # Append Theo's explanation to the final response if in pediatric mode
+        state["final_response"] = response.content
+        
+        return state
 
     def _generate_visual_prompt(self, explanation: str) -> str:
         """Create a prompt for the Image Generation agent based on the explanation."""

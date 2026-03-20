@@ -4,11 +4,11 @@ Imaging Router - Serving 3D volumetric data and slices.
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from utils.imaging_3d import VolumetricProcessor
-from api.main import oauth2_scheme # Reuse auth
+from api.deps import oauth2_scheme # Reuse auth
 import os
 from config import settings
 
-from api.main import app # Need app for some reason? No, just the router.
+# from api.main import app # Removed to avoid circular import
 router = APIRouter(prefix="/imaging", tags=["Imaging"])
 
 @router.get("/3d/{case_id}")

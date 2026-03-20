@@ -1,0 +1,31 @@
+﻿python :   File "agen
+ts/persistence_agent.
+py", line 23
+At line:1 char:1
++ python -m 
+py_compile agents/per
+sistence_agent.py > 
+py_compile_error.t 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (  File    
+ "agents/...nt.py    
+", line 23:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+    \"\"\"
+     ^
+SyntaxError: 
+unexpected character 
+after line 
+continuation 
+character

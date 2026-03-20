@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     
     # API
     MEDAGENT_API_URL: str = "http://localhost:8000"
+    CORS_ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
     
     # Feature Flags
     ENABLE_AUDIO: bool = False

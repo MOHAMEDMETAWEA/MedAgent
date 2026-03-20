@@ -41,4 +41,8 @@ async def consult(request: PatientRequest):
     )
     latency = int((time.perf_counter() - t0) * 1000)
     result["latency_ms"] = latency
+    
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("final_response", "Invalid input"))
+        
     return result

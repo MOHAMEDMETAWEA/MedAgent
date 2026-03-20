@@ -202,6 +202,19 @@ The database is reinforced with 6 mission-critical indexes on `user_id`, `sessio
 3. View differential diagnoses and clinical references.
 4. Export clinical SOAP notes as JSON or PDF.
 
+### **3. Autonomous Model Evolution**
+MEDAgent features a self-learning loop that improves diagnostic accuracy based on expert feedback.
+1. **Feedback Collection**: Doctors provide corrections via the UI.
+2. **Autonomous Pipeline**:
+   - `data_pipeline.py` filters for high-quality doctor corrections.
+   - `fine_tuner.py` trains a LoRA adapter (local) or optimizes prompts (API).
+   - `evaluator.py` compares metrics against clinical baselines.
+   - `safety_layer.py` validates medical fact-checking and disclaimers.
+3. **Registry & Rollout**: 
+   - New models are registered in `learning/model_registry.json`.
+   - The `ModelDeployer` automatically promotes models that exceed baseline performance.
+   - Monitor trends via `GET /models/analytics`.
+
 ---
 
 ## 🛡️ Security & Safety
@@ -222,13 +235,19 @@ The database is reinforced with 6 mission-critical indexes on `user_id`, `sessio
 
 ```text
 MEDAgent/
-├── agents/             # specialized AI agents (triage, vision, reasoning)
-├── api/                # FastAPI backend and Streamlit frontend
-├── database/           # SQLAlchemy models and migration logic
+├── agents/             # Native AI agents (triage, vision, reasoning, etc.)
+├── api/                # FastAPI backend & modular routes
+├── database/           # SQLAlchemy models & migrations
+├── maintenance/        # [NEW] System cleanup & auxiliary maintenance scripts
 ├── prompts/            # Central registry for all AI prompt templates
-├── utils/              # Shared utilities (safety, rate-limits, medical terms)
-├── scripts/            # Database initialization and maintenance scripts
-├── tests/              # Comprehensive test suite (unit, integration, stress)
+├── utils/              # Shared utilities (safety, rate-limits, clinical logic)
+├── scripts/            # Database initialization & primary system scripts
+├── tests/              # Structured test suite
+│   ├── unit/           # Core component unit tests
+│   ├── safety/         # Clinical safety & injection guardrail tests
+│   ├── integration/    # Multi-agent flow & EHR integration tests
+│   ├── performance/    # API & AI latency benchmarks
+│   └── stress/         # High-concurrency load tests
 ├── data/               # Local data storage (uploads, report exports)
 └── run_server.py       # Main entry point for the backend
 ```
@@ -238,13 +257,17 @@ MEDAgent/
 ## 🧪 Testing & Reliability
 
 ### **Running Tests**
+MEDAgent uses a tiered testing strategy to ensure clinical safety and system stability.
+
 ```bash
-# Unit tests
-pytest tests/test_core.py
-# Master Production Audit (100/100 Readiness Score)
-python tests/master_audit.py
-# Stress testing (100 concurrent users)
-python tests/stress_test_audit.py
+# Core unit tests
+pytest tests/unit/test_core.py
+
+# Clinical Safety Verification
+python tests/safety/safety_verification.py
+
+# Integration pipeline
+python tests/integration/cto_pipeline_verify.py
 ```
 
 ### **System Monitoring**

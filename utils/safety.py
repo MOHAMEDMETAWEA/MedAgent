@@ -5,6 +5,7 @@ Provides strict input validation, injection protection, and medical safety check
 import re
 from typing import List, Tuple, Optional
 from config import settings
+from utils.phi_redactor import phi_redactor
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,23 +31,51 @@ INJECTION_PATTERNS = [
     r"uncensored",
 ]
 
+def detect_prompt_injection(text: str) -> bool:
+    """Detects common LLM adversarial patterns."""
+    injection_patterns = [
+        r"ignore (all )?previous instructions",
+        r"system prompt",
+        r"new role",
+        r"act as",
+        r"you are now",
+        r"DAN mode",
+        r"jailbreak",
+        r"disregard (all )?safety",
+        r"speak in",
+        r"from now on"
+    ]
+    combined = "|".join(injection_patterns)
+    if re.search(combined, text, re.IGNORECASE):
+        logger.critical(f"SECURITY: Potential Prompt Injection Detected: '{text[:100]}...'")
+        return True
+    return False
+
 def sanitize_input(text: str, max_length: Optional[int] = None) -> str:
     """
     Sanitize user input to prevent injection attacks and ensure safety.
+    Now includes automatic PHI redaction.
     """
     if not text or not isinstance(text, str):
         return ""
     
-    # Remove null bytes and control characters (except newlines/tabs)
+    # 1. Check for injection first
+    if detect_prompt_injection(text):
+        return "ERROR: Malicious input detected. Request blocked by Safety Layer."
+
+    # 2. PHI Redaction (Cycle 5 Security Requirement)
+    text = phi_redactor.redact(text)
+    
+    # 3. Control Character Cleanup
     text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f]', '', text)
     
-    # Limit length
+    # 4. Length Enforcement
     max_len = max_length or settings.MAX_INPUT_LENGTH
     if len(text) > max_len:
         text = text[:max_len]
-        logger.warning(f"Input truncated due to length violation: {len(text)} > {max_len}")
+        logger.warning(f"Input truncated: {len(text)} > {max_len}")
     
-    # Normalize whitespace
+    # 4. Whitespace Normalization
     text = re.sub(r'\s+', ' ', text).strip()
     
     return text

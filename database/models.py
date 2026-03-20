@@ -104,6 +104,27 @@ class UserFeedback(Base):
     
     session = relationship("UserSession", back_populates="feedback")
 
+class Feedback(Base):
+    """Enhanced clinical feedback table for RLHF."""
+    __tablename__ = "feedback"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("user_accounts.id"), index=True)
+    role = Column(String) # doctor | patient
+    case_id = Column(String, ForeignKey("medical_cases.id"), index=True, nullable=True)
+    
+    # Encrypted fields for medical privacy
+    ai_response_encrypted = Column(Text)
+    comment_encrypted = Column(Text, nullable=True)
+    corrected_response_encrypted = Column(Text, nullable=True) # doctor only
+    
+    rating = Column(Integer) # 0-5
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Relationships
+    user = relationship("UserAccount")
+    case = relationship("MedicalCase")
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
     
@@ -131,6 +152,7 @@ class AIAuditLog(Base):
     confidence_score = Column(Float, nullable=True)
     risk_level = Column(String, nullable=True) # Low, Medium, High, Critical
     audit_hash = Column(String, nullable=True) # Integrity check
+    previous_hash = Column(String, nullable=True) # Link to previous log
 
 class SystemLog(Base):
     __tablename__ = "system_logs"

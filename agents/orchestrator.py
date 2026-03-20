@@ -23,8 +23,10 @@ class MedAgentOrchestrator:
             raise
 
     def get_agent(self, name: str):
-        """Standard mapping of nodes to agent instances."""
-        # All agent imports are now centralized here for direct instantiation
+        """Standard mapping of nodes to agent instances (Cached)."""
+        if name in self._agents:
+            return self._agents[name]
+            
         from .patient_agent import PatientAgent
         from .triage_agent import TriageAgent
         from .knowledge_agent import KnowledgeAgent
@@ -34,11 +36,17 @@ class MedAgentOrchestrator:
         from .response_agent import ResponseAgent
         from .persistence_agent import PersistenceAgent
         from .supervisor_agent import SupervisorAgent
-        from .vision_agent import VisionAnalysisAgent # Original name was VisionAnalysisAgent
+        from .vision_agent import VisionAnalysisAgent
         from .diagnosis_agent import DiagnosisAgent
         from .report_agent import ReportAgent
         from .clinical_review_agent import ClinicalReviewAgent
-        from .safety_guardrail_agent import SafetyGuardrailAgent # New agent
+        from .safety_guardrail_agent import SafetyGuardrailAgent
+        from .pediatric_agent import PediatricAgent
+        from .pregnancy_agent import PregnancyAgent
+        from .mental_health_agent import MentalHealthAgent
+        from .hallucination_detector import HallucinationDetector
+        from .uncertainty_calibrator import UncertaintyCalibrator
+        from .soap_agent import SoapAgent
 
         agents_map = {
             "patient": PatientAgent,
@@ -50,54 +58,73 @@ class MedAgentOrchestrator:
             "response": ResponseAgent,
             "persistence": PersistenceAgent,
             "supervisor": SupervisorAgent,
-            "vision": VisionAnalysisAgent, # Map to VisionAnalysisAgent
+            "vision": VisionAnalysisAgent,
             "diagnosis": DiagnosisAgent,
             "report": ReportAgent,
             "clinical_review": ClinicalReviewAgent,
-            "safety_guardrail": SafetyGuardrailAgent # New mapping
+            "safety_guardrail": SafetyGuardrailAgent,
+            "pediatric": PediatricAgent,
+            "maternity": PregnancyAgent,
+            "mental_health": MentalHealthAgent,
+            "hallucination": HallucinationDetector,
+            "calibrator": UncertaintyCalibrator,
+            "soap": SoapAgent
         }
         
         if name in agents_map:
-            # Instantiate and return the agent
-            if name not in self._agents: # Cache instantiated agents
-                self._agents[name] = agents_map[name]()
+            self._agents[name] = agents_map[name]()
             return self._agents[name]
-            from .response_agent import ResponseAgent
-            self._agents[name] = ResponseAgent()
-        elif name == "persistence":
-            from .persistence_agent import PersistenceAgent
-            self._agents[name] = PersistenceAgent()
-        elif name == "supervisor":
-            from .supervisor_agent import SupervisorAgent
-            self._agents[name] = SupervisorAgent()
-        elif name == "vision":
-            from .vision_agent import VisionAnalysisAgent
-            self._agents[name] = VisionAnalysisAgent()
-        elif name == "diagnosis":
-            from .diagnosis_agent import DiagnosisAgent
-            self._agents[name] = DiagnosisAgent()
-        elif name == "report":
-            from .report_agent import ReportAgent
-            self._agents[name] = ReportAgent()
-        elif name == "clinical_review":
-            from .clinical_review_agent import ClinicalReviewAgent
-            self._agents[name] = ClinicalReviewAgent()
-        # Add any others that are used in the graph or run()
-        return self._agents.get(name)
+        return None
 
     def _build_graph(self):
         workflow = StateGraph(AgentState)
+        import inspect
 
         def wrap_node(node_name):
-            def wrapper(state: AgentState):
-                agent = self.get_agent(node_name)
-                if not agent:
-                    logger.error(f"Agent {node_name} not found!")
-                    return state
-                # Use standardized run() if it exists (BaseAgent), else fallback to process()
-                if hasattr(agent, "run"):
-                    return agent.run(state)
-                return agent.process(state)
+            # Pre-fetch agent to determine async status once
+            agent = self.get_agent(node_name)
+            if not agent:
+                raise RuntimeError(f"Critical Error: Agent {node_name} failed to initialize.")
+            
+            # Determine method and async status
+            method_name = "run" if hasattr(agent, "run") else "process"
+            method = getattr(agent, method_name)
+            is_async = inspect.iscoroutinefunction(method)
+
+            async def wrapper(state: AgentState):
+                try:
+                    if is_async:
+                        return await method(state)
+                    return method(state)
+                except Exception as e:
+                    logger.error(f"--- NODE FAILURE: {node_name} --- Error: {e}")
+                    # Cycle 5: Autonomous Fallback System
+                    from learning.model_registry import model_registry
+                    fallback = model_registry.get_fallback_model()
+                    logger.warning(f"Self-Healing: Triggering Fallback Model {fallback.get('version')} for {node_name}")
+                    
+                    # Store fallback attempt in state for auditing
+                    state["model_fallback_triggered"] = True
+                    state["original_error"] = str(e)
+                    
+                    # Re-run with the same method (the agent logic should use the registry or we re-instantiate)
+                    # For simplicity in this architecture, we retry the call once.
+                    # A more robust fix would involve re-injecting the fallback model into the agent instance.
+                    try:
+                        if hasattr(agent, "llm"):
+                            # Dynamic model swap if the agent exposes its LLM
+                            from models.model_router import get_model
+                            agent.llm = get_model(model_name=fallback.get("version"))
+                        
+                        if is_async:
+                            return await method(state)
+                        return method(state)
+                    except Exception as fatal_e:
+                        logger.critical(f"FATAL: Fallback also failed for {node_name}. Error: {fatal_e}")
+                        state["status"] = "error"
+                        state["final_response"] = "The medical intelligence system is currently undergoing automated recovery. Please retry in 30 seconds."
+                        return state
+            
             return wrapper
 
         workflow.add_node("vision", wrap_node("vision"))
@@ -109,13 +136,23 @@ class MedAgentOrchestrator:
         workflow.add_node("safety", wrap_node("safety"))
         workflow.add_node("response", wrap_node("response"))
         workflow.add_node("review", wrap_node("clinical_review"))
+        
+        # Cycle 5: Specialty Adapters
+        workflow.add_node("pediatric", wrap_node("pediatric"))
+        workflow.add_node("maternity", wrap_node("maternity"))
+        workflow.add_node("mental_health", wrap_node("mental_health"))
+        workflow.add_node("hallucination", wrap_node("hallucination"))
+        workflow.add_node("calibrator", wrap_node("calibrator"))
+        workflow.add_node("soap", wrap_node("soap"))
 
-        # Conditional Entry: If image exists, start with vision, else patient
+        # Cycle 5: Parallel Start (Vision & Patient)
         def route_start(state: AgentState):
+            # We now run both if image exists, or just patient
             if state.get("image_path"):
-                return "vision"
-            return "patient"
-
+                return ["vision", "patient"]
+            return ["patient"]
+            
+        # Note: LangGraph allows multiple outputs from a conditional entry point for branching
         workflow.set_conditional_entry_point(
             route_start,
             {
@@ -124,7 +161,8 @@ class MedAgentOrchestrator:
             }
         )
 
-        workflow.add_edge("vision", "patient")
+        # Both converge into Triage
+        workflow.add_edge("vision", "triage")
         workflow.add_edge("patient", "triage")
 
         # Conditional Edge after Triage: Route to Knowledge or Review
@@ -158,9 +196,45 @@ class MedAgentOrchestrator:
             route_validation,
             {
                 "retry": "reasoning",
-                "continue": "safety"
+                "continue": "hallucination"
             }
         )
+
+        workflow.add_edge("hallucination", "calibrator")
+        workflow.add_edge("calibrator", "safety")
+
+        # Cycle 5: Specialty Routing Logic
+        def route_specialty(state: AgentState):
+            # Dynamic routing based on patient profile
+            if state.get("user_age", 0) > 0 and state.get("user_age", 0) < 18:
+                return "pediatric"
+            if state.get("patient_info", {}).get("is_pregnant"):
+                return "maternity"
+            if state.get("triage_category") == "Mental Health" or state.get("mental_health_screening"):
+                return "mental_health"
+            return "response"
+
+        workflow.add_conditional_edges(
+            "safety",
+            route_specialty,
+            {
+                "pediatric": "pediatric",
+                "maternity": "maternity",
+                "mental_health": "mental_health",
+                "response": "response"
+            }
+        )
+
+        # All specialties converge back to response or bypass it if they generate final_response
+        workflow.add_edge("pediatric", "soap")
+        workflow.add_edge("maternity", "soap")
+        workflow.add_edge("mental_health", "soap")
+        
+        # Standard flow also goes to SOAP for documentation
+        workflow.add_edge("response", "soap")
+        
+        # SOAP is the final clinical documentation step before END
+        workflow.add_edge("soap", END)
 
         workflow.add_node("safety_guardrail", wrap_node("safety_guardrail"))
 
@@ -187,9 +261,15 @@ class MedAgentOrchestrator:
             return {"final_response": f"Input validation failed: {error_msg}.", "status": "error"}
         
         user_profile = {}
+        ehr_data = {}
+        
+        # Phase 2: EHR Integration (Hospital-Grade)
+        from integrations.ehr_integration import ehr_manager
         if user_id != "guest":
-            from database.models import UserAccount, PatientProfile
-            # Need to use async DB in async run
+            ehr_data = await ehr_manager.sync_patient_record(user_id)
+            
+            from database.models import UserAccount, PatientProfile, AsyncSessionLocal
+            from sqlalchemy import select
             async with AsyncSessionLocal() as db:
                 try:
                     stmt = select(UserAccount).filter(UserAccount.id == user_id)
@@ -216,12 +296,21 @@ class MedAgentOrchestrator:
         session_id = await persistence.create_session(user_id=user_id, mode=final_mode)
         lang = self.detect_language(sanitized)
         
+        # Phase 11: Scalability - Prediction Caching
+        from intelligence.inference_cache import inference_cache
+        cached_result = inference_cache.get_prediction(sanitized, final_mode)
+        if cached_result:
+            return cached_result
+
+        from learning.model_registry import model_registry
+        current_model = model_registry.get_latest_model()
+        
         try:
             state = {
                 "messages": [HumanMessage(content=sanitized)],
                 "user_id": user_id,
                 "session_id": session_id,
-                "patient_info": {},
+                "patient_info": {"ehr": ehr_data, "vitals": ehr_data.get("vitals", {})},
                 "preliminary_diagnosis": "",
                 "retrieved_docs": "",
                 "doctor_notes": "",
@@ -245,18 +334,48 @@ class MedAgentOrchestrator:
                 "medical_background": user_profile.get("medical_background", ""),
                 "conversation_state": {"active_case_id": None, "risk_level": "unknown", "pending_actions": []},
                 "retry_reason": "",
-                "correction_count": 0
+                "correction_count": 0,
+                "prompt_version": current_model.get("version", "1.0.0"),
+                "model_used": current_model.get("version", "base")
             }
             
-            # Since LangGraph 0.1+ supports async natively if nodes are synchronous (handled by LangGraph threadpool)
+            # Phase 3: Real-Time Monitoring
+            from monitoring.realtime_engine import monitoring_system
+            if state["patient_info"]["vitals"]:
+                vitals_status = await monitoring_system.update_vitals(user_id, state["patient_info"]["vitals"])
+                if vitals_status.get("status") == "CRITICAL":
+                    state["critical_alert"] = True
+                    state["safety_status"] = "EMERGENCY_ESCALATION"
+
+            # Phase 4: Multi-Doctor Collaboration
+            from collaboration.case_workspace import case_workspace
+            if request_second_opinion:
+                case_id = f"CASE-{session_id[-8:]}"
+                await case_workspace.create_case(case_id, sanitized, user_id)
+                state["conversation_state"]["active_case_id"] = case_id
+                logger.info(f"Collaboration: Initiated workspace for Case {case_id}")
+
+            # Run AI Orchestration
             final_state = await self.graph.ainvoke(state)
             
+            # Phase 9: Smart Notifications (Emergency Alerts)
+            from notifications.engine import notification_engine
+            if final_state.get("risk_level") == "EMERGENCY" or final_state.get("critical_alert"):
+                await notification_engine.send_alert(
+                    user_id=user_id,
+                    title="🚨 CLINICAL EMERGENCY ALERT",
+                    message=f"Critical risk detected: {final_state.get('preliminary_diagnosis')}. Seek immediate help.",
+                    priority="EMERGENCY"
+                )
+
+            # Performance: Cache the result
+            inference_cache.set_prediction(sanitized, final_mode, final_state)
+
             await persistence.save_interaction(
                 session_id=session_id,
                 user_input=sanitized,
                 result=final_state
             )
-            
             return final_state
         except Exception as e:
             logger.error(f"Orchestrator run error: {e}")
