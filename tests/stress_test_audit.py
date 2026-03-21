@@ -37,7 +37,7 @@ def stress_test():
     success_count = sum(1 for status, dur in results if status == 200)
     avg_latency = sum(dur for status, dur in results) / num_requests
 
-    print(f"Stress Test Complete.")
+    print("Stress Test Complete.")
     print(f"Success Rate: {success_count}/{num_requests}")
     print(f"Average Latency: {avg_latency:.4f}s")
 

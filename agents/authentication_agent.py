@@ -20,22 +20,24 @@ class AuthenticationAgent:
         self.governance = GovernanceAgent()
         self.persistence = PersistenceAgent()
 
-    def register_new_user(self, **user_data):
-        return self.persistence.register_user(**user_data)
+    async def register_new_user(self, **user_data):
+        return await self.persistence.register_user(**user_data)
 
-    def validate_login(self, login_id, password, ip=None):
-        user = self.persistence.get_user_by_login(login_id)
+    async def validate_login(self, login_id, password, ip=None):
+        user = await self.persistence.get_user_by_login(login_id)
         if not user or not self.governance.verify_password(
             password, user.password_hash
         ):
             if user:
-                self.persistence.log_user_activity(user.id, "none", "failed", ip=ip)
+                await self.persistence.log_user_activity(
+                    user.id, "none", "failed", ip=ip
+                )
             return None, "Invalid credentials"
 
         # Serialize role enum to string for JWT and JSON
         role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
 
-        session_id = self.persistence.create_session(
+        session_id = await self.persistence.create_session(
             user_id=user.id, mode=user.interaction_mode
         )
         token = self.governance.create_access_token(
@@ -47,7 +49,7 @@ class AuthenticationAgent:
             }
         )
 
-        self.persistence.log_user_activity(user.id, session_id, "success", ip=ip)
+        await self.persistence.log_user_activity(user.id, session_id, "success", ip=ip)
         return {
             "token": token,
             "session_id": session_id,

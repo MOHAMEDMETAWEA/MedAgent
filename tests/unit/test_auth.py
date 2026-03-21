@@ -49,7 +49,7 @@ def test_auth_flow():
     login_payload = {"login_id": email, "password": password}
     r = requests.post(f"{API_BASE}/auth/login", json=login_payload)
     if r.status_code == 200:
-        token = r.json()["access_token"]
+        token = r.json()["token"]
         user_id = r.json()["user"]["id"]
         print(f"✅ Login successful. Token received. UserID: {user_id}")
     else:

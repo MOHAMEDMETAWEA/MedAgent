@@ -51,7 +51,7 @@ async def run_stress_test(concurrency: int = 10):
         valid_latencies = [l for l in latencies if l is not None]
         if valid_latencies:
             avg = sum(valid_latencies) / len(valid_latencies)
-            print(f"\n✅ STRESS TEST COMPLETE")
+            print("\n✅ STRESS TEST COMPLETE")
             print(f"Average Latency: {avg:.2f}s")
             print(f"Success Rate: {len(valid_latencies)/concurrency * 100}%")
 

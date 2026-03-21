@@ -28,6 +28,9 @@ CRITICAL_KEYWORDS = [
     "kill",
     "die",
     "death",
+    "chest pain",
+    "shortness of breath",
+    "difficulty breathing",
 ]
 
 # Prompt injection patterns

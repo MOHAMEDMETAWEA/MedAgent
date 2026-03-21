@@ -4,14 +4,48 @@ Launches the FastAPI backend and Streamlit frontend in parallel.
 """
 
 import os
+import signal
 import subprocess
 import sys
 import time
 
 
+def kill_port(port):
+    """Kills any process running on the specified port (Windows)."""
+    try:
+        # Find PID using netstat
+        output = subprocess.check_output(
+            f"netstat -ano | findstr :{port}", shell=True
+        ).decode()
+        for line in output.splitlines():
+            if "LISTENING" in line:
+                pid = line.strip().split()[-1]
+                print(f"[SYSTEM] Killing process {pid} on port {port}...")
+                subprocess.run(f"taskkill /F /PID {pid}", shell=True, check=False)
+    except subprocess.CalledProcessError:
+        # No process found on this port
+        pass
+
+
 def pre_flight_checks():
     """Ensure system requirements are met before launch."""
     print("[SYSTEM] Running Pre-flight Checks...")
+
+    # 0. Kill existing processes on ports 8000 and 8501
+    kill_port(8000)
+    kill_port(8501)
+
+    # 0.1 Initialize Database if missing
+    db_path = os.path.join(os.path.dirname(__file__), "medagent.db")
+    if not os.path.exists(db_path):
+        print("[INFO] Database missing. Initializing...")
+        try:
+            # Run the init script
+            subprocess.run([sys.executable, "scripts/init_db.py"], check=True)
+            print("[OK] Database Initialized.")
+        except Exception as e:
+            print(f"[ERROR] Failed to initialize database: {e}")
+            return False
 
     # 1. Check .env
     env_path = os.path.join(os.path.dirname(__file__), ".env")

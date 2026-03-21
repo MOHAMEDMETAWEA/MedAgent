@@ -144,7 +144,7 @@ def run_stress_audit():
         audit_summary["routing_accuracy"] / len(STRESS_CASES)
     ) * 100
 
-    print(f"--- Stress Audit Final ---")
+    print("--- Stress Audit Final ---")
     print(f"Total Cases: {len(STRESS_CASES)}")
     print(f"Routing Accuracy: {audit_summary['routing_accuracy']}%")
 

@@ -66,7 +66,7 @@ class PatientMonitoringSystem:
         # For now, we simulate the transmission
         email_sent = True
         push_sent = True
-        logger.info(f"Monitoring: Emergency notifications dispatched via Email/Push.")
+        logger.info("Monitoring: Emergency notifications dispatched via Email/Push.")
 
 
 # Singleton Instance

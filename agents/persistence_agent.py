@@ -14,9 +14,9 @@ from config import settings
 from database.models import (AsyncSessionLocal, Feedback, Interaction,
                              MedicalCase, MedicalImage, MedicalReport,
                              MedicationRecord, MemoryEdge, MemoryNode,
-                             PatientProfile, SymptomLog, SystemLog,
-                             UserAccount, UserAction, UserActivity, UserRole,
-                             UserSession)
+                             PatientProfile, SessionLocal, SymptomLog,
+                             SystemLog, UserAccount, UserAction, UserActivity,
+                             UserRole, UserSession)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ class PersistenceAgent:
     def __init__(self):
         self.governance = GovernanceAgent()
         self.audit = AuditAgent()
+        self.db = SessionLocal()  # Legacy sync support for older routes
 
     async def create_session(
         self, user_id: str = "guest", mode: str = "patient"

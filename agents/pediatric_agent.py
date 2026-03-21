@@ -36,6 +36,17 @@ class PediatricAgent:
         )
         age = state.get("user_age", 8)
 
+        result = await self.process_explanation(clinical_finding, age)
+
+        state["theo_explanation"] = result["explanation"]
+        state["visual_description"] = result["visual_prompt"]
+        # Append Theo's explanation to the final response if in pediatric mode
+        state["final_response"] = result["explanation"]
+
+        return state
+
+    async def process_explanation(self, clinical_finding: str, age: int = 8) -> Dict:
+        """Internal logic for child-friendly medical explanation."""
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.system_prompt),
@@ -46,12 +57,10 @@ class PediatricAgent:
         chain = prompt | self.llm
         response = await chain.ainvoke({})
 
-        state["theo_explanation"] = response.content
-        state["visual_description"] = self._generate_visual_prompt(response.content)
-        # Append Theo's explanation to the final response if in pediatric mode
-        state["final_response"] = response.content
+        explanation = response.content
+        visual_prompt = self._generate_visual_prompt(explanation)
 
-        return state
+        return {"explanation": explanation, "visual_prompt": visual_prompt}
 
     def _generate_visual_prompt(self, explanation: str) -> str:
         """Create a prompt for the Image Generation agent based on the explanation."""

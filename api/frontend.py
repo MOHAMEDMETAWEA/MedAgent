@@ -307,7 +307,9 @@ with st.sidebar:
                     )
                     if r and r.ok:
                         data = r.json()
-                        st.session_state["auth_token"] = data.get("access_token")
+                        st.session_state["auth_token"] = data.get(
+                            "token"
+                        )  # Fixed: backend returns 'token', not 'access_token'
                         st.session_state["user_info"] = data.get("user")
                         st.session_state["session_id"] = data.get("session_id")
                         st.rerun()
@@ -424,41 +426,40 @@ else:
 
         # Pending Reviews
         st.write("### 🩺 Pending Doctor Reviews")
-        # In a real app, this would fetch from /governance/reviews
-        pending_cases = [
-            {
-                "id": 104,
-                "patient": "Patient_A",
-                "symptoms": "Chest Pain",
-                "diagnosis": "Possible Myocardial Infarction",
-                "risk": "EMERGENCY",
-            },
-            {
-                "id": 105,
-                "patient": "Patient_B",
-                "symptoms": "Numbness",
-                "diagnosis": "Stroke Symptoms",
-                "risk": "HIGH",
-            },
-        ]
+        r_pending = api_call("GET", "/system/admin/pending-reviews")
+        if r_pending and r_pending.ok:
+            pending_cases = r_pending.json()
+            if not pending_cases:
+                st.success("✅ No cases pending review.")
+            for case in pending_cases:
+                with st.expander(
+                    f"Case #{case['id']} - Session: {case.get('session_id', 'N/A')}"
+                ):
+                    st.warning(f"**AI Suggestion**: {case['diagnosis']}")
+                    st.write(f"**Trigger symptoms**: {case['user_input']}")
 
-        for case in pending_cases:
-            with st.expander(
-                f"Case #{case['id']} - {case['patient']} ({case['risk']})"
-            ):
-                st.warning(f"**AI Suggestion**: {case['diagnosis']}")
-                st.write(f"**Trigger symptoms**: {case['symptoms']}")
-
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    if st.button(f"✅ Approve #{case['id']}"):
-                        st.success("Case approved and unlocked.")
-                with c2:
-                    if st.button(f"✏️ Modify #{case['id']}"):
-                        st.info("Opening editor...")
-                with c3:
-                    if st.button(f"❌ Reject #{case['id']}"):
-                        st.error("AI suggestion rejected.")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        comment = st.text_input(
+                            f"Comment for #{case['id']}", key=f"comm_{case['id']}"
+                        )
+                        if st.button(f"✅ Approve #{case['id']}"):
+                            res = api_call(
+                                "POST",
+                                "/governance/review/approve",
+                                data={"interaction_id": case["id"], "comment": comment},
+                            )
+                            if res and res.ok:
+                                st.success("Case approved and unlocked.")
+                                st.rerun()
+                    with c2:
+                        if st.button(f"✏️ Modify #{case['id']}"):
+                            st.info("Opening editor...")
+                    with c3:
+                        if st.button(f"❌ Reject #{case['id']}"):
+                            st.error("AI suggestion rejected.")
+        else:
+            st.info("No audit logs found or API unavailable.")
 
         st.divider()
         st.write("### 📜 AI Decisions Audit Trail")

@@ -33,12 +33,12 @@ def test_multi_user_registration():
             age=25 + i,
             country="TestLand",
         )
-        assert uid is not None, f"User {i} registration failed (returned None)"
+        assert uid is not None, "User {} registration failed (returned None)".format(i)
         users_created.append(uid)
         print(f"  ✅ User {i} registered: {uid}")
 
     assert len(set(users_created)) == 5, "Not all user IDs are unique"
-    print(f"  ✅ All 5 users registered with unique IDs")
+    print("  ✅ All 5 users registered with unique IDs")
 
 
 def test_duplicate_registration():

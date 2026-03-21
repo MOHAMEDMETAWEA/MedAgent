@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -6,15 +7,14 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from config import settings
-from database.models import Base, init_db
+from database.models import init_db
 
 
-def main():
-    db_url = getattr(settings, "DATABASE_URL", "sqlite:///./medagent.db")
-    print(f"Initializing database at: {db_url}")
-    SessionLocal = init_db(db_url)
+async def main():
+    print(f"Initializing database at: {settings.DATABASE_URL}")
+    await init_db()
     print("Database initialization complete.")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

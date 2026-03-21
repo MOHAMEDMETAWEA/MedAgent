@@ -103,7 +103,7 @@ class DeepAuditVerifier:
             if self.total_checks > 0
             else 0
         )
-        print(f"\n" + "=" * 60)
+        print("\n" + "=" * 60)
         print(f"🚀 FINAL PRODUCTION READINESS SCORE (CYCLE 5): {score:.2f}%")
         print("=" * 60)
         return score

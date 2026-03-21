@@ -51,7 +51,7 @@ def test_login_flow(reg_data):
 def test_concurrent_logins(reg_data):
     if not reg_data:
         return
-    print(f"\n--- Testing Concurrent Logins (5 users) ---")
+    print("\n--- Testing Concurrent Logins (5 users) ---")
 
     def login_task():
         payload = {"login_id": reg_data["username"], "password": reg_data["password"]}

@@ -60,5 +60,54 @@ class AuditLogger:
     @staticmethod
     def export_fhir_audit_event(log_id: int) -> dict:
         """Transforms a standard audit log into a HL7 FHIR AuditEvent resource."""
-        # Implementation for Feature 8: Compliance-Ready Logging
-        return {"resourceType": "AuditEvent", "id": str(log_id), "status": "active"}
+        try:
+            with SessionLocal() as db:
+                log = db.query(AIAuditLog).filter(AIAuditLog.id == log_id).first()
+                if not log:
+                    return {"error": "Audit log not found"}
+
+                return {
+                    "resourceType": "AuditEvent",
+                    "id": str(log.id),
+                    "type": {
+                        "system": "http://dicom.nema.org/resources/ontology/DCM",
+                        "code": "110113",
+                        "display": "Provisioning Event",
+                    },
+                    "action": "E",  # Execute
+                    "recorded": log.timestamp.isoformat() + "Z",
+                    "outcome": "0",  # Success
+                    "agent": [
+                        {
+                            "type": {
+                                "coding": [
+                                    {
+                                        "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
+                                        "code": "AUT",
+                                        "display": "Author",
+                                    }
+                                ]
+                            },
+                            "who": {"display": f"MedAgent {log.agent_name}"},
+                            "requestor": True,
+                        }
+                    ],
+                    "source": {
+                        "observer": {
+                            "display": "MedAgent Global Clinical Command Center"
+                        }
+                    },
+                    "entity": [
+                        {
+                            "type": {
+                                "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+                                "code": "2",
+                                "display": "System Object",
+                            },
+                            "description": f"AI Decision: {log.output_summary[:100]}",
+                        }
+                    ],
+                }
+        except Exception as e:
+            logger.error(f"Failed to export FHIR AuditEvent: {e}")
+            return {"error": str(e)}

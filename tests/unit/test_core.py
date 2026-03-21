@@ -21,7 +21,7 @@ def test_validate_input_injection():
     )
     assert valid == False
     assert (
-        "Unsafe" in msg.lower()
+        "unsafe" in msg.lower()
         or "injection" in msg.lower()
         or "invalid" in msg.lower()
     )

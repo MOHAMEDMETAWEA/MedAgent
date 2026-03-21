@@ -24,7 +24,7 @@ class DiagnosisAgent:
         symptoms = patient_info.get("summary", "")
         labs = state.get("lab_results", {})
 
-        logger.info(f"--- DIAGNOSIS AGENT: CORE CLINICAL ANALYSIS ---")
+        logger.info("--- DIAGNOSIS AGENT: CORE CLINICAL ANALYSIS ---")
 
         # 1. Lab Interpretation (UX & Loop 3 requirement)
         lab_analysis = self.interpret_labs(labs) if labs else None
