@@ -1,4 +1,3 @@
-
 import os
 
 file_path = "agents/persistence_agent.py"
@@ -7,7 +6,7 @@ if not os.path.exists(file_path):
     print(f"Error: {file_path} not found.")
     exit(1)
 
-with open(file_path, 'r', encoding='utf-8') as f:
+with open(file_path, "r", encoding="utf-8") as f:
     content = f.read()
 
 # Check if methods already exist
@@ -105,15 +104,15 @@ feedback_methods = """
 """
 
 # Append at the end of the class
-if content.strip().endswith("}"): # if it ends with a dict or something
+if content.strip().endswith("}"):  # if it ends with a dict or something
     pass
 
 # Find the last line of the class (usually ends with a method or return)
-# We can just append it to the end of the file if the class is the main thing, 
+# We can just append it to the end of the file if the class is the main thing,
 # but better to find the last method.
 # Since we know the file ends with some methods, we'll just append.
 
-with open(file_path, 'a', encoding='utf-8') as f:
+with open(file_path, "a", encoding="utf-8") as f:
     f.write(feedback_methods)
 
 print("Feedback methods appended successfully.")

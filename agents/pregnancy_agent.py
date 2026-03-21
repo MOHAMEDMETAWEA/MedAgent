@@ -2,12 +2,16 @@
 Maya - The Pregnancy & Maternity Specialist Agent.
 Focuses on fetal development, maternal health, and pregnancy-safe protocols.
 """
+
 import logging
-from typing import Dict, Any
-from models.model_router import get_model
+from typing import Any, Dict
+
 from langchain.prompts import ChatPromptTemplate
 
+from models.model_router import get_model
+
 logger = logging.getLogger(__name__)
+
 
 class PregnancyAgent:
     def __init__(self):
@@ -28,16 +32,21 @@ class PregnancyAgent:
         """Specialized reasoning for maternity cases."""
         clinical_finding = state.get("preliminary_diagnosis", "")
         trimester = state.get("patient_info", {}).get("trimester", "Unknown")
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.system_prompt),
-            ("user", f"Patient is in {trimester} trimester. Clinical finding: {clinical_finding}")
-        ])
-        
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                (
+                    "user",
+                    f"Patient is in {trimester} trimester. Clinical finding: {clinical_finding}",
+                ),
+            ]
+        )
+
         chain = prompt | self.llm
         response = await chain.ainvoke({})
-        
+
         state["specialty_recommendation"] = response.content
         state["is_pregnancy_safe"] = "safe" in response.content.lower()
-        
+
         return state

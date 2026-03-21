@@ -1,14 +1,16 @@
-import sys
 import os
+import sys
+import time
 import unittest
 import uuid
-import time
+
 from fastapi.testclient import TestClient
 
 # Add project root to sys.path
-sys.path.append('d:\\MedAgent')
+sys.path.append("d:\\MedAgent")
 
 from api.main import app
+
 
 class TestMedAgentAuthFlow(unittest.TestCase):
     def setUp(self):
@@ -27,26 +29,25 @@ class TestMedAgentAuthFlow(unittest.TestCase):
             "phone": self.phone,
             "password": self.password,
             "full_name": "Test User",
-            "role": "patient"
+            "role": "patient",
         }
         response = self.client.post("/auth/register", json=reg_payload)
-        self.assertEqual(response.status_code, 200, f"Registration failed: {response.text}")
-        
+        self.assertEqual(
+            response.status_code, 200, f"Registration failed: {response.text}"
+        )
+
         # 2. Login
-        login_payload = {
-            "login_id": self.username,
-            "password": self.password
-        }
+        login_payload = {"login_id": self.username, "password": self.password}
         response = self.client.post("/auth/login", json=login_payload)
         self.assertEqual(response.status_code, 200, f"Login failed: {response.text}")
         token = response.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         # 3. Get /auth/me
         response = self.client.get("/auth/me", headers=headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["name"], self.username)
-        
+
         # 4. Delete Account
         response = self.client.delete("/auth/account", headers=headers)
         self.assertEqual(response.status_code, 200)
@@ -58,15 +59,23 @@ class TestMedAgentAuthFlow(unittest.TestCase):
             p = "pass123!"
             e = f"{u}@test.com"
             ph = f"555{uuid.uuid4().hex[:4]}"
-            
+
             # Register
-            self.client.post("/auth/register", json={
-                "username": u, "email": e, "phone": ph, "password": p, "full_name": u
-            })
-            
+            self.client.post(
+                "/auth/register",
+                json={
+                    "username": u,
+                    "email": e,
+                    "phone": ph,
+                    "password": p,
+                    "full_name": u,
+                },
+            )
+
             # Login
             resp = self.client.post("/auth/login", json={"login_id": u, "password": p})
             self.assertEqual(resp.status_code, 200)
-            
+
+
 if __name__ == "__main__":
     unittest.main()

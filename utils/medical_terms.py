@@ -37,12 +37,14 @@ MEDICAL_TERMS = {
     "anticoagulant": "blood thinner",
     "metastasis": "spread of cancer",
     "benign": "non-cancerous",
-    "malignant": "cancerous"
+    "malignant": "cancerous",
 }
+
 
 def translate_term(term: str) -> str:
     """Returns a simple explanation for a technical term if available."""
     return MEDICAL_TERMS.get(term.lower(), term)
+
 
 def explain_text(text: str, replace_only: bool = False) -> str:
     """
@@ -50,12 +52,15 @@ def explain_text(text: str, replace_only: bool = False) -> str:
     Preserves original casing and supports 'replace_only' mode.
     """
     import re
+
     if not text:
         return text
 
     # Sort keys to ensure longer terms are matched first (e.g., 'heart attack' before 'heart')
     sorted_terms = sorted(MEDICAL_TERMS.keys(), key=len, reverse=True)
-    pattern_string = r'\b(' + '|'.join(re.escape(term) for term in sorted_terms) + r')\b'
+    pattern_string = (
+        r"\b(" + "|".join(re.escape(term) for term in sorted_terms) + r")\b"
+    )
     pattern = re.compile(pattern_string, re.IGNORECASE)
 
     def replace_fn(match):

@@ -1,3 +1,4 @@
 print("Testing langgraph import...")
-from langgraph.graph import StateGraph, END
+from langgraph.graph import END, StateGraph
+
 print("SUCCESS")

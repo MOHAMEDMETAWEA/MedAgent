@@ -2,26 +2,32 @@
 Governance Agent - Managing Security, RBAC, and Data Integrity.
 Handles encryption, audit logging, and admin controls.
 """
-import os
-import json
+
 import base64
+import hashlib
+import hmac
+import json
 import logging
-import jwt
+import os
 from datetime import datetime, timedelta
+
+import jwt
 from cryptography.fernet import Fernet
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-from database.models import SessionLocal, AuditLog, SystemConfig, UserSession, Interaction, UserRole, UserAccount, UserActivity
+
 from config import settings
-import hmac
-import hashlib
+from database.models import (AuditLog, Interaction, SessionLocal, SystemConfig,
+                             UserAccount, UserActivity, UserRole, UserSession)
 
 logger = logging.getLogger(__name__)
+
 
 class GovernanceAgent:
     """
     Enforces Data Governance policies: Encryption, RBAC, Auditing.
     """
+
     def __init__(self):
         self._db_factory = SessionLocal
         # Initialize Encryption Key
@@ -29,30 +35,38 @@ class GovernanceAgent:
         if not self._key:
             # Generate a temporary one for demo if not set (Safe failsafe)
             self._key = Fernet.generate_key().decode()
-            logger.warning("DATA_ENCRYPTION_KEY not set. Using temporary key. DATA WILL BE UNREADABLE AFTER RESTART.")
+            logger.warning(
+                "DATA_ENCRYPTION_KEY not set. Using temporary key. DATA WILL BE UNREADABLE AFTER RESTART."
+            )
         self.cipher = Fernet(self._key.encode())
-        
+
         # Password Hashing
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        
+
         # JWT Config (must be provided via env)
-        self.jwt_secret = os.getenv("JWT_SECRET_KEY") or getattr(settings, "JWT_SECRET_KEY", None)
+        self.jwt_secret = os.getenv("JWT_SECRET_KEY") or getattr(
+            settings, "JWT_SECRET_KEY", None
+        )
         self.jwt_algorithm = "HS256"
-        self.token_expire_minutes = 60 * 24 # 24 hours
+        self.token_expire_minutes = 60 * 24  # 24 hours
         if not self.jwt_secret:
-            logger.critical("JWT_SECRET_KEY is not set. Refusing to operate without a secure JWT secret.")
+            logger.critical(
+                "JWT_SECRET_KEY is not set. Refusing to operate without a secure JWT secret."
+            )
             raise RuntimeError("JWT secret missing")
 
     # --- ENCRYPTION ---
     def encrypt(self, data: str) -> str:
-        if not data: return ""
+        if not data:
+            return ""
         return self.cipher.encrypt(data.encode()).decode()
 
     def decrypt(self, token: str) -> str:
-        if not token: return ""
+        if not token:
+            return ""
         try:
             return self.cipher.decrypt(token.encode()).decode()
-        except:
+        except Exception:
             return "[ENCRYPTED_DATA_ERROR]"
 
     # --- AUTHENTICATION ---
@@ -65,11 +79,12 @@ class GovernanceAgent:
     def create_access_token(self, data: dict):
         to_encode = data.copy()
         import uuid
+
         jti = str(uuid.uuid4())
-        to_encode.update({"jti": jti}) # Added for revocation tracking
-        
+        to_encode.update({"jti": jti})  # Added for revocation tracking
+
         for key, val in to_encode.items():
-            if hasattr(val, 'value'):
+            if hasattr(val, "value"):
                 to_encode[key] = val.value
         expire = datetime.utcnow() + timedelta(minutes=self.token_expire_minutes)
         to_encode.update({"exp": expire})
@@ -77,18 +92,23 @@ class GovernanceAgent:
 
     def verify_token(self, token: str):
         try:
-            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
-            
+            payload = jwt.decode(
+                token, self.jwt_secret, algorithms=[self.jwt_algorithm]
+            )
+
             # Security Hardening: Check Redis Blacklist
             jti = payload.get("jti")
             if jti:
                 from intelligence.inference_cache import inference_cache
+
                 if inference_cache._enabled:
                     if inference_cache._redis.exists(f"token_blacklist:{jti}"):
-                        logger.warning(f"SECURITY: Blocked attempt to use revoked token {jti}")
+                        logger.warning(
+                            f"SECURITY: Blocked attempt to use revoked token {jti}"
+                        )
                         return None
-            
-            return payload 
+
+            return payload
         except jwt.ExpiredSignatureError:
             return None
         except jwt.InvalidTokenError:
@@ -97,23 +117,37 @@ class GovernanceAgent:
     def revoke_token(self, token: str):
         """Standard Logout: Add token to blacklist until it expires."""
         try:
-            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+            payload = jwt.decode(
+                token, self.jwt_secret, algorithms=[self.jwt_algorithm]
+            )
             jti = payload.get("jti")
             exp = payload.get("exp")
             if jti and exp:
                 from intelligence.inference_cache import inference_cache
+
                 if inference_cache._enabled:
                     # TTL = time remaining until expiration
                     ttl = int(exp - datetime.utcnow().timestamp())
                     if ttl > 0:
-                        inference_cache._redis.setex(f"token_blacklist:{jti}", ttl, "revoked")
+                        inference_cache._redis.setex(
+                            f"token_blacklist:{jti}", ttl, "revoked"
+                        )
                         logger.info(f"SECURITY: Token {jti} revoked.")
             return True
-        except:
+        except Exception:
             return False
 
     # --- AUDIT LOGGING ---
-    def log_action(self, actor_id: str, role: str, action: str, target: str, status: str = "SUCCESS", details: dict = None, ip: str = None):
+    def log_action(
+        self,
+        actor_id: str,
+        role: str,
+        action: str,
+        target: str,
+        status: str = "SUCCESS",
+        details: dict = None,
+        ip: str = None,
+    ):
         """Create an immutable audit record."""
         db = self._db_factory()
         try:
@@ -124,7 +158,7 @@ class GovernanceAgent:
                 resource_target=target,
                 status=status,
                 details=details or {},
-                ip_address=ip
+                ip_address=ip,
             )
             db.add(audit)
             db.commit()
@@ -141,9 +175,20 @@ class GovernanceAgent:
         policy = {
             UserRole.USER: ["READ_OWN_HISTORY", "DELETE_OWN_DATA", "CONSULT"],
             UserRole.PATIENT: ["READ_OWN_HISTORY", "DELETE_OWN_DATA", "CONSULT"],
-            UserRole.DOCTOR: ["READ_OWN_HISTORY", "DELETE_OWN_DATA", "CONSULT", "DOCTOR_TOOLS", "VIEW_CASE_STUDIES"],
-            UserRole.ADMIN: ["READ_ALL_LOGS", "SYSTEM_CONFIG", "VIEW_ANALYTICS", "READ_OWN_HISTORY"],
-            UserRole.SYSTEM: ["WRITE_LOGS", "READ_CONFIG"]
+            UserRole.DOCTOR: [
+                "READ_OWN_HISTORY",
+                "DELETE_OWN_DATA",
+                "CONSULT",
+                "DOCTOR_TOOLS",
+                "VIEW_CASE_STUDIES",
+            ],
+            UserRole.ADMIN: [
+                "READ_ALL_LOGS",
+                "SYSTEM_CONFIG",
+                "VIEW_ANALYTICS",
+                "READ_OWN_HISTORY",
+            ],
+            UserRole.SYSTEM: ["WRITE_LOGS", "READ_CONFIG"],
         }
         allowed = policy.get(role, [])
         if action in allowed:
@@ -156,17 +201,20 @@ class GovernanceAgent:
         cutoff = datetime.utcnow() - timedelta(days=days_retention)
         db = self._db_factory()
         try:
-            sessions = db.query(UserSession).filter(
-                UserSession.start_time < cutoff,
-                UserSession.is_anonymized == False
-            ).all()
-            
+            sessions = (
+                db.query(UserSession)
+                .filter(
+                    UserSession.start_time < cutoff, UserSession.is_anonymized == False
+                )
+                .all()
+            )
+
             count = 0
             for s in sessions:
                 s.user_id = "ANONYMIZED"
                 s.is_anonymized = True
                 count += 1
-            
+
             db.commit()
             self.log_action("SYSTEM", "SYSTEM", "AUTO_ANONYMIZE", f"{count}_records")
         except Exception as e:
@@ -224,8 +272,12 @@ class GovernanceAgent:
         """
         Create HMAC-SHA256 signature for evidence payload using AUDIT_SIGNING_KEY.
         """
-        key = os.getenv("AUDIT_SIGNING_KEY") or getattr(settings, "AUDIT_SIGNING_KEY", None)
+        key = os.getenv("AUDIT_SIGNING_KEY") or getattr(
+            settings, "AUDIT_SIGNING_KEY", None
+        )
         if not key:
             raise RuntimeError("AUDIT_SIGNING_KEY not configured")
-        sig = hmac.new(key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        sig = hmac.new(
+            key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
         return sig

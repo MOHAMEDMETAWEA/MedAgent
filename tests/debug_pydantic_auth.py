@@ -1,5 +1,7 @@
-from pydantic import BaseModel, EmailStr
 from typing import Optional
+
+from pydantic import BaseModel, EmailStr
+
 
 class RegisterRequest(BaseModel):
     username: str
@@ -12,16 +14,17 @@ class RegisterRequest(BaseModel):
     country: Optional[str] = None
     role: str = "patient"
 
+
 payload = {
     "username": "testuser_abc",
-    "email": "test_abc@medagent.com", # Use .com just in case
+    "email": "test_abc@medagent.com",  # Use .com just in case
     "phone": "555-abc",
     "password": "SecurePassword123!",
     "full_name": "Auditor Test User",
     "role": "patient",
     "age": 30,
     "gender": "Male",
-    "country": "Egypt"
+    "country": "Egypt",
 }
 
 try:

@@ -196,7 +196,7 @@ Central configuration hub. Uses Pydantic `BaseSettings` to load environment vari
 
 | Group | Settings | Purpose |
 |:---|:---|:---|
-| API Keys | `OPENAI_API_KEY`, `JWT_SECRET_KEY`, `CLERK_*` | Authentication & LLM access |
+| API Keys | `OPENAI_API_KEY`, `JWT_SECRET_KEY` | Native App Authentication & LLM access |
 | Paths | `BASE_DIR`, `PROMPTS_DIR`, `DATA_DIR`, `INDEX_DIR` | File system layout |
 | RAG | `RAG_CHUNK_SIZE=500`, `RAG_TOP_K=3`, `RAG_RELEVANCE_THRESHOLD=0.5` | Retrieval tuning |
 | LLM | `LLM_TEMPERATURE_DIAGNOSIS=0.0`, `LLM_TEMPERATURE_PATIENT=0.3` | Per-role temperature control |

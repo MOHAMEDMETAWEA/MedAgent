@@ -2,20 +2,33 @@
 Audit Agent - Centralized specialized auditing for all system changes.
 Tracks data mutations, security events, and administrative actions.
 """
+
 import logging
-from database.models import SessionLocal, AuditLog
 from datetime import datetime
 
+from database.models import AuditLog, SessionLocal
+
 logger = logging.getLogger(__name__)
+
 
 class AuditAgent:
     """
     Centralized agent for recording and managing audit trails.
     """
+
     def __init__(self):
         self._db_factory = SessionLocal
 
-    def log_change(self, actor_id: str, role: str, action: str, resource: str, status: str = "SUCCESS", details: dict = None, ip: str = None):
+    def log_change(
+        self,
+        actor_id: str,
+        role: str,
+        action: str,
+        resource: str,
+        status: str = "SUCCESS",
+        details: dict = None,
+        ip: str = None,
+    ):
         """
         Record a significant change or update in the system.
         :param actor_id: ID of the user or system component performing the action.
@@ -35,7 +48,7 @@ class AuditAgent:
                 resource_target=resource,
                 status=status,
                 details=details or {},
-                ip_address=ip
+                ip_address=ip,
             )
             db.add(audit)
             db.commit()

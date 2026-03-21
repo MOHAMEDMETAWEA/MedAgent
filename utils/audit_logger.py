@@ -2,13 +2,16 @@
 Centralized Audit Logger for medical AI decisions.
 Ensures every agent execution is traceable and compliant.
 """
-import logging
+
 import datetime
 import hashlib
 import json
+import logging
+
 from database.models import AIAuditLog, SessionLocal
 
 logger = logging.getLogger(__name__)
+
 
 class AuditLogger:
     @staticmethod
@@ -19,7 +22,7 @@ class AuditLogger:
         output_data: str,
         model_used: str,
         confidence: float = 0.0,
-        risk_level: str = "Low"
+        risk_level: str = "Low",
     ):
         """Records an agent execution event in the high-fidelity audit trail."""
         try:
@@ -41,14 +44,16 @@ class AuditLogger:
                     confidence_score=confidence,
                     risk_level=risk_level,
                     audit_hash=audit_hash,
-                    previous_hash=prev_hash, # Cycle 5: Immutable Chain
-                    timestamp=datetime.datetime.utcnow()
+                    previous_hash=prev_hash,  # Cycle 5: Immutable Chain
+                    timestamp=datetime.datetime.utcnow(),
                 )
 
                 db.add(log_entry)
                 db.commit()
-                logger.info(f"Audit chain updated for {agent_name} (Link: {audit_hash[:8]}...)")
-                
+                logger.info(
+                    f"Audit chain updated for {agent_name} (Link: {audit_hash[:8]}...)"
+                )
+
         except Exception as e:
             logger.error(f"Failed to generate audit log: {e}")
 

@@ -2,16 +2,20 @@
 Medical Hallucination Detector - Guardian of Clinical Truth.
 Analyzes AI responses for factual consistency against retrieved medical knowledge.
 """
+
 import logging
-from typing import Dict, Any, List
-from models.model_router import get_model
+from typing import Any, Dict, List
+
 from langchain.prompts import ChatPromptTemplate
+
+from models.model_router import get_model
 
 logger = logging.getLogger(__name__)
 
+
 class HallucinationDetector:
     def __init__(self):
-        self.llm = get_model() # Usually a smaller, faster model for verification
+        self.llm = get_model()  # Usually a smaller, faster model for verification
         self.system_prompt = """
         You are a Critical Clinical Auditor.
         Your task is to detect "Hallucinations" (unsupported or contradictory medical claims) 
@@ -32,35 +36,42 @@ class HallucinationDetector:
         """Verify the reasoning output against retrieved documents."""
         diagnosis = state.get("preliminary_diagnosis", "")
         evidence = state.get("retrieved_docs", "")
-        
+
         if not diagnosis or not evidence:
             state["hallucination_score"] = 100
             return state
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.system_prompt),
-            ("user", f"EVIDENCE: {evidence}\n\nDIAGNOSIS TO AUDIT: {diagnosis}")
-        ])
-        
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                ("user", f"EVIDENCE: {evidence}\n\nDIAGNOSIS TO AUDIT: {diagnosis}"),
+            ]
+        )
+
         chain = prompt | self.llm
         response = await chain.ainvoke({})
-        
+
         score = self._parse_score(response.content)
         state["hallucination_score"] = score
         state["hallucination_report"] = response.content
         state["is_hallucinating"] = score < 85
-        
+
         if state["is_hallucinating"]:
             logger.warning(f"HALLUCINATION DETECTED! Integrity Score: {score}")
-            state["validation_status"] = "invalid" # Trigger correction loop
-            state["retry_reason"] = "Clinical hallucination detected in previous reasoning."
-            
+            state["validation_status"] = "invalid"  # Trigger correction loop
+            state["retry_reason"] = (
+                "Clinical hallucination detected in previous reasoning."
+            )
+
         return state
 
     def _parse_score(self, text: str) -> int:
         import re
-        match = re.search(r'Score:\s*(\d+)', text, re.IGNORECASE)
-        if match: return int(match.group(1))
+
+        match = re.search(r"Score:\s*(\d+)", text, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
         # Fallback to keyword heuristic
-        if "hallucination" in text.lower(): return 50
+        if "hallucination" in text.lower():
+            return 50
         return 95

@@ -1,20 +1,31 @@
 """
 Clinical Governance & HITL Review Routes.
 """
-from fastapi import APIRouter, HTTPException, Depends
-from database.models import AIAuditLog, SessionLocal, Interaction, ReviewStatus
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from database.models import AIAuditLog, Interaction, ReviewStatus, SessionLocal
 
 router = APIRouter(prefix="/governance", tags=["Governance"])
+
 
 @router.get("/audit-logs")
 async def get_audit_logs(limit: int = 50):
     with SessionLocal() as db:
-        return db.query(AIAuditLog).order_by(AIAuditLog.timestamp.desc()).limit(limit).all()
+        return (
+            db.query(AIAuditLog)
+            .order_by(AIAuditLog.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
 
 @router.post("/review/approve")
 async def approve_case(interaction_id: int, comment: str):
     with SessionLocal() as db:
-        interaction = db.query(Interaction).filter(Interaction.id == interaction_id).first()
+        interaction = (
+            db.query(Interaction).filter(Interaction.id == interaction_id).first()
+        )
         if not interaction:
             raise HTTPException(status_code=404, detail="Interaction not found")
         interaction.review_status = ReviewStatus.APPROVED

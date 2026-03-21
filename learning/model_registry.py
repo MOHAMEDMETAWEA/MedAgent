@@ -1,17 +1,20 @@
-import json
-import os
-import logging
 import datetime
-from typing import Dict, Any, Optional, List
+import json
+import logging
+import os
+from typing import Any, Dict, List, Optional
+
 from config import settings
 
 logger = logging.getLogger(__name__)
+
 
 class ModelRegistry:
     """
     Phase 6: Model Registry
     Responsible for tracking model versions, metrics, and deployment status.
     """
+
     def __init__(self):
         self.registry_path = os.path.join(settings.DATA_DIR, "models", "registry.json")
         os.makedirs(os.path.dirname(self.registry_path), exist_ok=True)
@@ -29,9 +32,9 @@ class ModelRegistry:
                         "version": "1.0.0",
                         "metrics": {"accuracy_proxy": 0.85},
                         "timestamp": datetime.datetime.utcnow().isoformat(),
-                        "deployment_status": "production"
+                        "deployment_status": "production",
                     }
-                }
+                },
             }
             self._save_registry()
 
@@ -39,7 +42,9 @@ class ModelRegistry:
         with open(self.registry_path, "w") as f:
             json.dump(self.data, f, indent=2)
 
-    def register_model(self, version: str, checkpoint_path: str, metrics: Dict[str, Any]):
+    def register_model(
+        self, version: str, checkpoint_path: str, metrics: Dict[str, Any]
+    ):
         """Registers a new model version in the registry."""
         model_id = f"medagent-v{version}"
         self.data["models"][model_id] = {
@@ -47,7 +52,7 @@ class ModelRegistry:
             "checkpoint_path": checkpoint_path,
             "metrics": metrics,
             "timestamp": datetime.datetime.utcnow().isoformat(),
-            "deployment_status": "registered"
+            "deployment_status": "registered",
         }
         self._save_registry()
         logger.info(f"Registry: Registered new model {model_id} at {checkpoint_path}")
@@ -57,12 +62,12 @@ class ModelRegistry:
         if model_id not in self.data["models"]:
             logger.error(f"Registry: Model {model_id} not found in registry.")
             return
-        
+
         # Update old production model
         old_prod = self.data["current_model"]
         if old_prod in self.data["models"]:
             self.data["models"][old_prod]["deployment_status"] = "stale"
-            
+
         self.data["current_model"] = model_id
         self.data["models"][model_id]["deployment_status"] = "production"
         self._save_registry()
@@ -82,6 +87,7 @@ class ModelRegistry:
             if model_id != current_id:
                 return info
         return self.data["models"]["base"]
+
 
 # Singleton Instance
 model_registry = ModelRegistry()

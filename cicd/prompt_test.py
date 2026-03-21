@@ -1,11 +1,13 @@
+import json
 import os
 import sys
-import json
+
 
 class MEDAgentPromptValidator:
     """
     Validates Clinical Prompts and Agent Responses for Hallucinations.
     """
+
     def __init__(self, root_dir):
         self.root_dir = root_dir
         self.prompts_dir = os.path.join(self.root_dir, "prompts")
@@ -21,9 +23,13 @@ class MEDAgentPromptValidator:
                 with open(path, "r", encoding="utf-8") as f:
                     content = f.read()
                     # Placeholder check
-                    if ("triage" in file or "reasoning" in file) and "{symptoms}" not in content:
-                        self.failures.append(f"MISSING placeholder in {file}: {{symptoms}}")
-        
+                    if (
+                        "triage" in file or "reasoning" in file
+                    ) and "{symptoms}" not in content:
+                        self.failures.append(
+                            f"MISSING placeholder in {file}: {{symptoms}}"
+                        )
+
     def simulate_hallucination_check(self):
         print("[2] Simulating Hallucination Check Logic...")
         # In a real environment, this would call an LLM-as-a-judge (e.g., G-Eval or LangSmith)
@@ -38,23 +44,28 @@ class MEDAgentPromptValidator:
             with open(safety_path, "r", encoding="utf-8") as f:
                 content = f.read()
                 if "disclaimer" not in content.lower():
-                    self.failures.append("CRITICAL: Safety Agent missing disclaimer logic.")
+                    self.failures.append(
+                        "CRITICAL: Safety Agent missing disclaimer logic."
+                    )
 
     def run_all(self):
         print("--- Running MEDAgent Prompt & Clinical Logic Validation ---")
         self.validate_prompt_templates()
         self.check_medical_disclaimer()
         self.simulate_hallucination_check()
-        
+
         if self.failures:
             for f in self.failures:
                 print(f"FAIL: {f}")
             return False
-        
+
         print("PASS: Clinical prompts and safety logic verified.")
         return True
 
+
 if __name__ == "__main__":
-    validator = MEDAgentPromptValidator(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    validator = MEDAgentPromptValidator(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    )
     if not validator.run_all():
         sys.exit(1)

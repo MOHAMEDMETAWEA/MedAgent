@@ -7,12 +7,13 @@ state = {
     "medical_literacy_level": "low",
     "user_age": 75,
     "final_response": "The patient has severe hypertension and tachycardia.",
-    "language": "en"
+    "language": "en",
 }
 
 # Test 1: Full Replacement (Low Literacy/Elderly)
 print("--- Test 1: Full Replacement (Low Literacy + Elderly) ---")
 from utils.medical_terms import explain_text
+
 raw = "The patient has severe Hypertension and Tachycardia."
 output = explain_text(raw, replace_only=True)
 print(f"Input: {raw}")

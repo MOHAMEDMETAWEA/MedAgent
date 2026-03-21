@@ -1,4 +1,3 @@
-
 import os
 
 file_path = "api/frontend.py"
@@ -7,7 +6,7 @@ if not os.path.exists(file_path):
     print(f"Error: {file_path} not found.")
     exit(1)
 
-with open(file_path, 'r', encoding='utf-8') as f:
+with open(file_path, "r", encoding="utf-8") as f:
     lines = f.readlines()
 
 # 1. Add Feedback Form Function after helper functions
@@ -48,12 +47,13 @@ inserted_func = False
 for i, line in enumerate(lines):
     if "def api_call(method, endpoint" in line:
         # Find the end of api_call
-        for j in range(i+1, len(lines)):
+        for j in range(i + 1, len(lines)):
             if lines[j].startswith("# ---") or lines[j].startswith("with st.sidebar:"):
                 lines.insert(j, feedback_form_func)
                 inserted_func = True
                 break
-        if inserted_func: break
+        if inserted_func:
+            break
 
 # 2. Call feedback form in TAB 1
 call_feedback = """
@@ -94,15 +94,17 @@ feedback_analytics_section = """
 inserted_analytics = False
 # Tab 13 is the last tab
 for i, line in enumerate(reversed(lines)):
-    if "st.caption(\"MEDAgent Production V5.0.0" in line:
+    if 'st.caption("MEDAgent Production V5.0.0' in line:
         lines.insert(len(lines) - i - 1, feedback_analytics_section)
         inserted_analytics = True
         break
 
 if not (inserted_func and inserted_call and inserted_analytics):
-    print(f"Warning: Some insertions failed. Func: {inserted_func}, Call: {inserted_call}, Analytics: {inserted_analytics}")
+    print(
+        f"Warning: Some insertions failed. Func: {inserted_func}, Call: {inserted_call}, Analytics: {inserted_analytics}"
+    )
 
-with open(file_path, 'w', encoding='utf-8', newline='') as f:
+with open(file_path, "w", encoding="utf-8", newline="") as f:
     f.writelines(lines)
 
 print("api/frontend.py updated successfully with Phase 9 UI Integration.")

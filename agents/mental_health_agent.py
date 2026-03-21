@@ -2,12 +2,16 @@
 Aria - The Mental Health & Psychiatric Specialist Agent.
 Focuses on psychological well-aware, trauma-informed care, and crisis screening.
 """
+
 import logging
-from typing import Dict, Any
-from models.model_router import get_model
+from typing import Any, Dict
+
 from langchain.prompts import ChatPromptTemplate
 
+from models.model_router import get_model
+
 logger = logging.getLogger(__name__)
+
 
 class MentalHealthAgent:
     def __init__(self):
@@ -26,25 +30,34 @@ class MentalHealthAgent:
 
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Specialized reasoning for mental health cases."""
-        patient_input = state.get("messages", [None])[-1].content if state.get("messages") else ""
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.system_prompt),
-            ("user", f"Analyze patient state and provide compassionate guidance: {patient_input}")
-        ])
-        
+        patient_input = (
+            state.get("messages", [None])[-1].content if state.get("messages") else ""
+        )
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                (
+                    "user",
+                    f"Analyze patient state and provide compassionate guidance: {patient_input}",
+                ),
+            ]
+        )
+
         chain = prompt | self.llm
         response = await chain.ainvoke({})
-        
+
         state["mental_health_score"] = self._calculate_basic_distress(response.content)
         state["specialty_recommendation"] = response.content
-        
+
         return state
 
     def _calculate_basic_distress(self, text: str) -> int:
         # Simplified distress mapping for audit
         low = ["calm", "stable", "improving"]
         high = ["hopeless", "panic", "severe", "crisis"]
-        if any(h in text.lower() for h in high): return 8
-        if any(l in text.lower() for l in low): return 2
+        if any(h in text.lower() for h in high):
+            return 8
+        if any(l in text.lower() for l in low):
+            return 2
         return 5

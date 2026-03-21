@@ -1,15 +1,17 @@
-import requests
 import json
 import os
 
+import requests
+
 BASE_URL = "http://localhost:8000"
+
 
 def test_consult_text_only():
     print("\n--- Testing Consult (Text Only) ---")
     payload = {
         "symptoms": "I have a severe headache and sensitivity to light.",
         "patient_id": "auditor_test_user",
-        "interaction_mode": "patient"
+        "interaction_mode": "patient",
     }
     response = requests.post(f"{BASE_URL}/consult", json=payload)
     print(f"Status: {response.status_code}")
@@ -19,6 +21,7 @@ def test_consult_text_only():
         print(f"Diagnosis Snippet: {data.get('preliminary_diagnosis')[:100]}...")
     else:
         print(f"Error: {response.text}")
+
 
 def test_consult_with_image():
     print("\n--- Testing Consult (With Image) ---")
@@ -32,16 +35,19 @@ def test_consult_with_image():
         "symptoms": "My arm hurts after a fall.",
         "patient_id": "auditor_test_user",
         "image_path": image_path,
-        "interaction_mode": "patient"
+        "interaction_mode": "patient",
     }
     response = requests.post(f"{BASE_URL}/consult", json=payload)
     print(f"Status: {response.status_code}")
     if response.status_code == 200:
         data = response.json()
-        print(f"Visual Findings: {data.get('visual_findings', {}).get('status', 'not_found')}")
+        print(
+            f"Visual Findings: {data.get('visual_findings', {}).get('status', 'not_found')}"
+        )
         print(f"Diagnosis Snippet: {data.get('preliminary_diagnosis')[:100]}...")
     else:
         print(f"Error: {response.text}")
+
 
 if __name__ == "__main__":
     # Ensure server is running

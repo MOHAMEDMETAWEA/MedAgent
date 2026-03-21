@@ -2,14 +2,17 @@
 Volumetric Processing Engine for 3D Medical Imaging.
 Converts DICOM series into volumetric arrays for 3D rendering.
 """
-import pydicom
-import numpy as np
+
 import logging
 import os
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
+
+import numpy as np
+import pydicom
 
 logger = logging.getLogger(__name__)
+
 
 class VolumetricProcessor:
     def __init__(self, dicom_dir: str):
@@ -27,11 +30,17 @@ class VolumetricProcessor:
 
         # Sort by Instance Number or Image Position Patient
         slices = [pydicom.dcmread(f) for f in dicom_files]
-        slices.sort(key=lambda x: int(x.InstanceNumber) if hasattr(x, 'InstanceNumber') else 0)
+        slices.sort(
+            key=lambda x: int(x.InstanceNumber) if hasattr(x, "InstanceNumber") else 0
+        )
 
         # Extract spacing
-        self.pixel_spacing = slices[0].PixelSpacing if hasattr(slices[0], 'PixelSpacing') else [1.0, 1.0]
-        self.slice_thickness = slices[0].SliceThickness if hasattr(slices[0], 'SliceThickness') else 1.0
+        self.pixel_spacing = (
+            slices[0].PixelSpacing if hasattr(slices[0], "PixelSpacing") else [1.0, 1.0]
+        )
+        self.slice_thickness = (
+            slices[0].SliceThickness if hasattr(slices[0], "SliceThickness") else 1.0
+        )
 
         # Build volume
         img_shape = list(slices[0].pixel_array.shape)
@@ -45,14 +54,14 @@ class VolumetricProcessor:
         return self.volume, {
             "spacing": self.pixel_spacing,
             "thickness": self.slice_thickness,
-            "shape": self.volume.shape
+            "shape": self.volume.shape,
         }
 
     def get_slice(self, axis: str, index: int) -> np.ndarray:
         """Get a single slice along axial (z), coronal (y), or sagittal (x) planes."""
         if self.volume is None:
             self.load_series()
-            
+
         if axis == "axial":
             return self.volume[:, :, index]
         elif axis == "coronal":
@@ -62,7 +71,9 @@ class VolumetricProcessor:
         else:
             raise ValueError("Invalid axis. Choose axial, coronal, or sagittal.")
 
-    def apply_window_level(self, image: np.ndarray, window: float, level: float) -> np.ndarray:
+    def apply_window_level(
+        self, image: np.ndarray, window: float, level: float
+    ) -> np.ndarray:
         """Apply Window/Level (Brightness/Contrast) for clinical display."""
         img_min = level - window // 2
         img_max = level + window // 2

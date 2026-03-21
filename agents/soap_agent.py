@@ -2,12 +2,16 @@
 SOAP Agent - The Clinical Scribe.
 Automates the generation of SOAP notes (Subjective, Objective, Assessment, Plan) for doctors.
 """
+
 import logging
-from typing import Dict, Any
-from models.model_router import get_model
+from typing import Any, Dict
+
 from langchain.prompts import ChatPromptTemplate
 
+from models.model_router import get_model
+
 logger = logging.getLogger(__name__)
+
 
 class SoapAgent:
     def __init__(self):
@@ -30,20 +34,29 @@ class SoapAgent:
 
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Generate structured SOAP documentation."""
-        symptoms = state.get("messages", [None])[-1].content if state.get("messages") else "Not provided"
+        symptoms = (
+            state.get("messages", [None])[-1].content
+            if state.get("messages")
+            else "Not provided"
+        )
         vitals = state.get("patient_info", {}).get("vitals", "Not provided")
         findings = state.get("visual_findings", "None")
         diagnosis = state.get("preliminary_diagnosis", "Inconclusive")
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.system_prompt),
-            ("user", f"SYMPTOMS: {symptoms}\nVITALS: {vitals}\nIMAGING: {findings}\nDIAGNOSIS: {diagnosis}")
-        ])
-        
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                (
+                    "user",
+                    f"SYMPTOMS: {symptoms}\nVITALS: {vitals}\nIMAGING: {findings}\nDIAGNOSIS: {diagnosis}",
+                ),
+            ]
+        )
+
         chain = prompt | self.llm
         response = await chain.ainvoke({})
-        
+
         state["soap_notes"] = response.content
         logger.info("UX: Generated professional SOAP notes.")
-        
+
         return state

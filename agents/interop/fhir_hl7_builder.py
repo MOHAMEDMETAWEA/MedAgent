@@ -2,27 +2,32 @@
 FHIR & HL7 Interoperability Builder.
 Converts clinical results into standardized medical data exchange formats.
 """
+
 import json
 import logging
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
+
 from agents.prompts.registry import PROMPT_REGISTRY
 from config import settings
 
 logger = logging.getLogger(__name__)
+
 
 class InteropBuilder:
     """
     Builder responsible for generating hospital-grade interoperability messages.
     Ensures compliance with FHIR R4 and HL7 v2.x standards.
     """
+
     def __init__(self, model=None):
         self.llm = ChatOpenAI(
             model=model or settings.OPENAI_MODEL,
             temperature=0.0,
-            api_key=settings.OPENAI_API_KEY
+            api_key=settings.OPENAI_API_KEY,
         )
 
     def build_fhir_bundle(self, clinical_data: Dict[str, Any]):
@@ -30,7 +35,7 @@ class InteropBuilder:
         Generates a FHIR R4 Patient/Observation/Condition bundle.
         """
         logger.info("--- INTEROP: GENERATING FHIR BUNDLE ---")
-        
+
         prompt_entry = PROMPT_REGISTRY.get("MED-INT-FHIR-001")
         if not prompt_entry:
             return {"error": "FHIR prompt not found."}
@@ -40,11 +45,15 @@ class InteropBuilder:
         )
 
         try:
-            response = self.llm.invoke([
-                SystemMessage(content="You are a Health Informatics Specialist expert in FHIR R4 and SNOMED-CT."),
-                HumanMessage(content=prompt)
-            ])
-            
+            response = self.llm.invoke(
+                [
+                    SystemMessage(
+                        content="You are a Health Informatics Specialist expert in FHIR R4 and SNOMED-CT."
+                    ),
+                    HumanMessage(content=prompt),
+                ]
+            )
+
             content = response.content
             if "{" in content:
                 start = content.find("{")
@@ -61,7 +70,7 @@ class InteropBuilder:
         Generates a standard HL7 v2.5.1 MSH/PID/OBR/OBX message.
         """
         logger.info("--- INTEROP: GENERATING HL7 v2 MESSAGE ---")
-        
+
         prompt_entry = PROMPT_REGISTRY.get("MED-INT-HL7-001")
         if not prompt_entry:
             return {"error": "HL7 prompt not found."}
@@ -71,11 +80,15 @@ class InteropBuilder:
         )
 
         try:
-            response = self.llm.invoke([
-                SystemMessage(content="You are a certified HL7 Integration Engine specialist."),
-                HumanMessage(content=prompt)
-            ])
-            
+            response = self.llm.invoke(
+                [
+                    SystemMessage(
+                        content="You are a certified HL7 Integration Engine specialist."
+                    ),
+                    HumanMessage(content=prompt),
+                ]
+            )
+
             return response.content
 
         except Exception as e:
@@ -90,49 +103,78 @@ class InteropBuilder:
             try:
                 json.loads(data)
                 return True
-            except: return False
+            except Exception:
+                return False
         elif format == "hl7":
             return "MSH|" in data and "PID|" in data
         return False
+
 
 class FHIRClient:
     """
     Client for interacting with external FHIR R4 servers (e.g. Hapi FHIR, Epic, Cerner).
     """
+
     def __init__(self, base_url: str = None, token: str = None):
         import os
+
         from config import settings
-        self.base_url = base_url or os.getenv("FHIR_BASE_URL", "https://hapi.fhir.org/baseR4")
+
+        self.base_url = base_url or os.getenv(
+            "FHIR_BASE_URL", "https://hapi.fhir.org/baseR4"
+        )
         self.token = token or os.getenv("FHIR_TOKEN")
-        
+
     def fetch_patient_background(self, patient_fhir_id: str):
         """
         Fetches Patient, Conditions, and Medications from a FHIR server.
         """
         import httpx
+
         logger.info(f"--- FHIR CLIENT: FETCHING DATA FOR {patient_fhir_id} ---")
-        
+
         headers = {"Accept": "application/fhir+json"}
-        if self.token: headers["Authorization"] = f"Bearer {self.token}"
-        
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+
         try:
             # 1. Fetch Patient Resource
-            p_res = httpx.get(f"{self.base_url}/Patient/{patient_fhir_id}", headers=headers, timeout=10.0)
+            p_res = httpx.get(
+                f"{self.base_url}/Patient/{patient_fhir_id}",
+                headers=headers,
+                timeout=10.0,
+            )
             p_data = p_res.json() if p_res.status_code == 200 else {}
-            
+
             # 2. Fetch Conditions (Differential Diagnostic Context)
-            c_res = httpx.get(f"{self.base_url}/Condition?patient={patient_fhir_id}", headers=headers, timeout=10.0)
+            c_res = httpx.get(
+                f"{self.base_url}/Condition?patient={patient_fhir_id}",
+                headers=headers,
+                timeout=10.0,
+            )
             c_data = c_res.json() if c_res.status_code == 200 else {"entry": []}
-            
+
             # 3. Fetch Medications
-            m_res = httpx.get(f"{self.base_url}/MedicationRequest?patient={patient_fhir_id}", headers=headers, timeout=10.0)
+            m_res = httpx.get(
+                f"{self.base_url}/MedicationRequest?patient={patient_fhir_id}",
+                headers=headers,
+                timeout=10.0,
+            )
             m_data = m_res.json() if m_res.status_code == 200 else {"entry": []}
-            
+
             summary = {
                 "fhir_id": patient_fhir_id,
                 "name": p_data.get("name", [{}])[0].get("text", "Unknown"),
-                "conditions": [e["resource"]["code"]["text"] for e in c_data.get("entry", []) if "resource" in e],
-                "medications": [e["resource"]["medicationCodeableConcept"]["text"] for e in m_data.get("entry", []) if "resource" in e and "medicationCodeableConcept" in e]
+                "conditions": [
+                    e["resource"]["code"]["text"]
+                    for e in c_data.get("entry", [])
+                    if "resource" in e
+                ],
+                "medications": [
+                    e["resource"]["medicationCodeableConcept"]["text"]
+                    for e in m_data.get("entry", [])
+                    if "resource" in e and "medicationCodeableConcept" in e
+                ],
             }
             return summary
         except Exception as e:

@@ -1,13 +1,15 @@
-import os
-import requests
 import json
+import os
 import time
+
+import requests
 
 API_BASE = "http://127.0.0.1:8000"
 
+
 def test_system_flow():
     print("--- 🔬 STARTING SYSTEM-WIDE VALIDATION TEST ---")
-    
+
     # 1. Login/Register
     print("[TEST 1] Testing Auth Flow...")
     reg_data = {
@@ -19,17 +21,17 @@ def test_system_flow():
         "age": 30,
         "gender": "Male",
         "country": "Egypt",
-        "role": "patient"
+        "role": "patient",
     }
     # Using existing user if registration fails due to duplicate
     r = requests.post(f"{API_BASE}/auth/register", json=reg_data)
-    
+
     login_data = {"login_id": "testuser_unique", "password": "testpassword"}
     r = requests.post(f"{API_BASE}/auth/login", json=login_data)
     if not r.ok:
         print(f"FAILED: Login failed: {r.text}")
         return
-    
+
     auth = r.json()
     token = auth["access_token"]
     user_id = auth["user"]["id"]
@@ -40,14 +42,16 @@ def test_system_flow():
     print("\n[TEST 2] Testing Medical Image Upload & Analysis...")
     # Create a small dummy image file
     with open("test_xray.png", "wb") as f:
-        f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDAT\x08\xd7c\xf8\xff\xff?\x00\x05\xfe\x02\xfe\xdcD\xfe\xe8\x00\x00\x00\x00IEND\xaeB`\x82")
-    
+        f.write(
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDAT\x08\xd7c\xf8\xff\xff?\x00\x05\xfe\x02\xfe\xdcD\xfe\xe8\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+
     files = {"file": ("test_xray.png", open("test_xray.png", "rb"))}
     ur = requests.post(f"{API_BASE}/upload", files=files, headers=headers)
     if not ur.ok:
         print(f"FAILED: Image upload failed: {ur.text}")
         return
-    
+
     img_path = ur.json()["image_path"]
     print(f"✅ Image Upload Successful: {img_path}")
 
@@ -57,7 +61,7 @@ def test_system_flow():
         "symptoms": "I have been coughing for 2 weeks and have chest pain.",
         "image_path": img_path,
         "patient_id": user_id,
-        "language": "en"
+        "language": "en",
     }
     cr = requests.post(f"{API_BASE}/consult", json=consult_data, headers=headers)
     if not cr.ok:
@@ -65,8 +69,12 @@ def test_system_flow():
     else:
         res = cr.json()
         print("✅ Consultation Successful.")
-        print(f"--- PRELIMINARY DIAGNOSIS ---\n{res.get('preliminary_diagnosis')[:200]}...")
-        print(f"--- VISUAL FINDINGS ---\n{res.get('visual_findings', {}).get('visual_findings', 'N/A')}")
+        print(
+            f"--- PRELIMINARY DIAGNOSIS ---\n{res.get('preliminary_diagnosis')[:200]}..."
+        )
+        print(
+            f"--- VISUAL FINDINGS ---\n{res.get('visual_findings', {}).get('visual_findings', 'N/A')}"
+        )
         print(f"--- REPORT ID: {res.get('report_id')} ---")
 
     # 4. History Retrieval
@@ -94,12 +102,13 @@ def test_system_flow():
 
     print("\n--- 🏁 SYSTEM VALIDATION COMPLETE ---")
 
+
 if __name__ == "__main__":
-    # Ensure background server is NOT running for this script if we want to test locally, 
+    # Ensure background server is NOT running for this script if we want to test locally,
     # but here we assume it IS running or we start it.
     # Since I can't easily start and stop, I'll just check if it's reachable.
     try:
         requests.get(f"{API_BASE}/health")
         test_system_flow()
-    except:
+    except Exception:
         print("ERROR: Backend not reachable at http://localhost:8000. Start it first.")

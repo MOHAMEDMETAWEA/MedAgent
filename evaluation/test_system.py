@@ -3,6 +3,7 @@ Basic system tests for MedAgent.
 Run from project root: python -m pytest evaluation/test_system.py -v
 Or: python evaluation/test_system.py
 """
+
 import sys
 from pathlib import Path
 
@@ -15,20 +16,26 @@ if str(_root) not in sys.path:
 def test_imports():
     """Verify core modules can be imported."""
     from config import settings
+
     assert settings.BASE_DIR is not None
-    from utils.safety import validate_medical_input, sanitize_input
+    from utils.safety import sanitize_input, validate_medical_input
+
     assert validate_medical_input("I have a headache")[0] is True
     from utils.rate_limit import check_rate_limit
+
     allowed, _ = check_rate_limit("127.0.0.1")
     assert allowed is True
     from agents.state import AgentState
+
     assert "messages" in AgentState.__annotations__
 
 
 def test_health_endpoint():
     """Verify / and /health return 200."""
     from fastapi.testclient import TestClient
+
     from api.main import app
+
     client = TestClient(app)
     r = client.get("/")
     assert r.status_code == 200
@@ -41,7 +48,9 @@ def test_health_endpoint():
 def test_ready_without_api_key():
     """Without OPENAI_API_KEY, /ready should return 503."""
     from fastapi.testclient import TestClient
+
     from api.main import app
+
     client = TestClient(app)
     r = client.get("/ready")
     # 503 when orchestrator cannot be created (e.g. missing API key)
@@ -52,7 +61,9 @@ def test_ready_without_api_key():
 def test_consult_validation():
     """Invalid input to /consult should return 422."""
     from fastapi.testclient import TestClient
+
     from api.main import app
+
     client = TestClient(app)
     r = client.post("/consult", json={"symptoms": ""})
     assert r.status_code == 422  # Pydantic validation error for empty string
@@ -61,6 +72,7 @@ def test_consult_validation():
 def test_agent_response_schema():
     """AgentResponse model includes all fields (summary, diagnosis, report fields, etc.)."""
     from api.main import AgentResponse
+
     schema = AgentResponse.model_json_schema()
     props = schema.get("properties", {})
     assert "summary" in props
@@ -75,8 +87,9 @@ def test_agent_response_schema():
 
 def test_report_agent_import():
     """Report agent and state report fields are available."""
-    from agents.state import AgentState
     from agents.report_agent import ReportAgent
+    from agents.state import AgentState
+
     assert "report_medical" in AgentState.__annotations__
     assert "report_doctor_summary" in AgentState.__annotations__
     assert "report_patient_instructions" in AgentState.__annotations__

@@ -2,16 +2,18 @@
 Rate limiting for MedAgent API.
 Supports in-memory (single instance) and Redis (multi-instance production).
 """
-import time
+
 import logging
-from typing import Optional, Tuple
+import time
 from collections import defaultdict
 from threading import Lock
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 # Optional Redis
 _redis = None
+
 
 def _get_redis():
     global _redis
@@ -19,8 +21,10 @@ def _get_redis():
         return _redis
     try:
         from config import settings
+
         if settings.REDIS_URL:
             import redis
+
             _redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
             _redis.ping()
             return _redis
@@ -31,16 +35,16 @@ def _get_redis():
 
 class InMemoryRateLimiter:
     """Sliding-window rate limiter per identifier (e.g. IP). Thread-safe."""
-    
+
     def __init__(self, max_per_minute: int):
         self.max_per_minute = max_per_minute
         self._timestamps: dict[str, list[float]] = defaultdict(list)
         self._lock = Lock()
-    
+
     def _prune(self, key: str, now: float):
         window_start = now - 60.0
         self._timestamps[key] = [t for t in self._timestamps[key] if t > window_start]
-    
+
     def is_allowed(self, identifier: str) -> Tuple[bool, int]:
         """
         Returns (allowed, retry_after_seconds).
@@ -65,12 +69,13 @@ def check_rate_limit(identifier: str) -> Tuple[bool, int]:
     Returns (allowed, retry_after_seconds). Uses Redis if REDIS_URL is set, else in-memory.
     """
     from config import settings
+
     if not settings.RATE_LIMIT_ENABLED:
         return True, 0
-    
+
     max_per_minute = settings.MAX_REQUESTS_PER_MINUTE
     redis_client = _get_redis()
-    
+
     if redis_client:
         # Redis: fixed window per minute (key = ratelimit:{id}:{minute})
         try:
@@ -85,7 +90,7 @@ def check_rate_limit(identifier: str) -> Tuple[bool, int]:
         except Exception as e:
             logger.warning("Redis rate limit check failed: %s. Allowing request.", e)
             return True, 0
-    
+
     # In-memory
     if not hasattr(check_rate_limit, "_limiter"):
         check_rate_limit._limiter = InMemoryRateLimiter(max_per_minute)

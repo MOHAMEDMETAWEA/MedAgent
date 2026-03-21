@@ -1,6 +1,7 @@
-import os
 import ast
+import os
 import sys
+
 
 class MEDAgentStaticAnalyzer:
     def __init__(self, root_dir):
@@ -20,9 +21,19 @@ class MEDAgentStaticAnalyzer:
                     for i, line in enumerate(lines):
                         if "print(" in line and "def " not in line:
                             # Allow prints in test/simulation utilities; block in core API and critical agents
-                            is_nonprod = any(seg in path for seg in ["tests", "scripts", "agents\\intelligence", "agents\\prompts"])
-                            if ("api" in path or ("agents" in path and not is_nonprod)):
-                                self.errors.append(f"STRICT: print() found in production code: {path}:{i+1}")
+                            is_nonprod = any(
+                                seg in path
+                                for seg in [
+                                    "tests",
+                                    "scripts",
+                                    "agents\\intelligence",
+                                    "agents\\prompts",
+                                ]
+                            )
+                            if "api" in path or ("agents" in path and not is_nonprod):
+                                self.errors.append(
+                                    f"STRICT: print() found in production code: {path}:{i+1}"
+                                )
 
     def check_unused_imports(self):
         """Simple check for unused imports using ast."""
@@ -37,16 +48,19 @@ class MEDAgentStaticAnalyzer:
         print("--- Running MEDAgent Static Analysis ---")
         self.check_print_statements()
         # Add more checks here
-        
+
         if self.errors:
             for err in self.errors:
                 print(f"FAIL: {err}")
             return False
-        
+
         print("PASS: Static analysis clean.")
         return True
 
+
 if __name__ == "__main__":
-    analyzer = MEDAgentStaticAnalyzer(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    analyzer = MEDAgentStaticAnalyzer(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    )
     if not analyzer.run_all():
         sys.exit(1)

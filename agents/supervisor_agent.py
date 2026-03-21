@@ -2,12 +2,15 @@
 Supervisor Agent - System Health & Self-Healing.
 Monitors agent activities and logs system health.
 """
-import logging
+
 import datetime
-from agents.persistence_agent import PersistenceAgent
+import logging
+
 from agents.governance_agent import GovernanceAgent
+from agents.persistence_agent import PersistenceAgent
 
 logger = logging.getLogger(__name__)
+
 
 class SupervisorAgent:
     """
@@ -17,9 +20,10 @@ class SupervisorAgent:
     - Log critical errors
     - Trigger self-healing (if applicable)
     """
+
     def __init__(self):
         self.persistence = PersistenceAgent()
-        self.governance = GovernanceAgent() # For secure logging
+        self.governance = GovernanceAgent()  # For secure logging
 
     def log_event(self, level: str, message: str, details: dict = None):
         """Log a system event securely."""
@@ -28,7 +32,7 @@ class SupervisorAgent:
             log_entry = f"[{timestamp}] [{level}] {message}"
             if details:
                 log_entry += f" | Details: {details}"
-            
+
             # Log to file/console
             if level == "ERROR":
                 logger.error(log_entry)
@@ -36,7 +40,7 @@ class SupervisorAgent:
                 logger.warning(log_entry)
             else:
                 logger.info(log_entry)
-                
+
             # Log to DB via Persistence
             self.persistence.log_system_event(level, "Supervisor", message, details)
         except Exception as e:
@@ -49,19 +53,20 @@ class SupervisorAgent:
         status = {
             "database": "Unknown",
             "openai_api": "Unknown",
-            "agents": "Active" # Assuming they loaded if this runs
+            "agents": "Active",  # Assuming they loaded if this runs
         }
-        
+
         # Check DB
         db = self.persistence._get_db()
         try:
             # Simple query to check connectivity
             from database.models import SystemLog
+
             db.query(SystemLog).first()
             status["database"] = "Healthy"
         except Exception:
             status["database"] = "Unhealthy"
         finally:
             db.close()
-            
+
         return status

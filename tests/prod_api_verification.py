@@ -1,14 +1,16 @@
-import sys
-import os
-import unittest
 import asyncio
+import os
+import sys
+import unittest
+
 from fastapi.testclient import TestClient
 
 # Add project root to sys.path
-sys.path.append('d:\\MedAgent')
+sys.path.append("d:\\MedAgent")
 
 from api.main import app
 from config import settings
+
 
 class TestMedAgentAPI(unittest.TestCase):
     @classmethod
@@ -21,7 +23,7 @@ class TestMedAgentAPI(unittest.TestCase):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
-        
+
         response = self.client.get("/ready")
         # Might be 503 if agents not fully ready, but should return valid JSON
         self.assertIn(response.status_code, [200, 503])
@@ -37,7 +39,7 @@ class TestMedAgentAPI(unittest.TestCase):
         # /auth/me requires JWT
         response = self.client.get("/auth/me")
         self.assertEqual(response.status_code, 401)
-        
+
         # /admin/review-action requires Admin Key
         response = self.client.post("/admin/review-action", json={})
         self.assertEqual(response.status_code, 403)
@@ -47,13 +49,14 @@ class TestMedAgentAPI(unittest.TestCase):
         # We'll use a simple symptom that should pass triage
         payload = {
             "symptoms": "I have a slight headache and feel tired.",
-            "patient_id": "test_patient_001"
+            "patient_id": "test_patient_001",
         }
         # This will trigger the actual LangGraph if API keys are present.
         # If keys are missing, it might return 500 or 400.
         # We just want to check if the route is wired correctly.
         response = self.client.post("/consult", json=payload)
         self.assertIn(response.status_code, [200, 400, 500])
+
 
 if __name__ == "__main__":
     unittest.main()

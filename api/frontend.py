@@ -2,12 +2,15 @@
 MedAgent Global Medical Consultation - Web UI v5.0
 Comprehensive, Secure, and Feature-Rich Multi-Agent Hub.
 """
-import os
-import streamlit as st
-import requests
+
 import json
-import pandas as pd
+import os
 from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import requests
+import streamlit as st
 import streamlit.components.v1 as components
 
 # Clerk Config (Fetch from environment or fallback)
@@ -20,11 +23,12 @@ st.set_page_config(
     page_title="MedAgent Global Hub",
     page_icon="🏥",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # --- THEME & CSS ---
-st.markdown("""
+st.markdown(
+    """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
     
@@ -124,32 +128,44 @@ st.markdown("""
     }
     
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # --- SESSION STATE ---
-if "auth_token" not in st.session_state: st.session_state["auth_token"] = None
-if "user_info" not in st.session_state: st.session_state["user_info"] = None
-if "session_id" not in st.session_state: st.session_state["session_id"] = None
-if "language" not in st.session_state: st.session_state["language"] = "en"
-if "auth_mode" not in st.session_state: st.session_state["auth_mode"] = "login"
-if "second_opinion_req" not in st.session_state: st.session_state["second_opinion_req"] = False
+if "auth_token" not in st.session_state:
+    st.session_state["auth_token"] = None
+if "user_info" not in st.session_state:
+    st.session_state["user_info"] = None
+if "session_id" not in st.session_state:
+    st.session_state["session_id"] = None
+if "language" not in st.session_state:
+    st.session_state["language"] = "en"
+if "auth_mode" not in st.session_state:
+    st.session_state["auth_mode"] = "login"
+if "second_opinion_req" not in st.session_state:
+    st.session_state["second_opinion_req"] = False
+
 
 # --- HELPER FUNCTIONS ---
 def get_headers():
     return {"Authorization": f"Bearer {st.session_state['auth_token']}"}
 
+
 def api_call(method, endpoint, data=None, files=None, timeout=120):
     try:
         url = f"{API_BASE}{endpoint}"
         headers = get_headers()
-        if method == "GET": r = requests.get(url, headers=headers, timeout=timeout)
+        if method == "GET":
+            r = requests.get(url, headers=headers, timeout=timeout)
         elif method == "POST":
             if files:
                 # When uploading files, don't send json — use data or just files
                 r = requests.post(url, files=files, headers=headers, timeout=timeout)
             else:
                 r = requests.post(url, json=data, headers=headers, timeout=timeout)
-        elif method == "DELETE": r = requests.delete(url, headers=headers, timeout=timeout)
+        elif method == "DELETE":
+            r = requests.delete(url, headers=headers, timeout=timeout)
         return r
     except Exception as e:
         st.error(f"Network error: {e}")
@@ -161,23 +177,32 @@ def render_feedback_form(case_id, ai_response):
     st.markdown("--- ")
     st.subheader("💬 Provide Feedback for Learning")
     role = st.session_state["user_info"].get("role", "patient")
-    
+
     with st.form("feedback_form_" + str(case_id)):
-        rating = st.select_slider("Rate this AI response (0-5)", options=[0, 1, 2, 3, 4, 5], value=5)
-        comment = st.text_area("Comments / ملاحظات", placeholder="Tell us what to improve...")
-        
+        rating = st.select_slider(
+            "Rate this AI response (0-5)", options=[0, 1, 2, 3, 4, 5], value=5
+        )
+        comment = st.text_area(
+            "Comments / ملاحظات", placeholder="Tell us what to improve..."
+        )
+
         corrected_response = None
         if role == "doctor":
-            st.info("🩺 **Doctor Mode**: You can provide a clinical correction to improve the AI's medical reasoning.")
-            corrected_response = st.text_area("Clinical Correction (Optional)", placeholder="Enter the accurate medical reasoning or diagnosis here...")
-            
+            st.info(
+                "🩺 **Doctor Mode**: You can provide a clinical correction to improve the AI's medical reasoning."
+            )
+            corrected_response = st.text_area(
+                "Clinical Correction (Optional)",
+                placeholder="Enter the accurate medical reasoning or diagnosis here...",
+            )
+
         if st.form_submit_button("Submit Feedback"):
             payload = {
                 "case_id": str(case_id),
                 "rating": rating,
                 "ai_response": ai_response,
                 "comment": comment,
-                "corrected_response": corrected_response
+                "corrected_response": corrected_response,
             }
             r = api_call("POST", "/feedback/", data=payload)
             if r and r.ok:
@@ -185,20 +210,25 @@ def render_feedback_form(case_id, ai_response):
             else:
                 st.error("Failed to submit feedback.")
 
+
 # --- SIDEBAR: AUTH & SETTINGS ---
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/hospital.png", width=80)
     st.title("MedAgent Hub")
-    
+
     if st.session_state["auth_token"]:
         # Professional Doctor Portrait in Sidebar
-        st.image("https://images.pexels.com/photos/4225880/pexels-photo-4225880.jpeg?auto=compress&cs=tinysrgb&w=400", caption="Active Medical Agent", width=150)
-        
+        st.image(
+            "https://images.pexels.com/photos/4225880/pexels-photo-4225880.jpeg?auto=compress&cs=tinysrgb&w=400",
+            caption="Active Medical Agent",
+            width=150,
+        )
+
         st.success(f"Hello, {st.session_state['user_info']['full_name']}")
         st.caption(f"Role: {st.session_state['user_info']['role']}")
-        
-        if st.session_state['user_info']['role'] == "doctor":
-            if st.session_state['user_info'].get('doctor_verified'):
+
+        if st.session_state["user_info"]["role"] == "doctor":
+            if st.session_state["user_info"].get("doctor_verified"):
                 st.success("✅ Verified Doctor")
             else:
                 st.warning("⚠️ Unverified Doctor Mode")
@@ -206,21 +236,26 @@ with st.sidebar:
                     lic = st.text_input("License Number")
                     spec = st.text_input("Specialization")
                     if st.button("Submit Verification"):
-                        vr = api_call("POST", "/auth/verify-doctor", data={"license_number": lic, "specialization": spec})
-                        if vr and vr.ok: 
+                        vr = api_call(
+                            "POST",
+                            "/auth/verify-doctor",
+                            data={"license_number": lic, "specialization": spec},
+                        )
+                        if vr and vr.ok:
                             st.success("Verification Submitted!")
                             st.rerun()
-                        else: st.error("Verification failed.")
+                        else:
+                            st.error("Verification failed.")
 
         # Interaction Mode Toggle
         st.markdown("---")
         mode_options = ["Patient Mode", "Doctor Mode"]
         current_mode = st.session_state["user_info"].get("interaction_mode", "patient")
         mode_idx = 0 if current_mode == "patient" else 1
-        
+
         new_mode_label = st.radio("Interaction Mode", mode_options, index=mode_idx)
         new_mode = "patient" if new_mode_label == "Patient Mode" else "doctor"
-        
+
         if new_mode != current_mode:
             r = api_call("POST", "/auth/set-mode", data={"interaction_mode": new_mode})
             if r and r.ok:
@@ -228,105 +263,107 @@ with st.sidebar:
                 st.rerun()
 
         # Language Toggle
-        new_lang = st.selectbox("Language / اللغة", ["English", "Arabic"], index=0 if st.session_state["language"]=="en" else 1)
+        new_lang = st.selectbox(
+            "Language / اللغة",
+            ["English", "Arabic"],
+            index=0 if st.session_state["language"] == "en" else 1,
+        )
         st.session_state["language"] = "en" if new_lang == "English" else "ar"
-        
+
         st.markdown("---")
         if st.button("Logout"):
             st.session_state["auth_token"] = None
             st.rerun()
-            
+
         with st.expander("⚙️ Account Settings"):
-            if st.button("Edit Profile"): st.toast("Profile editing coming soon...")
-            if st.button("Privacy Policy"): st.info("Your data is encrypted and stored locally. No HIPAA-protected data is sent to external clouds without encryption.")
+            if st.button("Edit Profile"):
+                st.toast("Profile editing coming soon...")
+            if st.button("Privacy Policy"):
+                st.info(
+                    "Your data is encrypted and stored locally. No HIPAA-protected data is sent to external clouds without encryption."
+                )
             if st.button("🗑️ Delete Account", type="primary"):
                 if st.warning("This will permanently anonymize your data. Proceed?"):
                     r = api_call("DELETE", "/auth/account")
                     if r and r.ok:
-                         st.session_state["auth_token"] = None
-                         st.rerun()
+                        st.session_state["auth_token"] = None
+                        st.rerun()
     else:
-        st.info("Log in with Clerk to access clinical features.")
-        
-        # Clerk Component Logic
-        # We'll use a hidden iframe/script to handle Clerk authentication
-        # and pass the token back to Streamlit via a custom component or window.parent message.
-        
-        clerk_html = f"""
-        <script
-            async
-            crossorigin="anonymous"
-            data-clerk-publishable-key="{CLERK_PUB_KEY}"
-            src="https://clerk.medagent.local/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
-            type="text/javascript"
-        ></script>
-        
-        <script>
-            window.addEventListener('load', async function() {{
-                await window.Clerk.load();
-                
-                if (window.Clerk.user) {{
-                    const token = await window.Clerk.session.getToken();
-                    window.parent.postMessage({{
-                        type: 'clerk-auth',
-                        token: token,
-                        user: window.Clerk.user
-                    }}, '*');
-                }} else {{
-                    window.Clerk.openSignIn();
-                }}
-            }});
-        </script>
-        <div id="clerk-auth-container"></div>
-        """
-        
-        # For simplicity in this environment, we'll simulate the token capture
-        # or ask the user to provide the token if they have one.
-        # In a real integration, this would be a custom Streamlit component.
-        
+        # Native Authentication UI
         st.markdown("### 🔐 Secure Sign In")
-        st.caption("Sign in with Google or Phone Number via Clerk")
-        
-        # Placeholder for real Clerk UI
-        # In a real app, users would interact with the Clerk Sign-In modal here.
-        
-        simulated_token = st.text_input("Paste Clerk Session Token (for testing)", type="password")
-        if st.button("Authenticate with Token"):
-            try:
-                # Get user info from /auth/me or verify token directly
-                r = requests.get(f"{API_BASE}/auth/me", headers={"Authorization": f"Bearer {simulated_token}"}, timeout=10)
-                if r.ok:
-                    data = r.json()
-                    st.session_state["auth_token"] = simulated_token
-                    st.session_state["user_info"] = {{
-                        "id": data["sub"],
-                        "username": data["name"],
-                        "full_name": data["name"],
-                        "role": data["role"],
-                        "interaction_mode": "patient"
-                    }}
-                    st.session_state["session_id"] = "clerk_session_" + data["sub"][:8]
-                    st.rerun()
-                else: 
-                    st.error("Invalid or expired Clerk token.")
-            except Exception as e:
-                st.error(f"Authentication error: {{e}}")
-        
+
+        auth_tab1, auth_tab2 = st.tabs(["Login", "Create Account"])
+
+        with auth_tab1:
+            with st.form("login_form"):
+                st.caption("Sign in with Username, Email, or Phone")
+                login_id = st.text_input("Username / Email / Phone")
+                login_pass = st.text_input("Password", type="password")
+                if st.form_submit_button("Sign In"):
+                    r = api_call(
+                        "POST",
+                        "/auth/login",
+                        data={"login_id": login_id, "password": login_pass},
+                    )
+                    if r and r.ok:
+                        data = r.json()
+                        st.session_state["auth_token"] = data.get("access_token")
+                        st.session_state["user_info"] = data.get("user")
+                        st.session_state["session_id"] = data.get("session_id")
+                        st.rerun()
+                    else:
+                        err_msg = r.json().get("detail") if r else "Network Error"
+                        st.error(f"Login failed: {err_msg}")
+
+        with auth_tab2:
+            with st.form("register_form"):
+                st.caption("Register a new Secure MedAgent Account")
+                reg_full = st.text_input("Full Name")
+                reg_user = st.text_input("Username")
+                reg_email = st.text_input("Email Address")
+                reg_phone = st.text_input("Phone Number")
+                reg_pass = st.text_input("Password", type="password")
+                reg_role = st.selectbox("I am a:", ["patient", "doctor"])
+
+                if st.form_submit_button("Create Account"):
+                    payload = {
+                        "full_name": reg_full,
+                        "username": reg_user,
+                        "email": reg_email,
+                        "phone": reg_phone,
+                        "password": reg_pass,
+                        "role": reg_role,
+                    }
+                    r = api_call("POST", "/auth/register", data=payload)
+                    if r and r.ok:
+                        st.success(
+                            "Account created successfully! Please click the 'Login' tab to sign in."
+                        )
+                    else:
+                        err_msg = r.json().get("detail") if r else "Network Error"
+                        st.error(f"Registration failed: {err_msg}")
+
         st.divider()
-        st.caption("Note: Phone and Google sign-in are managed through the Clerk secure portal.")
+        st.caption(
+            "Note: Phone and Google sign-in are managed through the Clerk secure portal."
+        )
 
 # --- MAIN INTERFACE ---
 if not st.session_state["auth_token"]:
-    st.markdown("""
+    st.markdown(
+        """
     <div style="text-align: center; padding: 20px;">
         <h1 style="color: #2e7d32; font-size: 3rem;">MedAgent Global Medical Hub</h1>
         <p style="font-size: 1.2rem; color: #666;">A state-of-the-art Multi-Agent workforce powered by Generative & Agentic AI.</p>
     </div>
-    """, unsafe_allow_html=True)
-    
+    """,
+        unsafe_allow_html=True,
+    )
+
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.markdown("""
+        st.markdown(
+            """
         ### 👨‍⚕️ Advanced Clinical Intelligence
         Our production environment orchestrates **12 specialized AI agents** to provide 24/7 medical guidance:
         - **Intelligent Triage Agent**: Real-time risk assessment and clinical prioritization.
@@ -338,13 +375,33 @@ if not st.session_state["auth_token"]:
         - **Automated Report Generation**: Professional PDF/Image exports following SOAP standards.
         - **Governance & Safety Agents**: Active monitoring for medical accuracy and patient safety.
         - **Self-Improvement Agent**: System that learns from human feedback and reviews.
-        """)
+        """
+        )
     with col2:
         st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=250)
-        st.info("🔒 **Secure & Private**: All data is encrypted and stored according to global health authority standards.")
+        st.info(
+            "🔒 **Secure & Private**: All data is encrypted and stored according to global health authority standards."
+        )
 else:
-    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13 = st.tabs(["💬 Consult", "📸 3D Imaging", "🔬 Image Analysis", "📡 Governance", "🧪 Labs", "📅 Appointments", "💊 Meds", "📚 Education", "📜 History", "🛡️ Privacy", "🔑 Admin", "📡 Audit", "📈 Analytics"])
-    
+    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14 = st.tabs(
+        [
+            "💬 Consult",
+            "📸 3D Imaging",
+            "🔬 Image Analysis",
+            "📡 Governance",
+            "🧪 Labs",
+            "📅 Appointments",
+            "💊 Meds",
+            "📚 Education",
+            "📜 History",
+            "🛡️ Privacy",
+            "🔑 Admin",
+            "📡 Audit",
+            "📈 Analytics",
+            "📘 AI Docs",
+        ]
+    )
+
     # --- TAB 1: CONSULTATION ---
     with t1:
         # Existing consult logic...
@@ -364,20 +421,34 @@ else:
     with t4:
         st.subheader("📡 Clinical Governance & HITL")
         st.write("Human-in-the-Loop review for high-risk AI decisions.")
-        
+
         # Pending Reviews
         st.write("### 🩺 Pending Doctor Reviews")
         # In a real app, this would fetch from /governance/reviews
         pending_cases = [
-            {"id": 104, "patient": "Patient_A", "symptoms": "Chest Pain", "diagnosis": "Possible Myocardial Infarction", "risk": "EMERGENCY"},
-            {"id": 105, "patient": "Patient_B", "symptoms": "Numbness", "diagnosis": "Stroke Symptoms", "risk": "HIGH"}
+            {
+                "id": 104,
+                "patient": "Patient_A",
+                "symptoms": "Chest Pain",
+                "diagnosis": "Possible Myocardial Infarction",
+                "risk": "EMERGENCY",
+            },
+            {
+                "id": 105,
+                "patient": "Patient_B",
+                "symptoms": "Numbness",
+                "diagnosis": "Stroke Symptoms",
+                "risk": "HIGH",
+            },
         ]
-        
+
         for case in pending_cases:
-            with st.expander(f"Case #{case['id']} - {case['patient']} ({case['risk']})"):
+            with st.expander(
+                f"Case #{case['id']} - {case['patient']} ({case['risk']})"
+            ):
                 st.warning(f"**AI Suggestion**: {case['diagnosis']}")
                 st.write(f"**Trigger symptoms**: {case['symptoms']}")
-                
+
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     if st.button(f"✅ Approve #{case['id']}"):
@@ -399,58 +470,90 @@ else:
             st.info("No audit logs found or API unavailable.")
             # For demo, show mock audit data if API fails
             mock_audit = [
-                {"timestamp": "2026-03-14 14:22", "agent": "ReasoningAgent", "input": "cough + fever", "output": "possible pneumonia", "risk": "Medium", "confidence": 0.78},
-                {"timestamp": "2026-03-14 14:25", "agent": "TriageAgent", "input": "chest pain", "output": "emergency alert", "risk": "Emergency", "confidence": 1.0}
+                {
+                    "timestamp": "2026-03-14 14:22",
+                    "agent": "ReasoningAgent",
+                    "input": "cough + fever",
+                    "output": "possible pneumonia",
+                    "risk": "Medium",
+                    "confidence": 0.78,
+                },
+                {
+                    "timestamp": "2026-03-14 14:25",
+                    "agent": "TriageAgent",
+                    "input": "chest pain",
+                    "output": "emergency alert",
+                    "risk": "Emergency",
+                    "confidence": 1.0,
+                },
             ]
             st.table(mock_audit)
         # Existing consult logic...
-        pass # Placeholder for replace_file_content chunking
+        pass  # Placeholder for replace_file_content chunking
 
     # --- TAB 2: 3D IMAGING ---
     with t2:
         st.subheader("📸 3D Multi-Planar Reconstruction (MPR)")
         st.write("Interactive 3D visualization for CT/MRI DICOM studies.")
-        
+
         case_id = st.text_input("Case ID", value="test-case-001")
-        
+
         col_mpr, col_3d = st.columns([2, 1])
-        
+
         with col_mpr:
             st.write("### 🩻 Cross-Sectional Views")
-            axis = st.radio("View Plane", ["Axial", "Coronal", "Sagittal"], horizontal=True)
-            
+            axis = st.radio(
+                "View Plane", ["Axial", "Coronal", "Sagittal"], horizontal=True
+            )
+
             # Fetch metadata for sliders
             # In production, we'd have a metadata endpoint. For now, we'll try to fetch slice 0.
-            r_meta = api_call("GET", f"/imaging/3d/{case_id}?axis={axis.lower()}&slice_index=0")
+            r_meta = api_call(
+                "GET", f"/imaging/3d/{case_id}?axis={axis.lower()}&slice_index=0"
+            )
             if r_meta and r_meta.ok:
                 meta = r_meta.json()
-                total_slices = meta.get("shape", [0, 0, 100])[2] # Fallback
-                
-                slice_idx = st.slider("Slice Navigator", 0, total_slices - 1, total_slices // 2)
-                
+                total_slices = meta.get("shape", [0, 0, 100])[2]  # Fallback
+
+                slice_idx = st.slider(
+                    "Slice Navigator", 0, total_slices - 1, total_slices // 2
+                )
+
                 # Window/Level controls
                 c_window, c_level = st.columns(2)
                 with c_window:
                     window = st.number_input("Window Width (HU)", value=400)
                 with c_level:
                     level = st.number_input("Window Level (HU)", value=40)
-                
+
                 # Fetch actual slice
-                r_slice = api_call("GET", f"/imaging/3d/{case_id}?axis={axis.lower()}&slice_index={slice_idx}")
+                r_slice = api_call(
+                    "GET",
+                    f"/imaging/3d/{case_id}?axis={axis.lower()}&slice_index={slice_idx}",
+                )
                 if r_slice and r_slice.ok:
                     data = np.array(r_slice.json()["data"])
                     # Apply WL using processor logic (re-implemented here for speed or via API)
                     import numpy as np
+
                     img_min = level - window // 2
                     img_max = level + window // 2
                     windowed = np.clip(data, img_min, img_max)
-                    final_img = ((windowed - img_min) / (img_max - img_min) * 255.0).astype(np.uint8)
-                    
-                    st.image(final_img, caption=f"{axis} Slice {slice_idx}", use_column_width=True)
+                    final_img = (
+                        (windowed - img_min) / (img_max - img_min) * 255.0
+                    ).astype(np.uint8)
+
+                    st.image(
+                        final_img,
+                        caption=f"{axis} Slice {slice_idx}",
+                        use_column_width=True,
+                    )
                 else:
                     st.error("Failed to load slice data.")
             else:
-                st.info("Enter a valid Case ID with available DICOM series to begin visualization.")
+                st.info(
+                    "Enter a valid Case ID with available DICOM series to begin visualization."
+                )
 
         with col_3d:
             st.write("### 🧊 3D Volume Context")
@@ -458,7 +561,7 @@ else:
             show_annotations = st.toggle("Show AI Annotations", value=True)
             if show_annotations:
                 st.caption("🟢 No critical anomalies detected in 3D space.")
-            
+
             st.write("#### Window Templates")
             if st.button("🫁 Lung Window (1500, -600)"):
                 st.toast("Lung window applied")
@@ -468,53 +571,83 @@ else:
                 st.toast("Brain window applied")
         st.subheader("Interactive Consultation / استشارة تفاعلية")
         col_in, col_out = st.columns([1, 1])
-        
+
         with col_in:
-            symptoms = st.text_area("Describe symptoms", placeholder="e.g. Sharp chest pain after exercise...", height=150)
-            st.session_state["second_opinion_req"] = st.checkbox("🔍 Request specialized Second Opinion (More thorough analysis)")
-            
+            symptoms = st.text_area(
+                "Describe symptoms",
+                placeholder="e.g. Sharp chest pain after exercise...",
+                height=150,
+            )
+            st.session_state["second_opinion_req"] = st.checkbox(
+                "🔍 Request specialized Second Opinion (More thorough analysis)"
+            )
+
             st.markdown("---")
             st.write("🎙️ **Voice Entry (Optional)** / الإدخال الصوتي")
             audio_data = st.audio_input("Speak your symptoms")
-            
-            uploaded_file = st.file_uploader("Upload Medical Image (Optional)", type=["jpg", "png", "jpeg", "webp", "dicom", "dcm"])
-            
+
+            uploaded_file = st.file_uploader(
+                "Upload Medical Image (Optional)",
+                type=["jpg", "png", "jpeg", "webp", "dicom", "dcm"],
+            )
+
             if st.button("⚡ ANALYZE SYSTEM-WIDE"):
                 img_path = None
                 if uploaded_file:
                     files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
                     u_resp = api_call("POST", "/upload", files=files)
-                    if u_resp and u_resp.ok: img_path = u_resp.json().get("image_path")
-                
+                    if u_resp and u_resp.ok:
+                        img_path = u_resp.json().get("image_path")
+
                 with st.spinner("Agents are collaborating..."):
                     payload = {
-                        "symptoms": symptoms, 
-                        "image_path": img_path, 
-                        "patient_id": st.session_state["user_info"]["id"], 
+                        "symptoms": symptoms,
+                        "image_path": img_path,
+                        "patient_id": st.session_state["user_info"]["id"],
                         "language": st.session_state["language"],
-                        "request_second_opinion": st.session_state["second_opinion_req"]
+                        "request_second_opinion": st.session_state[
+                            "second_opinion_req"
+                        ],
                     }
                     r = api_call("POST", "/consult", data=payload)
                     if r and r.ok:
                         st.session_state["last_result"] = r.json()
                         st.balloons()
-                    else: st.error("Analysis failed.")
-        
+                    else:
+                        st.error("Analysis failed.")
+
         with col_out:
             if "last_result" in st.session_state:
                 res = st.session_state["last_result"]
-                
+
                 c1, c2 = st.columns([1, 4])
                 with c1:
-                    st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=60)
+                    st.image(
+                        "https://cdn-icons-png.flaticon.com/512/3774/3774299.png",
+                        width=60,
+                    )
                 with c2:
-                    current_interaction_mode = res.get("interaction_mode", "patient").upper()
-                    mode_color = "#2e7d32" if current_interaction_mode == "PATIENT" else "#1e3c72"
-                    st.markdown(f"### Medical Specialist Analysis <span style='background-color: {mode_color}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; vertical-align: middle;'>MODE: {current_interaction_mode}</span>", unsafe_allow_html=True)
-                    st.caption(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+                    current_interaction_mode = res.get(
+                        "interaction_mode", "patient"
+                    ).upper()
+                    mode_color = (
+                        "#2e7d32"
+                        if current_interaction_mode == "PATIENT"
+                        else "#1e3c72"
+                    )
+                    st.markdown(
+                        f"### Medical Specialist Analysis <span style='background-color: {mode_color}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; vertical-align: middle;'>MODE: {current_interaction_mode}</span>",
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(
+                        f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                    )
 
                 # Vision Findings
-                if res.get("visual_findings") and res["visual_findings"].get("status") != "skipped":
+                if (
+                    res.get("visual_findings")
+                    and res["visual_findings"].get("status") != "skipped"
+                ):
                     with st.expander("👁️ Visual Analysis Results"):
                         vf = res["visual_findings"]
                         st.write(f"**Findings:** {vf.get('visual_findings')}")
@@ -523,41 +656,48 @@ else:
 
                 st.info("🧠 REASONING OUTPUT")
                 st.write(res.get("preliminary_diagnosis", "No diagnosis generated."))
-                
+
                 st.info("📋 CLINICAL ACTION PLAN")
                 st.markdown(res.get("final_response", "Waiting for plan..."))
 
                 # Phase 9: Feedback Integration
                 if res.get("id") or res.get("report_id"):
-                    render_feedback_form(res.get("report_id", "temp_case"), res.get("final_response", ""))
-                
+                    render_feedback_form(
+                        res.get("report_id", "temp_case"), res.get("final_response", "")
+                    )
+
                 # TTS Button
                 if st.button("🔊 Listen/استمع"):
                     with st.spinner("Preparing audio (AI Alloy)..."):
-                        t_resp = api_call("POST", "/system/tts", {"text": res.get("final_response", "")})
+                        t_resp = api_call(
+                            "POST",
+                            "/system/tts",
+                            {"text": res.get("final_response", "")},
+                        )
                         if t_resp and t_resp.ok:
                             st.audio(t_resp.content, format="audio/mp3")
-                        else: st.error("Audio generation failed.")
-                
+                        else:
+                            st.error("Audio generation failed.")
+
                 # Simplify Button
                 if res.get("interaction_mode") == "doctor":
                     if st.button("✨ Explain in simpler terms (Patient Mode)"):
                         with st.spinner("Simplifying clinical analysis..."):
                             payload = {
-                                "symptoms": symptoms, 
-                                "image_path": res.get("image_path"), 
-                                "patient_id": st.session_state["user_info"]["id"], 
+                                "symptoms": symptoms,
+                                "image_path": res.get("image_path"),
+                                "patient_id": st.session_state["user_info"]["id"],
                                 "language": st.session_state["language"],
-                                "interaction_mode": "patient"
+                                "interaction_mode": "patient",
                             }
                             sr = api_call("POST", "/consult", data=payload)
                             if sr and sr.ok:
                                 st.session_state["last_result"] = sr.json()
                                 st.rerun()
-                
+
                 if res.get("critical_alert"):
                     st.error("🚨 EMERGENCY ESCALATION DETECTED")
-                
+
                 # Confidence and Risk badges (if available)
                 if res.get("confidence_score") is not None or res.get("risk_level"):
                     col_conf, col_risk = st.columns(2)
@@ -568,15 +708,18 @@ else:
                     with col_risk:
                         risk = (res.get("risk_level") or "unknown").upper()
                         st.info(f"Risk Level: {risk}")
-                
+
                 # Lineage info
                 lineage = []
-                if res.get("model_used"): lineage.append(f"Model: {res['model_used']}")
-                if res.get("secondary_model"): lineage.append(f"Fallback: {res['secondary_model']}")
-                if res.get("prompt_version"): lineage.append(f"Prompt: {res['prompt_version']}")
+                if res.get("model_used"):
+                    lineage.append(f"Model: {res['model_used']}")
+                if res.get("secondary_model"):
+                    lineage.append(f"Fallback: {res['secondary_model']}")
+                if res.get("prompt_version"):
+                    lineage.append(f"Prompt: {res['prompt_version']}")
                 if lineage:
                     st.caption(" | ".join(lineage))
-                
+
                 # Expose RAG and ToT Reasoning if available
                 if res.get("retrieved_docs") or res.get("doctor_notes"):
                     with st.expander("🔬 Agent Insights (RAG & ToT)"):
@@ -592,7 +735,11 @@ else:
                                 if isinstance(parsed, list):
                                     for d in parsed:
                                         if isinstance(d, dict):
-                                            title = d.get("title") or d.get("source") or "Reference"
+                                            title = (
+                                                d.get("title")
+                                                or d.get("source")
+                                                or "Reference"
+                                            )
                                             url = d.get("url") or d.get("link")
                                             if url:
                                                 st.markdown(f"- [{title}]({url})")
@@ -609,73 +756,107 @@ else:
                 # Expose Memory Graph Context
                 if res.get("long_term_memory"):
                     with st.expander("🧠 Longitudinal Memory Graph"):
-                        st.info("The Memory Agent has linked this consultation to your medical history.")
+                        st.info(
+                            "The Memory Agent has linked this consultation to your medical history."
+                        )
                         st.write(res["long_term_memory"])
-                
+
                 if res.get("report_id"):
                     st.write("### ⬇️ Export Clinical Report")
                     c1, c2, c3 = st.columns(3)
                     with c1:
-                        st.markdown(f"[📄 PDF]({API_BASE}/reports/{res['report_id']}/export?format=pdf)")
+                        st.markdown(
+                            f"[📄 PDF]({API_BASE}/reports/{res['report_id']}/export?format=pdf)"
+                        )
                     with c2:
-                        st.markdown(f"[🖼️ Image]({API_BASE}/reports/{res['report_id']}/export?format=image)")
+                        st.markdown(
+                            f"[🖼️ Image]({API_BASE}/reports/{res['report_id']}/export?format=image)"
+                        )
                     with c3:
-                        st.markdown(f"[📝 Text]({API_BASE}/reports/{res['report_id']}/export?format=text)")
-                    
+                        st.markdown(
+                            f"[📝 Text]({API_BASE}/reports/{res['report_id']}/export?format=text)"
+                        )
+
                     st.markdown("---")
                     st.write("### 🥗 Actionable Clinical Care Plan")
                     if st.button("✨ Generate Personalized Care Plan"):
                         with st.spinner("Creating your custom wellness plan..."):
-                            plan_r = api_call("POST", "/generative/care-plan", {
-                                "diagnosis": res.get("preliminary_diagnosis", "General health assessment"),
-                                "patient_profile": st.session_state["user_info"]
-                            })
+                            plan_r = api_call(
+                                "POST",
+                                "/generative/care-plan",
+                                {
+                                    "diagnosis": res.get(
+                                        "preliminary_diagnosis",
+                                        "General health assessment",
+                                    ),
+                                    "patient_profile": st.session_state["user_info"],
+                                },
+                            )
                             if plan_r and plan_r.ok:
                                 st.success("Your Personalized Plan is Ready!")
                                 st.markdown(plan_r.json().get("content"))
-                            else: st.error("Failed to generate plan.")
+                            else:
+                                st.error("Failed to generate plan.")
 
                 with st.expander("🛠️ Advanced Export"):
-                    st.download_button("Download Raw JSON", data=json.dumps(res, indent=2), file_name="medical_report.json")
+                    st.download_button(
+                        "Download Raw JSON",
+                        data=json.dumps(res, indent=2),
+                        file_name="medical_report.json",
+                    )
                     if res.get("report_id"):
                         # FHIR/HL7 export via authenticated API calls
                         if st.button("Generate FHIR Bundle"):
-                            r = api_call("POST", "/interop/fhir", {"report_id": res["report_id"]})
+                            r = api_call(
+                                "POST", "/interop/fhir", {"report_id": res["report_id"]}
+                            )
                             if r and r.ok:
-                                st.download_button("Download FHIR JSON", data=json.dumps(r.json(), indent=2), file_name=f"report_{res['report_id']}_fhir.json")
+                                st.download_button(
+                                    "Download FHIR JSON",
+                                    data=json.dumps(r.json(), indent=2),
+                                    file_name=f"report_{res['report_id']}_fhir.json",
+                                )
                             else:
                                 st.error("FHIR generation failed.")
                         if st.button("Generate HL7 v2"):
-                            r = api_call("POST", "/interop/hl7", {"report_id": res["report_id"]})
+                            r = api_call(
+                                "POST", "/interop/hl7", {"report_id": res["report_id"]}
+                            )
                             if r and r.ok:
                                 hl7_txt = r.json().get("hl7", "")
-                                st.download_button("Download HL7 Message", data=hl7_txt, file_name=f"report_{res['report_id']}.hl7")
+                                st.download_button(
+                                    "Download HL7 Message",
+                                    data=hl7_txt,
+                                    file_name=f"report_{res['report_id']}.hl7",
+                                )
                             else:
                                 st.error("HL7 generation failed.")
 
     # --- TAB 2: IMAGE ANALYSIS ---
     with t2:
         st.subheader("🔬 Medical Image Analysis / تحليل الصور الطبية")
-        st.write("Upload X-rays, CT scans, MRI images, skin conditions, or lab reports for AI-powered clinical analysis.")
-        
+        st.write(
+            "Upload X-rays, CT scans, MRI images, skin conditions, or lab reports for AI-powered clinical analysis."
+        )
+
         col_upload, col_results = st.columns([1, 1])
-        
+
         with col_upload:
             st.write("### 📤 Upload Image")
             img_file = st.file_uploader(
-                "Select medical image", 
+                "Select medical image",
                 type=["jpg", "jpeg", "png", "webp", "dicom", "dcm"],
                 key="image_analysis_uploader",
-                help="Supported: X-ray, CT, MRI, skin photos, lab reports, DICOM (JPG, PNG, WEBP, DCM)"
+                help="Supported: X-ray, CT, MRI, skin photos, lab reports, DICOM (JPG, PNG, WEBP, DCM)",
             )
-            
+
             img_symptoms = st.text_area(
-                "Clinical context (optional)", 
+                "Clinical context (optional)",
                 placeholder="e.g. Patient reports sharp pain in lower right abdomen for 3 days...",
                 height=100,
-                key="image_context"
+                key="image_context",
             )
-            
+
             if st.button("🔍 Analyze Image", key="analyze_image_btn"):
                 if img_file:
                     with st.spinner("🧠 Vision Analysis Agent processing..."):
@@ -685,14 +866,23 @@ else:
                         if u_resp and u_resp.ok:
                             img_path = u_resp.json().get("image_path")
                             # Run analysis with clinical context
-                            context = img_symptoms if img_symptoms else "Analyze this medical image"
+                            context = (
+                                img_symptoms
+                                if img_symptoms
+                                else "Analyze this medical image"
+                            )
                             payload = {
                                 "symptoms": context,
                                 "image_path": img_path,
                                 "patient_id": st.session_state["user_info"]["id"],
-                                "language": st.session_state["language"]
+                                "language": st.session_state["language"],
                             }
-                            r = requests.post(f"{API_BASE}/consult", json=payload, headers=get_headers(), timeout=120)
+                            r = requests.post(
+                                f"{API_BASE}/consult",
+                                json=payload,
+                                headers=get_headers(),
+                                timeout=120,
+                            )
                             if r and r.ok:
                                 st.session_state["image_result"] = r.json()
                                 st.success("✅ Analysis complete!")
@@ -702,65 +892,78 @@ else:
                             st.error("Image upload failed.")
                 else:
                     st.warning("Please upload an image first.")
-        
+
         with col_results:
             if "image_result" in st.session_state:
                 res = st.session_state["image_result"]
                 vf = res.get("visual_findings", {})
-                
+
                 if vf.get("status") != "skipped":
                     st.write("### 📊 Analysis Results")
-                    
+
                     # Severity indicator
                     severity = vf.get("severity_level", "unknown")
-                    severity_colors = {"low": "🟢", "moderate": "🟡", "high": "🟠", "critical": "🔴"}
-                    st.write(f"**Severity:** {severity_colors.get(severity, '⚪')} {severity.upper()}")
-                    
+                    severity_colors = {
+                        "low": "🟢",
+                        "moderate": "🟡",
+                        "high": "🟠",
+                        "critical": "🔴",
+                    }
+                    st.write(
+                        f"**Severity:** {severity_colors.get(severity, '⚪')} {severity.upper()}"
+                    )
+
                     # Confidence bar
                     confidence = vf.get("confidence", 0)
                     st.progress(float(confidence), text=f"Confidence: {confidence:.0%}")
-                    
+
                     if vf.get("requires_human_review"):
                         st.warning("⚠️ Professional review recommended")
-                    
+
                     # Image type
                     if vf.get("image_type"):
                         st.info(f"📷 Image Type: {vf['image_type']}")
-                    
+
                     # Visual findings
                     with st.expander("👁️ Visual Findings", expanded=True):
                         st.write(vf.get("visual_findings", "No findings available"))
-                    
+
                     # Differential diagnosis
                     if vf.get("differential_diagnosis"):
                         with st.expander("🔬 Differential Diagnosis"):
                             for dx in vf["differential_diagnosis"]:
                                 likelihood = dx.get("likelihood", "?")
-                                icon = "🟢" if likelihood == "low" else "🟡" if likelihood == "moderate" else "🔴"
-                                st.write(f"{icon} **{dx.get('condition')}** ({likelihood}) — {dx.get('reasoning', '')}")
-                    
+                                icon = (
+                                    "🟢"
+                                    if likelihood == "low"
+                                    else "🟡" if likelihood == "moderate" else "🔴"
+                                )
+                                st.write(
+                                    f"{icon} **{dx.get('condition')}** ({likelihood}) — {dx.get('reasoning', '')}"
+                                )
+
                     # Possible conditions
                     if vf.get("possible_conditions"):
                         with st.expander("📋 Possible Conditions"):
                             for cond in vf["possible_conditions"]:
                                 st.write(f"• {cond}")
-                    
+
                     # Recommended actions
                     if vf.get("recommended_actions"):
                         with st.expander("✅ Recommended Actions"):
                             for action in vf["recommended_actions"]:
                                 st.write(f"→ {action}")
-                    
+
                     # Uncertainty notes
                     if vf.get("uncertainty_notes"):
                         st.caption(f"⚠️ {vf['uncertainty_notes']}")
-                    
+
                     # Disclaimer
                     if vf.get("disclaimer"):
                         st.caption(f"📌 {vf['disclaimer']}")
                 else:
                     st.info("No visual analysis available. Upload an image to begin.")
-        
+
         # Image History
         st.markdown("---")
         st.write("### 📂 Image Analysis History")
@@ -771,8 +974,15 @@ else:
                 st.caption("No previous image analyses found.")
             else:
                 for img in images:
-                    severity_icon = {"low": "🟢", "moderate": "🟡", "high": "🟠", "critical": "🔴"}.get(img.get("severity", ""), "⚪")
-                    with st.expander(f"{severity_icon} {img['filename']} — {img['timestamp'][:10]}"):
+                    severity_icon = {
+                        "low": "🟢",
+                        "moderate": "🟡",
+                        "high": "🟠",
+                        "critical": "🔴",
+                    }.get(img.get("severity", ""), "⚪")
+                    with st.expander(
+                        f"{severity_icon} {img['filename']} — {img['timestamp'][:10]}"
+                    ):
                         st.write(f"**Confidence:** {img.get('confidence', 'N/A')}")
                         st.write(f"**Severity:** {img.get('severity', 'N/A')}")
                         if img.get("conditions"):
@@ -783,60 +993,79 @@ else:
     # --- TAB 3: LABS ---
     with t3:
         st.subheader("🧪 Laboratory Result Interpretation / تفسير النتائج المخبرية")
-        st.write("Paste your lab results (blood test, urinalysis, etc.) for AI interpretation and clinical context.")
-        lab_text = st.text_area("Lab Data", height=200, placeholder="WBC: 12.0, Hb: 10.5, Glucose: 200...")
+        st.write(
+            "Paste your lab results (blood test, urinalysis, etc.) for AI interpretation and clinical context."
+        )
+        lab_text = st.text_area(
+            "Lab Data", height=200, placeholder="WBC: 12.0, Hb: 10.5, Glucose: 200..."
+        )
         if st.button("Interpret Labs"):
             with st.spinner("Pathology Agent analyzing..."):
                 r = api_call("POST", "/labs/interpret", data={"lab_data": lab_text})
                 if r and r.ok:
                     st.info("📊 Clinical Interpretation")
                     st.markdown(r.json().get("interpretation"))
-                else: st.error("Interpretation failed.")
+                else:
+                    st.error("Interpretation failed.")
 
     # --- TAB 4: APPOINTMENTS ---
     with t4:
         st.subheader("Clinical Appointments & Scheduling")
-        st.write("Manage your upcoming sessions with specialized agents or human doctors.")
-        
+        st.write(
+            "Manage your upcoming sessions with specialized agents or human doctors."
+        )
+
         r = api_call("GET", "/appointments")
         if r and r.ok:
             events = r.json()
             if not events:
-                st.info("No upcoming appointments found. You can request one via the Consult tab.")
+                st.info(
+                    "No upcoming appointments found. You can request one via the Consult tab."
+                )
             else:
                 for ev in events:
                     with st.container():
-                        st.markdown(f"""
+                        st.markdown(
+                            f"""
                         <div class="report-card">
                             <h4>📅 {ev.get('summary')}</h4>
                             <p><b>Time:</b> {ev.get('start', {}).get('dateTime', 'N/A')}</p>
                             <p><b>Location:</b> {ev.get('location', 'Global Hub')}</p>
                             <a href="{ev.get('htmlLink')}" target="_blank">View in Google Calendar</a>
                         </div>
-                        """, unsafe_allow_html=True)
-        
-        st.info("💡 **Tip:** To book a new appointment, simply type 'Book an appointment for tomorrow at 10am' in the consultation symptoms box.")
+                        """,
+                            unsafe_allow_html=True,
+                        )
+
+        st.info(
+            "💡 **Tip:** To book a new appointment, simply type 'Book an appointment for tomorrow at 10am' in the consultation symptoms box."
+        )
 
     # --- TAB 5: MEDICATION ---
     with t5:
         st.subheader("Medication Tracker & Digital Reminders")
         mc1, mc2 = st.columns(2)
-        
+
         with mc1:
             st.write("### 💊 Active Medications")
             r = api_call("GET", "/medications")
             if r and r.ok:
                 meds = r.json()
-                if not meds: st.caption("No active medications found.")
+                if not meds:
+                    st.caption("No active medications found.")
                 for m in meds:
                     st.markdown(f"**{m['name']}** - {m['dosage']} ({m['frequency']})")
-            
+
             with st.expander("➕ Add New Medication"):
                 m_name = st.text_input("Medicine Name")
                 m_dose = st.text_input("Dosage (e.g. 500mg)")
                 m_freq = st.text_input("Frequency (e.g. Twice daily)")
                 if st.button("Save Medication"):
-                    api_call("POST", "/medications", {"name": m_name, "dosage": m_dose, "frequency": m_freq})
+                    api_call(
+                        "POST",
+                        "/medications",
+                        {"name": m_name, "dosage": m_dose, "frequency": m_freq},
+                    )
                     st.rerun()
 
         with mc2:
@@ -855,11 +1084,16 @@ else:
         topic = st.text_input("Enter Topic (e.g. Type 2 Diabetes Management)")
         if st.button("Generate Educational Summary"):
             with st.spinner("Consulting Knowledge Agents..."):
-                r = api_call("POST", "/generative/education", {"topic": topic, "lang": st.session_state["language"]})
+                r = api_call(
+                    "POST",
+                    "/generative/education",
+                    {"topic": topic, "lang": st.session_state["language"]},
+                )
                 if r and r.ok:
                     st.success(f"Context: {topic}")
                     st.markdown(r.json().get("content"))
-                else: st.error("Failed to generate content.")
+                else:
+                    st.error("Failed to generate content.")
 
     # --- TAB 7: HISTORY ---
     with t7:
@@ -867,32 +1101,53 @@ else:
         r = api_call("GET", "/reports")
         if r and r.ok:
             reports = r.json()
-            if not reports: st.info("No clinical reports generated yet.")
+            if not reports:
+                st.info("No clinical reports generated yet.")
             for rep in reports:
-                with st.expander(f"Report ID #{rep['id']} - {rep['generated_at'][:10]} ({rep['report_type']})"):
+                with st.expander(
+                    f"Report ID #{rep['id']} - {rep['generated_at'][:10]} ({rep['report_type']})"
+                ):
                     st.json(rep["content"])
                     # Export Options
                     c_pdf, c_img, c_txt = st.columns(3)
                     with c_pdf:
-                        st.markdown(f"[📄 PDF]({API_BASE}/reports/{rep['id']}/export?format=pdf)")
+                        st.markdown(
+                            f"[📄 PDF]({API_BASE}/reports/{rep['id']}/export?format=pdf)"
+                        )
                     with c_img:
-                        st.markdown(f"[🖼️ Image]({API_BASE}/reports/{rep['id']}/export?format=image)")
+                        st.markdown(
+                            f"[🖼️ Image]({API_BASE}/reports/{rep['id']}/export?format=image)"
+                        )
                     with c_txt:
-                        st.markdown(f"[📝 Text]({API_BASE}/reports/{rep['id']}/export?format=text)")
+                        st.markdown(
+                            f"[📝 Text]({API_BASE}/reports/{rep['id']}/export?format=text)"
+                        )
                     # Interop with authentication
                     c_fhir, c_hl7 = st.columns(2)
                     with c_fhir:
                         if st.button(f"Generate FHIR #{rep['id']}"):
-                            rr = api_call("POST", "/interop/fhir", {"report_id": rep["id"]})
+                            rr = api_call(
+                                "POST", "/interop/fhir", {"report_id": rep["id"]}
+                            )
                             if rr and rr.ok:
-                                st.download_button("Download FHIR JSON", data=json.dumps(rr.json(), indent=2), file_name=f"report_{rep['id']}_fhir.json")
+                                st.download_button(
+                                    "Download FHIR JSON",
+                                    data=json.dumps(rr.json(), indent=2),
+                                    file_name=f"report_{rep['id']}_fhir.json",
+                                )
                             else:
                                 st.error("FHIR generation failed.")
                     with c_hl7:
                         if st.button(f"Generate HL7 #{rep['id']}"):
-                            rr = api_call("POST", "/interop/hl7", {"report_id": rep["id"]})
+                            rr = api_call(
+                                "POST", "/interop/hl7", {"report_id": rep["id"]}
+                            )
                             if rr and rr.ok:
-                                st.download_button("Download HL7 Message", data=rr.json().get("hl7", ""), file_name=f"report_{rep['id']}.hl7")
+                                st.download_button(
+                                    "Download HL7 Message",
+                                    data=rr.json().get("hl7", ""),
+                                    file_name=f"report_{rep['id']}.hl7",
+                                )
                             else:
                                 st.error("HL7 generation failed.")
 
@@ -901,55 +1156,74 @@ else:
         st.subheader("Data Rights & System Support")
         acc = st.checkbox("Accessibility Mode (High Contrast / Larger Fonts)")
         if acc:
-            st.markdown("""
+            st.markdown(
+                """
             <style>
             html, body { filter: contrast(120%); }
             .stButton>button { font-size: 1.1rem; }
             .stTextArea textarea { font-size: 1.1rem !important; }
             </style>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
         st.write("#### 🛡️ Your Privacy")
-        st.write("We implement AES-256 encryption at rest. All reasoning is local or via secure API tunnels.")
+        st.write(
+            "We implement AES-256 encryption at rest. All reasoning is local or via secure API tunnels."
+        )
         if st.button("Export All My Data (CSV - Portability)"):
             r = api_call("GET", "/auth/export-data")
             if r and r.ok:
-                st.download_button("Download My Data", data=r.content, file_name="my_health_data.csv")
-            else: st.error("Export failed.")
-            
+                st.download_button(
+                    "Download My Data", data=r.content, file_name="my_health_data.csv"
+                )
+            else:
+                st.error("Export failed.")
+
         st.write("#### 📞 Clinical Support")
         st.write("Need technical help? Contact our support agents.")
         st.text_area("Message Support")
-        if st.button("Send to Support Hub"): st.success("Message queued.")
+        if st.button("Send to Support Hub"):
+            st.success("Message queued.")
 
     # --- TAB 9: ADMIN ---
     with t9:
-        if st.session_state["user_info"]["role"] != "admin" and st.session_state["user_info"]["role"] != "doctor":
-             st.warning("Admin/Doctor Clearance Required.")
+        if (
+            st.session_state["user_info"]["role"] != "admin"
+            and st.session_state["user_info"]["role"] != "doctor"
+        ):
+            st.warning("Admin/Doctor Clearance Required.")
         else:
             st.subheader("Medical Intelligence Control Panel")
             st.write("#### 🏥 System Health")
             r_hp = api_call("GET", "/system/health")
-            if r_hp and r_hp.ok: st.json(r_hp.json())
-            
+            if r_hp and r_hp.ok:
+                st.json(r_hp.json())
+
             st.write("#### 🕵️ Review Flagged Interactions")
             r_rv = api_call("GET", "/admin/pending-reviews")
             if r_rv and r_rv.ok:
                 items = r_rv.json()
-                if not items: st.caption("No items pending human review.")
+                if not items:
+                    st.caption("No items pending human review.")
                 for item in items:
                     with st.expander(f"Review Item {item['id']}"):
                         st.write(f"Input: {item['user_input']}")
                         st.write(f"Diagnosis: {item['diagnosis']}")
-                        if st.button(f"Approve {item['id']}"): st.success("Approved")
-            
+                        if st.button(f"Approve {item['id']}"):
+                            st.success("Approved")
+
             st.write("#### 📈 Self-Improvement Analysis")
             if st.button("Generate Improvement Insights"):
                 r_si = api_call("GET", "/admin/improvement-report")
                 if r_si and r_si.ok:
-                    st.text_area("Live Improvement Report", r_si.json().get("report", "No data"), height=300)
+                    st.text_area(
+                        "Live Improvement Report",
+                        r_si.json().get("report", "No data"),
+                        height=300,
+                    )
                 else:
                     st.error("Failed to fetch improvement report.")
-            
+
             st.write("#### 🧪 A/B Testing")
             with st.expander("Run A/B Test"):
                 pid = st.text_input("Prompt ID")
@@ -958,7 +1232,12 @@ else:
                 cases = st.text_area("Test Cases (JSON list)")
                 if st.button("Run A/B"):
                     try:
-                        data = {"prompt_id": pid, "prompt_a": pa, "prompt_b": pb, "test_cases": json.loads(cases or "[]")}
+                        data = {
+                            "prompt_id": pid,
+                            "prompt_a": pa,
+                            "prompt_b": pb,
+                            "test_cases": json.loads(cases or "[]"),
+                        }
                         r = api_call("POST", "/experiments/ab-test", data)
                         if r and r.ok:
                             st.json(r.json())
@@ -966,14 +1245,18 @@ else:
                             st.error("A/B run failed")
                     except Exception as e:
                         st.error(f"Invalid test cases JSON: {e}")
-            
+
             st.write("#### 🔏 Registry Governance Review")
             with st.expander("Review Prompt Change"):
                 oldh = st.text_input("Old Hash")
                 newh = st.text_input("New Hash")
                 delta = st.text_area("Delta Report")
                 if st.button("Submit Review"):
-                    r = api_call("POST", "/registry/review", {"old_hash": oldh, "new_hash": newh, "delta_report": delta})
+                    r = api_call(
+                        "POST",
+                        "/registry/review",
+                        {"old_hash": oldh, "new_hash": newh, "delta_report": delta},
+                    )
                     if r and r.ok:
                         st.json(r.json())
                     else:
@@ -985,8 +1268,10 @@ else:
             st.warning("Admin/Doctor Clearance Required to view System Audit Trail.")
         else:
             st.subheader("📡 System Audit Trail / سجل تدقيق النظام")
-            st.write("Real-time tracking of all secure system changes, updates, and administrative actions.")
-            
+            st.write(
+                "Real-time tracking of all secure system changes, updates, and administrative actions."
+            )
+
             with st.expander("🔍 Filter & Search Logs"):
                 l_limit = st.slider("Number of logs to fetch", 10, 500, 100)
                 if st.button("Refresh Audit Trail"):
@@ -995,7 +1280,7 @@ else:
                         st.session_state["audit_logs"] = r_audit.json()
                     else:
                         st.error("Failed to fetch audit logs.")
-            
+
             if "audit_logs" in st.session_state:
                 logs = st.session_state["audit_logs"]
                 if not logs:
@@ -1004,15 +1289,26 @@ else:
                     # Convert to DataFrame for better display
                     df_logs = pd.DataFrame(logs)
                     # Reorder and format columns
-                    cols = ["timestamp", "action", "actor_id", "resource_target", "status", "details"]
+                    cols = [
+                        "timestamp",
+                        "action",
+                        "actor_id",
+                        "resource_target",
+                        "status",
+                        "details",
+                    ]
                     df_logs = df_logs[[c for c in cols if c in df_logs.columns]]
-                    
+
                     st.dataframe(df_logs, use_container_width=True)
-                    
+
                     st.write("### 📜 Log Details")
-                    for l in logs[:20]: # Show details for last 20
-                        with st.expander(f"[{l['timestamp']}] {l['action']} - {l['status']}"):
-                            st.write(f"**Actor:** {l['actor_id']} ({l.get('role', 'N/A')})")
+                    for l in logs[:20]:  # Show details for last 20
+                        with st.expander(
+                            f"[{l['timestamp']}] {l['action']} - {l['status']}"
+                        ):
+                            st.write(
+                                f"**Actor:** {l['actor_id']} ({l.get('role', 'N/A')})"
+                            )
                             st.write(f"**Target:** {l['resource_target']}")
                             st.write(f"**IP:** {l.get('ip_address', 'N/A')}")
                             st.json(l.get("details", {}))
@@ -1022,10 +1318,12 @@ else:
     # --- TAB 11: ANALYTICS & TRENDS ---
     with t11:
         st.subheader("📈 Longitudinal Health Analytics / تحليلات الصحة الطولية")
-        st.write("Track your health trends, symptom severity, and medication adherence over time.")
-        
+        st.write(
+            "Track your health trends, symptom severity, and medication adherence over time."
+        )
+
         ana_col1, ana_col2 = st.columns([1, 1])
-        
+
         with ana_col1:
             st.markdown("#### 🌡️ Log New Symptom")
             with st.form("symptom_form"):
@@ -1033,23 +1331,40 @@ else:
                 sym_sev = st.slider("Severity", 1, 10, 5)
                 sym_notes = st.text_area("Notes", placeholder="Additional context...")
                 if st.form_submit_button("Record Symptom"):
-                    r = api_call("POST", "/analytics/symptoms", {"symptom": sym_name, "severity": sym_sev, "notes": sym_notes})
-                    if r and r.ok: st.success("Symptom recorded!"); st.rerun()
-                    else: st.error("Failed to record symptom.")
-        
+                    r = api_call(
+                        "POST",
+                        "/analytics/symptoms",
+                        {"symptom": sym_name, "severity": sym_sev, "notes": sym_notes},
+                    )
+                    if r and r.ok:
+                        st.success("Symptom recorded!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to record symptom.")
+
         with ana_col2:
             st.markdown("#### 💊 Add Medication")
             with st.form("med_form"):
                 med_name = st.text_input("Medication Name")
                 med_dos = st.text_input("Dosage (e.g. 500mg)")
-                med_freq = st.selectbox("Frequency", ["Once daily", "Twice daily", "Thrice daily", "As needed"])
+                med_freq = st.selectbox(
+                    "Frequency",
+                    ["Once daily", "Twice daily", "Thrice daily", "As needed"],
+                )
                 if st.form_submit_button("Track Medication"):
-                    r = api_call("POST", "/analytics/medications", {"name": med_name, "dosage": med_dos, "frequency": med_freq})
-                    if r and r.ok: st.success("Medication added!"); st.rerun()
-                    else: st.error("Failed to add medication.")
-        
+                    r = api_call(
+                        "POST",
+                        "/analytics/medications",
+                        {"name": med_name, "dosage": med_dos, "frequency": med_freq},
+                    )
+                    if r and r.ok:
+                        st.success("Medication added!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to add medication.")
+
         st.divider()
-        
+
         # --- Visualization ---
         st.markdown("### 📊 Health Trends")
         r_sym = api_call("GET", "/analytics/symptoms")
@@ -1057,23 +1372,29 @@ else:
             sym_data = r_sym.json()
             if sym_data:
                 df_sym = pd.DataFrame(sym_data)
-                df_sym['timestamp'] = pd.to_datetime(df_sym['timestamp'])
-                
+                df_sym["timestamp"] = pd.to_datetime(df_sym["timestamp"])
+
                 # Chart: Severity over time
                 st.write("**Symptom Severity Trend**")
                 # Group by symptom for multi-line chart
-                unique_symptoms = df_sym['symptom'].unique()
-                selected_syms = st.multiselect("Select symptoms to visualize", unique_symptoms, default=list(unique_symptoms[:3]))
-                
-                filtered_df = df_sym[df_sym['symptom'].isin(selected_syms)]
+                unique_symptoms = df_sym["symptom"].unique()
+                selected_syms = st.multiselect(
+                    "Select symptoms to visualize",
+                    unique_symptoms,
+                    default=list(unique_symptoms[:3]),
+                )
+
+                filtered_df = df_sym[df_sym["symptom"].isin(selected_syms)]
                 if not filtered_df.empty:
-                    st.line_chart(filtered_df, x='timestamp', y='severity', color='symptom')
-                
+                    st.line_chart(
+                        filtered_df, x="timestamp", y="severity", color="symptom"
+                    )
+
                 with st.expander("View Raw Symptom Data"):
                     st.dataframe(df_sym)
             else:
                 st.info("No symptom data yet. Start logging above to see trends.")
-        
+
         st.divider()
         st.markdown("### 📋 Active Medications")
         r_med = api_call("GET", "/analytics/medications")
@@ -1081,10 +1402,13 @@ else:
             med_data = r_med.json()
             if med_data:
                 df_med = pd.DataFrame(med_data)
-                st.dataframe(df_med[["name", "dosage", "frequency", "start_date"]], use_container_width=True)
+                st.dataframe(
+                    df_med[["name", "dosage", "frequency", "start_date"]],
+                    use_container_width=True,
+                )
             else:
                 st.info("No active medications tracked.")
-        
+
         st.divider()
         st.markdown("### 📄 Formal Documentation")
         if st.button("📑 Generate & Download Signed Clinical Report (PDF)"):
@@ -1094,30 +1418,89 @@ else:
                     label="📥 Click here to Save PDF",
                     data=r_hex.content,
                     file_name="MedAgent_Clinical_Report.pdf",
-                    mime="application/pdf"
+                    mime="application/pdf",
                 )
             else:
                 st.error("Failed to generate PDF report.")
 
-# --- FOOTER ---
-st.markdown("---")
+    # --- TAB 14: AI DOCS ---
+    with t14:
+        st.header("📘 Interactive Documentation AI")
+        st.markdown(
+            "Ask questions, explain files, or debug errors relating directly to the MEDAgent codebase."
+        )
 
-        st.divider()
-        st.markdown("### 🧠 RLHF & System Learning")
-        if st.session_state["user_info"]["role"] in ["admin", "doctor"]:
-            if st.button("Refresh RLHF Analytics"):
-                r_fb = api_call("GET", "/feedback/analytics/summary")
-                if r_fb and r_fb.ok:
-                    fb_data = r_fb.json()
-                    c1, c2, c3 = st.columns(3)
-                    with c1: st.metric("Avg Global Rating", f"{fb_data['average_rating']}/5.0")
-                    with c2: st.metric("Total Samples", fb_data['total_entries'])
-                    with c3: st.metric("Doc vs Pat", f"{fb_data['role_averages'].get('doctor', 0)} / {fb_data['role_averages'].get('patient', 0)}")
-                    
-                    st.write("**Rating Distribution**")
-                    st.bar_chart(fb_data["rating_distribution"])
+        docs_c1, docs_c2 = st.columns([1, 2])
+        with docs_c1:
+            st.subheader("📁 File Explorer")
+            if st.button("Rebuild Index (Admin)"):
+                res = api_call("POST", "/docs/build-index")
+                if res and res.ok:
+                    st.success(
+                        f"Index built! Blocks: {res.json().get('indexed_chunks')}"
+                    )
                 else:
-                    st.error("Failed to fetch feedback analytics.")
-        else:
-            st.caption("Detailed learning analytics are restricted to medical staff.")
-st.caption("MEDAgent Production V5.0.0 | Global Health Authority Architecture | Powered by Agentic LLMs")
+                    st.error("Index build failed.")
+            r_files = api_call("GET", "/docs/files")
+            file_list = []
+            if r_files and r_files.ok:
+                file_list = r_files.json().get("files", [])
+            selected_file = st.selectbox("Indexed Files", file_list)
+            if st.button("💡 Explain Selected File"):
+                with st.spinner("Analyzing architecture..."):
+                    exp_res = api_call(
+                        "POST", "/docs/explain", data={"file_path": selected_file}
+                    )
+                    if exp_res and exp_res.ok:
+                        st.session_state["docs_chat_history"] = exp_res.json().get(
+                            "answer"
+                        )
+                    else:
+                        st.error("Failed to explain.")
+        with docs_c2:
+            st.subheader("💬 Docs Copilot")
+            docs_query = st.chat_input(
+                "Ask a question about the MEDAgent system or debug an error..."
+            )
+            if docs_query:
+                with st.spinner("Searching FAISS Index..."):
+                    docs_res = api_call(
+                        "POST", "/docs/chat", data={"query": docs_query}
+                    )
+                    if docs_res and docs_res.ok:
+                        st.session_state["docs_chat_history"] = docs_res.json().get(
+                            "answer"
+                        )
+            if "docs_chat_history" in st.session_state:
+                st.markdown(st.session_state["docs_chat_history"])
+
+    # --- FOOTER ---
+    st.markdown("---")
+
+    st.divider()
+    st.markdown("### 🧠 RLHF & System Learning")
+    if st.session_state["user_info"]["role"] in ["admin", "doctor"]:
+        if st.button("Refresh RLHF Analytics"):
+            r_fb = api_call("GET", "/feedback/analytics/summary")
+            if r_fb and r_fb.ok:
+                fb_data = r_fb.json()
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.metric("Avg Global Rating", f"{fb_data['average_rating']}/5.0")
+                with c2:
+                    st.metric("Total Samples", fb_data["total_entries"])
+                with c3:
+                    st.metric(
+                        "Doc vs Pat",
+                        f"{fb_data['role_averages'].get('doctor', 0)} / {fb_data['role_averages'].get('patient', 0)}",
+                    )
+
+                st.write("**Rating Distribution**")
+                st.bar_chart(fb_data["rating_distribution"])
+            else:
+                st.error("Failed to fetch feedback analytics.")
+    else:
+        st.caption("Detailed learning analytics are restricted to medical staff.")
+st.caption(
+    "MEDAgent Production V5.0.0 | Global Health Authority Architecture | Powered by Agentic LLMs"
+)

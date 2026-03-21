@@ -1,8 +1,10 @@
 """
 Migration script to update medagent.db with new role-based fields.
 """
-import sqlite3
+
 import os
+import sqlite3
+
 
 def migrate():
     db_path = "medagent.db"
@@ -21,12 +23,14 @@ def migrate():
         ("interaction_mode", "TEXT DEFAULT 'patient'"),
         ("doctor_verified", "BOOLEAN DEFAULT 0"),
         ("license_number", "TEXT"),
-        ("specialization", "TEXT")
+        ("specialization", "TEXT"),
     ]
 
     for col_name, col_type in columns_to_add:
         try:
-            cursor.execute(f"ALTER TABLE user_accounts ADD COLUMN {col_name} {col_type}")
+            cursor.execute(
+                f"ALTER TABLE user_accounts ADD COLUMN {col_name} {col_type}"
+            )
             print(f"Added column {col_name} to user_accounts.")
         except sqlite3.OperationalError as e:
             if "duplicate column name" in str(e):
@@ -36,7 +40,9 @@ def migrate():
 
     # 2. Update user_sessions table
     try:
-        cursor.execute("ALTER TABLE user_sessions ADD COLUMN interaction_mode TEXT DEFAULT 'patient'")
+        cursor.execute(
+            "ALTER TABLE user_sessions ADD COLUMN interaction_mode TEXT DEFAULT 'patient'"
+        )
         print("Added column interaction_mode to user_sessions.")
     except sqlite3.OperationalError as e:
         if "duplicate column name" in str(e):
@@ -52,7 +58,7 @@ def migrate():
         ("risk_level", "TEXT"),
         ("audit_hash", "TEXT"),
         ("secondary_model", "TEXT"),
-        ("latency_ms", "INTEGER")
+        ("latency_ms", "INTEGER"),
     ]
     for col_name, col_type in interaction_columns:
         try:
@@ -67,6 +73,7 @@ def migrate():
     conn.commit()
     conn.close()
     print("Migration complete.")
+
 
 if __name__ == "__main__":
     migrate()

@@ -1,9 +1,11 @@
-import traceback
 import sys
+import traceback
 
 try:
-    from api.main import app
     import uvicorn
+
+    from api.main import app
+
     print("App imported successfully. Running uvicorn...")
     uvicorn.run(app, host="127.0.0.1", port=8000)
 except BaseException as e:

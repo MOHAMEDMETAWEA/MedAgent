@@ -180,6 +180,7 @@ User Input ──► PHI Redaction ──► Injection Guard ──► Patient I
 | Tree-of-Thought         | `agents/reasoning_agent.py`        | Multi-path reasoning with confidence ranking        |
 | Multimodal Vision       | `agents/vision_agent.py`           | Medical imaging analysis (X-ray, MRI, derm)         |
 | RAG Retrieval           | `rag/retriever.py`                 | FAISS-backed medical knowledge retrieval            |
+| Interactive AI Docs     | `agents/docs_agent.py`             | RAG-powered Developer Copilot indexing codebase     |
 | Hallucination Detection | `agents/hallucination_detector.py` | Cross-references AI claims with evidence            |
 | Uncertainty Calibration | `agents/uncertainty_calibrator.py` | Human-in-the-loop escalation trigger                |
 | Model Routing           | `models/model_router.py`           | Cloud (GPT-4) ↔ Local (Meditron/Ollama) switching  |
@@ -682,7 +683,7 @@ The Kubernetes manifest (`k8s/deployment.yaml`) provides:
 - [X] SOAP note generation
 - [X] Immutable audit chain (hash-linking)
 - [X] PHI redaction + prompt injection guard
-- [X] JWT authentication with Redis revocation
+- [X] Native Streamlit Authentication with JWT + Redis
 - [X] Redis distributed inference caching
 - [X] Parallel node execution in clinical graph
 - [X] Specialty routing (Pediatric / Maternity / Mental Health)
@@ -722,6 +723,7 @@ MEDAgent/
 │   ├── hallucination_detector.py  # Factual integrity checker
 │   ├── uncertainty_calibrator.py  # HITL escalation trigger
 │   ├── soap_agent.py           # SOAP note generation
+│   ├── docs_agent.py           # Interactive AI Copilot for Docs
 │   ├── safety_agent.py         # Medical safety checks
 │   ├── report_agent.py         # PDF/JSON report generation
 │   ├── persistence_agent.py    # Encrypted data persistence

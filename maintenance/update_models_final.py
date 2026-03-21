@@ -1,4 +1,3 @@
-
 import os
 import sys
 
@@ -9,18 +8,18 @@ if not os.path.exists(rel_path):
     print(f"FAILED: Could not find {rel_path} in {os.getcwd()}")
     sys.exit(1)
 
-with open(rel_path, 'r', encoding='utf-8') as f:
+with open(rel_path, "r", encoding="utf-8") as f:
     lines = f.readlines()
 
 new_feedback_class = [
     "class Feedback(Base):\n",
-    "    \"\"\"Enhanced clinical feedback table for RLHF.\"\"\"\n",
-    "    __tablename__ = \"feedback\"\n",
+    '    """Enhanced clinical feedback table for RLHF."""\n',
+    '    __tablename__ = "feedback"\n',
     "    \n",
     "    id = Column(Integer, primary_key=True, autoincrement=True)\n",
-    "    user_id = Column(String, ForeignKey(\"user_accounts.id\"), index=True)\n",
+    '    user_id = Column(String, ForeignKey("user_accounts.id"), index=True)\n',
     "    role = Column(String) # doctor | patient\n",
-    "    case_id = Column(String, ForeignKey(\"medical_cases.id\"), index=True, nullable=True)\n",
+    '    case_id = Column(String, ForeignKey("medical_cases.id"), index=True, nullable=True)\n',
     "    \n",
     "    # Encrypted fields for medical privacy\n",
     "    ai_response_encrypted = Column(Text)\n",
@@ -31,9 +30,9 @@ new_feedback_class = [
     "    timestamp = Column(DateTime, default=datetime.datetime.utcnow)\n",
     "    \n",
     "    # Relationships\n",
-    "    user = relationship(\"UserAccount\")\n",
-    "    case = relationship(\"MedicalCase\")\n",
-    "\n"
+    '    user = relationship("UserAccount")\n',
+    '    case = relationship("MedicalCase")\n',
+    "\n",
 ]
 
 # Check if already exists
@@ -55,7 +54,7 @@ if not inserted:
     print("FAILED: Could not find insertion point 'class AuditLog(Base):'")
     sys.exit(1)
 
-with open(rel_path, 'w', encoding='utf-8', newline='') as f:
+with open(rel_path, "w", encoding="utf-8", newline="") as f:
     f.writelines(lines)
 
 print("Feedback class added successfully.")

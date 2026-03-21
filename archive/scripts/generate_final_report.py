@@ -2,8 +2,9 @@
 Final System Report Generator.
 Aggregates tests, health, and status into a developer-facing Report.
 """
-import sys
+
 import os
+import sys
 from pathlib import Path
 
 # Fix python path to allow importing modules from root
@@ -12,13 +13,14 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from agents.developer_agent import DeveloperControlAgent
 from agents.self_improvement_agent import SelfImprovementAgent
 
+
 def generate_final_report():
     dev = DeveloperControlAgent()
     imp = SelfImprovementAgent()
-    
+
     health = dev.get_system_health()
     improvement = imp.generate_improvement_report()
-    
+
     report = f"""
 # MEDAGENT FINAL SYSTEM STATUS REPORT
 **Date:** 2026-02-14
@@ -51,11 +53,12 @@ def generate_final_report():
 - Regularly rotate Admin API Keys.
 - Review "Pending" cases in Admin Dashboard daily.
     """
-    
+
     with open("FINAL_SYSTEM_REPORT.md", "w", encoding="utf-8") as f:
         f.write(report.strip())
-    
+
     print("Report generated: FINAL_SYSTEM_REPORT.md")
+
 
 if __name__ == "__main__":
     generate_final_report()

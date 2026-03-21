@@ -1,17 +1,21 @@
 """
 Authentication Agent - Secure Identity and Session Management.
 """
+
 import logging
+
 from agents.governance_agent import GovernanceAgent
 from agents.persistence_agent import PersistenceAgent
 
 logger = logging.getLogger(__name__)
+
 
 class AuthenticationAgent:
     """
     Dedicated agent for secure user registration, login, and token management.
     Wraps Governance and Persistence for identity logic.
     """
+
     def __init__(self):
         self.governance = GovernanceAgent()
         self.persistence = PersistenceAgent()
@@ -21,22 +25,28 @@ class AuthenticationAgent:
 
     def validate_login(self, login_id, password, ip=None):
         user = self.persistence.get_user_by_login(login_id)
-        if not user or not self.governance.verify_password(password, user.password_hash):
+        if not user or not self.governance.verify_password(
+            password, user.password_hash
+        ):
             if user:
                 self.persistence.log_user_activity(user.id, "none", "failed", ip=ip)
             return None, "Invalid credentials"
-        
+
         # Serialize role enum to string for JWT and JSON
-        role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
-        
-        session_id = self.persistence.create_session(user_id=user.id, mode=user.interaction_mode)
-        token = self.governance.create_access_token({
-            "sub": user.id, 
-            "role": role_str, 
-            "mode": user.interaction_mode,
-            "name": user.username
-        })
-        
+        role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
+
+        session_id = self.persistence.create_session(
+            user_id=user.id, mode=user.interaction_mode
+        )
+        token = self.governance.create_access_token(
+            {
+                "sub": user.id,
+                "role": role_str,
+                "mode": user.interaction_mode,
+                "name": user.username,
+            }
+        )
+
         self.persistence.log_user_activity(user.id, session_id, "success", ip=ip)
         return {
             "token": token,
@@ -50,6 +60,6 @@ class AuthenticationAgent:
                 "age": user.age,
                 "country": user.country,
                 "interaction_mode": user.interaction_mode,
-                "doctor_verified": user.doctor_verified
-            }
+                "doctor_verified": user.doctor_verified,
+            },
         }, None

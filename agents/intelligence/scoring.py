@@ -2,25 +2,30 @@
 Performance Scoring System.
 Evaluates clinical prompts against diagnostic accuracy, hallucinations, and safety.
 """
+
 import json
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
+
 from agents.prompts.registry import PROMPT_REGISTRY
 from config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class PerformanceScorer:
     """
     Evaluation engine that assigns scores (0-1) to prompt interactions.
     """
+
     def __init__(self, model=None):
         self.llm = ChatOpenAI(
             model=model or settings.OPENAI_MODEL,
             temperature=0.0,
-            api_key=settings.OPENAI_API_KEY
+            api_key=settings.OPENAI_API_KEY,
         )
 
     def score_interaction(self, interaction_data: Dict[str, Any]):
@@ -28,7 +33,7 @@ class PerformanceScorer:
         Scores a specific interaction context.
         """
         logger.info("--- PERFORMANCE SCORING: EVALUATING CLINICAL INTERACTION ---")
-        
+
         eval_prompt_entry = PROMPT_REGISTRY.get("MED-SC-EVAL-001")
         if not eval_prompt_entry:
             return {"error": "Evaluation prompt not found."}
@@ -38,17 +43,21 @@ class PerformanceScorer:
         )
 
         try:
-            response = self.llm.invoke([
-                SystemMessage(content="You are a Clinical Data Scientist and Quality Assurance auditor."),
-                HumanMessage(content=prompt)
-            ])
-            
+            response = self.llm.invoke(
+                [
+                    SystemMessage(
+                        content="You are a Clinical Data Scientist and Quality Assurance auditor."
+                    ),
+                    HumanMessage(content=prompt),
+                ]
+            )
+
             content = response.content
             if "{" in content:
                 start = content.find("{")
                 end = content.rfind("}") + 1
                 result = json.loads(content[start:end])
-                
+
                 # Deployment Gating
                 result["deployment_flag"] = result.get("overall_score", 0) >= 0.8
                 return result
@@ -72,5 +81,5 @@ class PerformanceScorer:
             "reasoning_depth": "ToT logical consistency",
             "output_integrity": "Schema validity",
             "escalation_timing": "Appropriateness of escalation triggers",
-            "comprehension_index": "User-level accessibility"
+            "comprehension_index": "User-level accessibility",
         }

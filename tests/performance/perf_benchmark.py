@@ -1,14 +1,16 @@
-import sys
 import os
+import sys
 import time
 import unittest
+
 from fastapi.testclient import TestClient
 
 # Add project root to sys.path
-sys.path.append('d:\\MedAgent')
+sys.path.append("d:\\MedAgent")
 
 import tests.ai_mocks
 from api.main import app
+
 
 class TestMedAgentPerformance(unittest.TestCase):
     def setUp(self):
@@ -19,11 +21,11 @@ class TestMedAgentPerformance(unittest.TestCase):
         start_time = time.time()
         payload = {
             "symptoms": "Mild headache and fatigue.",
-            "patient_id": "perf_test_user"
+            "patient_id": "perf_test_user",
         }
         response = self.client.post("/consult", json=payload)
         latency = time.time() - start_time
-        
+
         self.assertEqual(response.status_code, 200)
         print(f"Consultation Latency (Mocked): {latency:.4f}s")
         self.assertLess(latency, 5.0, "Latency too high even for mocks!")
@@ -35,6 +37,7 @@ class TestMedAgentPerformance(unittest.TestCase):
         latency = time.time() - start_time
         self.assertEqual(response.status_code, 200)
         print(f"Health Check Latency: {latency:.4f}s")
+
 
 if __name__ == "__main__":
     unittest.main()

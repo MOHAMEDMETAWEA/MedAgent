@@ -2,25 +2,30 @@
 Auto-Discovery Subsystem.
 Analyzes logs and feedback to detect prompt blind spots and hallucinations.
 """
+
 import json
 import logging
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
+
 from agents.prompts.registry import PROMPT_REGISTRY
 from config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class AutoDiscoveryAgent:
     """
-    Subsystem designed to continuously analyze system performance 
+    Subsystem designed to continuously analyze system performance
     and recommend prompt evolutions without direct modification.
     """
+
     def __init__(self, model=None):
         self.llm = ChatOpenAI(
             model=model or settings.OPENAI_MODEL,
             temperature=0.2,
-            api_key=settings.OPENAI_API_KEY
+            api_key=settings.OPENAI_API_KEY,
         )
 
     def analyze(self, logs: str, feedback: str, escalations: str, hallucinations: str):
@@ -28,7 +33,7 @@ class AutoDiscoveryAgent:
         Analyzes multi-source data to detect system blind spots.
         """
         logger.info("--- AUTO-DISCOVERY: ANALYZING SYSTEM LOGS & FEEDBACK ---")
-        
+
         prompt_entry = PROMPT_REGISTRY.get("MED-INT-DISCOVERY-001")
         if not prompt_entry:
             logger.error("MED-INT-DISCOVERY-001 not found in registry.")
@@ -39,15 +44,19 @@ class AutoDiscoveryAgent:
             logs=logs,
             feedback=feedback,
             escalations=escalations,
-            hallucinations=hallucinations
+            hallucinations=hallucinations,
         )
 
         try:
-            response = self.llm.invoke([
-                SystemMessage(content="You are a Clinical AI Meta-Auditor for hospital-grade systems."),
-                HumanMessage(content=analysis_prompt)
-            ])
-            
+            response = self.llm.invoke(
+                [
+                    SystemMessage(
+                        content="You are a Clinical AI Meta-Auditor for hospital-grade systems."
+                    ),
+                    HumanMessage(content=analysis_prompt),
+                ]
+            )
+
             # Extract JSON from response
             content = response.content
             if "{" in content:
@@ -66,6 +75,6 @@ class AutoDiscoveryAgent:
         """
         return {
             "hallucination_threshold": 0.05,  # >5% triggers deep audit
-            "escalation_threshold": 0.10,    # >10% triggers category scan
-            "low_confidence_threshold": 0.20 # >20% triggers prompt refactoring proposal
+            "escalation_threshold": 0.10,  # >10% triggers category scan
+            "low_confidence_threshold": 0.20,  # >20% triggers prompt refactoring proposal
         }

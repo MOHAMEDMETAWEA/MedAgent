@@ -2,15 +2,19 @@
 Vision Analysis Agent - Clinical-Grade Medical Image Analysis.
 Uses GPT-4o Vision with structured prompt for safety and accuracy.
 """
-import os
+
 import base64
-import logging
 import json
-from typing import Dict, Any
-from langchain_openai import ChatOpenAI
+import logging
+import os
+from typing import Any, Dict
+
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+
+from config import get_prompt_path, settings
+
 from .state import AgentState
-from config import settings, get_prompt_path
 
 logger = logging.getLogger(__name__)
 
@@ -24,34 +28,38 @@ MIME_MAP = {
     "dicom": "application/dicom",
 }
 
+
 class VisionAnalysisAgent:
     """
     Analyzes user-uploaded medical images (X-ray, CT, MRI, skin, lab reports)
     using GPT-4o Vision with clinical-grade structured prompts.
     """
+
     def __init__(self, model=None):
         from models.model_router import get_model
+
         self.model_name = model or "gpt-4o"
         self.llm = get_model(model_name=self.model_name, temperature=0.0)
 
     def _load_prompt(self, filename: str) -> str:
         try:
-            return get_prompt_path(filename).read_text(encoding='utf-8')
+            return get_prompt_path(filename).read_text(encoding="utf-8")
         except Exception as e:
             logger.error(f"Error loading prompt {filename}: {e}")
             return ""
 
     def _encode_image(self, image_path: str) -> str:
         ext = os.path.splitext(image_path)[1].lower().strip(".")
-        
+
         # Handle DICOM conversion
         if ext in ["dicom", "dcm"]:
             try:
-                import pydicom
-                import numpy as np
-                from PIL import Image
                 import io
-                
+
+                import numpy as np
+                import pydicom
+                from PIL import Image
+
                 ds = pydicom.dcmread(image_path)
                 # Convert pixel data to image
                 img_array = ds.pixel_array.astype(float)
@@ -59,18 +67,18 @@ class VisionAnalysisAgent:
                 rescaled = (np.maximum(img_array, 0) / img_array.max()) * 255.0
                 rescaled = np.uint8(rescaled)
                 img = Image.fromarray(rescaled)
-                
+
                 # Save to buffer as PNG
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
-                return base64.b64encode(buf.getvalue()).decode('utf-8')
+                return base64.b64encode(buf.getvalue()).decode("utf-8")
             except Exception as e:
                 logger.error(f"DICOM conversion failed: {e}")
                 # Fallback or error? For now, re-raise to catch in process()
                 raise
 
         with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+            return base64.b64encode(image_file.read()).decode("utf-8")
 
     def _get_mime_type(self, image_path: str) -> str:
         ext = os.path.splitext(image_path)[1].lower().strip(".")
@@ -80,9 +88,13 @@ class VisionAnalysisAgent:
         """Process a medical image and return structured clinical findings."""
         image_path = state.get("image_path")
         if not image_path or not os.path.exists(image_path):
-            return {"visual_findings": {"status": "skipped", "reason": "No image provided"}}
+            return {
+                "visual_findings": {"status": "skipped", "reason": "No image provided"}
+            }
 
-        logger.info(f"--- VISION ANALYSIS AGENT: ANALYZING {os.path.basename(image_path)} ---")
+        logger.info(
+            f"--- VISION ANALYSIS AGENT: ANALYZING {os.path.basename(image_path)} ---"
+        )
 
         try:
             base64_image = self._encode_image(image_path)
@@ -97,7 +109,11 @@ class VisionAnalysisAgent:
             country = state.get("user_country", "Unknown")
 
             if template:
-                system_prompt = template.replace("{age}", str(age)).replace("{gender}", str(gender)).replace("{country}", str(country))
+                system_prompt = (
+                    template.replace("{age}", str(age))
+                    .replace("{gender}", str(gender))
+                    .replace("{country}", str(country))
+                )
             else:
                 # Fallback inline prompt
                 system_prompt = (
@@ -118,13 +134,18 @@ class VisionAnalysisAgent:
                 SystemMessage(content=system_prompt),
                 HumanMessage(
                     content=[
-                        {"type": "text", "text": "Analyze this medical image. Provide a structured clinical assessment."},
+                        {
+                            "type": "text",
+                            "text": "Analyze this medical image. Provide a structured clinical assessment.",
+                        },
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:{mime_type};base64,{base64_image}"},
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{base64_image}"
+                            },
                         },
                     ]
-                )
+                ),
             ]
 
             response = self.llm.invoke(messages)
@@ -132,7 +153,9 @@ class VisionAnalysisAgent:
 
             # Parse structured JSON output
             try:
-                clean_content = content.replace("```json", "").replace("```", "").strip()
+                clean_content = (
+                    content.replace("```json", "").replace("```", "").strip()
+                )
                 findings = json.loads(clean_content)
             except (json.JSONDecodeError, ValueError):
                 findings = {
@@ -144,7 +167,7 @@ class VisionAnalysisAgent:
                     "severity_level": "moderate",
                     "recommended_actions": ["Consult a healthcare professional"],
                     "requires_human_review": True,
-                    "uncertainty_notes": "Could not parse structured output from vision model"
+                    "uncertainty_notes": "Could not parse structured output from vision model",
                 }
 
             # Enforce confidence threshold safety rule
@@ -154,7 +177,9 @@ class VisionAnalysisAgent:
             if confidence < 0.7:
                 findings["requires_human_review"] = True
                 if not findings.get("uncertainty_notes"):
-                    findings["uncertainty_notes"] = "Confidence below threshold (0.7) — professional review recommended."
+                    findings["uncertainty_notes"] = (
+                        "Confidence below threshold (0.7) — professional review recommended."
+                    )
 
             if severity in ("high", "critical"):
                 findings["requires_human_review"] = True
@@ -169,8 +194,9 @@ class VisionAnalysisAgent:
 
             return {
                 "visual_findings": findings,
-                "requires_human_review": state.get("requires_human_review", False) or needs_review,
-                "status": "Vision Analysis Complete / تم الانتهاء من تحليل الصور"
+                "requires_human_review": state.get("requires_human_review", False)
+                or needs_review,
+                "status": "Vision Analysis Complete / تم الانتهاء من تحليل الصور",
             }
 
         except Exception as e:
@@ -180,8 +206,7 @@ class VisionAnalysisAgent:
                     "error": str(e),
                     "status": "failed",
                     "requires_human_review": True,
-                    "disclaimer": "Image analysis failed. Please consult a healthcare professional."
+                    "disclaimer": "Image analysis failed. Please consult a healthcare professional.",
                 },
-                "requires_human_review": True
+                "requires_human_review": True,
             }
-

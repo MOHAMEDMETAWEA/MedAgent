@@ -2,12 +2,15 @@
 Prompt Registry - Centralized Governance for Medical AI instructions.
 Supports versioning and hot-swapping of agent personas.
 """
-import os
+
 import logging
+import os
 from typing import Dict, Optional
+
 from config import settings
 
 logger = logging.getLogger(__name__)
+
 
 class PromptRegistry:
     def __init__(self):
@@ -25,10 +28,12 @@ class PromptRegistry:
         for filename in os.listdir(self.prompt_dir):
             if filename.endswith(".txt"):
                 name = filename.replace(".txt", "")
-                with open(os.path.join(self.prompt_dir, filename), "r", encoding="utf-8") as f:
+                with open(
+                    os.path.join(self.prompt_dir, filename), "r", encoding="utf-8"
+                ) as f:
                     self._prompts[name] = f.read()
-                    self._versions[name] = "1.0.0" # Default version
-        
+                    self._versions[name] = "1.0.0"  # Default version
+
         logger.info(f"Prompt Registry: loaded {len(self._prompts)} medical prompts.")
 
     def get_prompt(self, agent_name: str, version: str = "latest") -> str:
@@ -43,12 +48,13 @@ class PromptRegistry:
         """Saves a new prompt version to disk and refreshes memory."""
         self._prompts[agent_name] = content
         self._versions[agent_name] = version
-        
+
         filepath = os.path.join(self.prompt_dir, f"{agent_name}.txt")
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)
-        
+
         logger.info(f"Prompt Registry: UPDATED {agent_name} to v{version}")
+
 
 # Singleton Instance
 prompt_registry = PromptRegistry()

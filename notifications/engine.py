@@ -1,12 +1,13 @@
 import logging
 import os
 import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
 
 class NotificationEngine:
     """
@@ -18,6 +19,7 @@ class NotificationEngine:
     - iCal appointment generation.
     - Emergency medical escalation logic.
     """
+
     def __init__(self):
         self.smtp_host = os.getenv("SMTP_HOST", "")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
@@ -25,25 +27,38 @@ class NotificationEngine:
         self.smtp_password = os.getenv("SMTP_PASSWORD", "")
         self.from_email = os.getenv("SMTP_FROM_EMAIL", "noreply@medagent.hospital")
         self.enabled = bool(self.smtp_host and self.smtp_user)
-        
+
         self.priority_map = {"EMERGENCY": 1, "URGENT": 2, "ROUTINE": 3}
 
-    async def send_alert(self, user_id: str, title: str, message: str, priority: str = "ROUTINE", email: str = None):
+    async def send_alert(
+        self,
+        user_id: str,
+        title: str,
+        message: str,
+        priority: str = "ROUTINE",
+        email: str = None,
+    ):
         """Dispatches an alert through the most appropriate channels."""
-        logger.info(f"Notification: Dispatching '{title}' to {user_id} [Priority: {priority}]")
-        
+        logger.info(
+            f"Notification: Dispatching '{title}' to {user_id} [Priority: {priority}]"
+        )
+
         # 1. Always Log & Push (Simulated)
         logger.info(f"[PUSH/SMS] {title}: {message}")
-        
+
         # 2. If Emergency, Trigger Escalation
         if priority == "EMERGENCY":
-            logger.critical(f"HEALTH-CRITICAL: Emergency escalation triggered for {user_id}")
-            
+            logger.critical(
+                f"HEALTH-CRITICAL: Emergency escalation triggered for {user_id}"
+            )
+
         # 3. If email provided, send SMTP
         if email:
             self._send_formatted_email(email, title, message, priority)
 
-    def _send_formatted_email(self, to_email: str, title: str, message: str, priority: str):
+    def _send_formatted_email(
+        self, to_email: str, title: str, message: str, priority: str
+    ):
         """Sends a rich HTML email based on priority."""
         if not self.enabled:
             logger.info(f"[EMAIL-SIMULATED] To: {to_email} | Subject: {title}")
@@ -69,7 +84,7 @@ class NotificationEngine:
             msg["From"] = self.from_email
             msg["To"] = to_email
             msg.attach(MIMEText(body_html, "html"))
-            
+
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.smtp_user, self.smtp_password)
@@ -79,10 +94,13 @@ class NotificationEngine:
             logger.error(f"SMTP Failed: {e}")
             return False
 
-    def generate_ical(self, title: str, start_time: datetime, duration: int = 30) -> str:
+    def generate_ical(
+        self, title: str, start_time: datetime, duration: int = 30
+    ) -> str:
         """Utility for clinical appointment integration."""
         end_time = start_time + timedelta(minutes=duration)
         return f"BEGIN:VCALENDAR\nSUMMARY:{title}\nDTSTART:{start_time.isoformat()}\nDTEND:{end_time.isoformat()}\nEND:VCALENDAR"
+
 
 # Singleton Instance
 notification_engine = NotificationEngine()
