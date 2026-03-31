@@ -192,6 +192,35 @@ class PersistenceAgent:
                 logger.error(f"Failed to retrieve history: {e}")
                 return []
 
+    async def get_session_history(self, session_id: str, limit: int = 20):
+        """Retrieve all interactions for a specific session code (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = (
+                    select(Interaction)
+                    .filter(Interaction.session_id == session_id)
+                    .order_by(Interaction.timestamp.asc())  # Chronicle order
+                    .limit(limit)
+                )
+                res = await db.execute(stmt)
+                interactions = res.scalars().all()
+
+                history = []
+                for i in interactions:
+                    try:
+                        u_in = self.governance.decrypt(i.user_input_encrypted)
+                        ai_out = self.governance.decrypt(i.final_response_encrypted)
+                        history.append({"user": u_in, "ai": ai_out})
+                    except Exception as e:
+                        logger.error(
+                            f"History decryption failed for interaction {i.id}: {e}"
+                        )
+
+                return history
+            except Exception as e:
+                logger.error(f"Failed to retrieve session history: {e}")
+                return []
+
     async def get_long_term_memory(self, user_id: str, limit_sessions: int = 3):
         """Fetch and format past interactions for LLM context (Async)."""
         async with AsyncSessionLocal() as db:
@@ -869,6 +898,333 @@ AI Diagnosis: {diag}\
             except Exception as e:
                 logger.error(f"Feedback analytics failed: {e}")
                 return {}
+
+    # --- Medication & Reminder CRUD ---
+
+    async def log_medication(
+        self, patient_id: str, name: str, dosage: str, frequency: str
+    ):
+        """Log a medication to the MedicationRecord analytics table (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                record = MedicationRecord(
+                    patient_id=patient_id,
+                    medication_name_encrypted=self.governance.encrypt(name),
+                    dosage_encrypted=self.governance.encrypt(dosage),
+                    frequency=frequency,
+                    is_active=True,
+                )
+                db.add(record)
+                await db.commit()
+                self.audit.log_change(
+                    patient_id,
+                    "PATIENT",
+                    "LOG_MEDICATION",
+                    f"Medication#{name}",
+                    details={"dosage": dosage, "frequency": frequency},
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Medication logging failed: {e}")
+                await db.rollback()
+                return False
+
+    async def get_medications(self, patient_id: str):
+        """Retrieve active medications for a patient (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = (
+                    select(MedicationRecord)
+                    .filter(
+                        MedicationRecord.patient_id == patient_id,
+                        MedicationRecord.is_active == True,
+                    )
+                    .order_by(MedicationRecord.start_date.desc())
+                )
+                res = await db.execute(stmt)
+                records = res.scalars().all()
+                results = []
+                for r in records:
+                    results.append(
+                        {
+                            "id": r.id,
+                            "name": self.governance.decrypt(
+                                r.medication_name_encrypted
+                            ),
+                            "dosage": self.governance.decrypt(r.dosage_encrypted),
+                            "frequency": r.frequency,
+                            "start_date": (
+                                r.start_date.isoformat() if r.start_date else ""
+                            ),
+                            "is_active": r.is_active,
+                        }
+                    )
+                return results
+            except Exception as e:
+                logger.error(f"Failed to get medications: {e}")
+                return []
+
+    async def add_medication(
+        self, user_id: str, name: str, dosage: str, frequency: str
+    ):
+        """Add a medication to the Medication table and create a default reminder (Async)."""
+        from database.models import Medication, Reminder
+
+        async with AsyncSessionLocal() as db:
+            try:
+                med = Medication(
+                    user_id=user_id,
+                    name_encrypted=self.governance.encrypt(name),
+                    dosage_encrypted=self.governance.encrypt(dosage),
+                    frequency_encrypted=self.governance.encrypt(frequency),
+                    is_active=True,
+                )
+                db.add(med)
+                await db.flush()
+
+                self.audit.log_change(
+                    user_id,
+                    "PATIENT",
+                    "ADD_MEDICATION",
+                    f"Medication#{name}",
+                    details={"dosage": dosage, "frequency": frequency},
+                )
+
+                await db.commit()
+                return med.id
+            except Exception as e:
+                logger.error(f"Failed to add medication: {e}")
+                await db.rollback()
+                return None
+
+    async def get_medications_list(self, user_id: str):
+        """Retrieve medications from the Medication table (Async)."""
+        from database.models import Medication
+
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = (
+                    select(Medication)
+                    .filter(Medication.user_id == user_id, Medication.is_active == True)
+                    .order_by(Medication.start_date.desc())
+                )
+                res = await db.execute(stmt)
+                meds = res.scalars().all()
+                results = []
+                for m in meds:
+                    results.append(
+                        {
+                            "id": m.id,
+                            "name": self.governance.decrypt(m.name_encrypted),
+                            "dosage": self.governance.decrypt(m.dosage_encrypted),
+                            "frequency": self.governance.decrypt(m.frequency_encrypted),
+                            "start_date": (
+                                m.start_date.isoformat() if m.start_date else ""
+                            ),
+                            "is_active": m.is_active,
+                        }
+                    )
+                return results
+            except Exception as e:
+                logger.error(f"Failed to get medications list: {e}")
+                return []
+
+    async def deactivate_medication(self, user_id: str, med_id: int):
+        """Deactivate a medication (Async)."""
+        from database.models import Medication
+
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = select(Medication).filter(
+                    Medication.id == med_id, Medication.user_id == user_id
+                )
+                res = await db.execute(stmt)
+                med = res.scalars().first()
+                if med:
+                    med.is_active = False
+                    med.end_date = datetime.datetime.utcnow()
+                    await db.commit()
+                    self.audit.log_change(
+                        user_id,
+                        "PATIENT",
+                        "DEACTIVATE_MEDICATION",
+                        f"Medication#{med_id}",
+                    )
+                    return True
+                return False
+            except Exception as e:
+                logger.error(f"Failed to deactivate medication: {e}")
+                await db.rollback()
+                return False
+
+    async def add_reminder(
+        self, user_id: str, title: str, time_str: str, med_id: int = None
+    ):
+        """Add a health reminder (Async)."""
+        from database.models import Reminder
+
+        async with AsyncSessionLocal() as db:
+            try:
+                reminder = Reminder(
+                    user_id=user_id,
+                    medication_id=med_id,
+                    title_encrypted=self.governance.encrypt(title),
+                    reminder_time=time_str,
+                    is_enabled=True,
+                )
+                db.add(reminder)
+                await db.commit()
+                self.audit.log_change(
+                    user_id,
+                    "PATIENT",
+                    "ADD_REMINDER",
+                    f"Reminder#{title}",
+                    details={"time": time_str},
+                )
+                return reminder.id
+            except Exception as e:
+                logger.error(f"Failed to add reminder: {e}")
+                await db.rollback()
+                return None
+
+    async def get_reminders(self, user_id: str):
+        """Retrieve active reminders for a user (Async)."""
+        from database.models import Reminder
+
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = (
+                    select(Reminder)
+                    .filter(Reminder.user_id == user_id, Reminder.is_enabled == True)
+                    .order_by(Reminder.id.desc())
+                )
+                res = await db.execute(stmt)
+                rems = res.scalars().all()
+                results = []
+                for r in rems:
+                    results.append(
+                        {
+                            "id": r.id,
+                            "title": self.governance.decrypt(r.title_encrypted),
+                            "time": r.reminder_time,
+                            "is_enabled": r.is_enabled,
+                            "medication_id": r.medication_id,
+                            "last_triggered": (
+                                r.last_triggered.isoformat()
+                                if r.last_triggered
+                                else None
+                            ),
+                        }
+                    )
+                return results
+            except Exception as e:
+                logger.error(f"Failed to get reminders: {e}")
+                return []
+
+    def get_all_active_reminders(self):
+        """Retrieve all active reminders system-wide (Sync — for scheduler thread)."""
+        from database.models import Reminder
+
+        db = SessionLocal()
+        try:
+            rems = db.query(Reminder).filter(Reminder.is_enabled == True).all()
+            results = []
+            for r in rems:
+                # Get user email for notification
+                user = db.query(UserAccount).filter(UserAccount.id == r.user_id).first()
+                email = user.email if user else "unknown@system"
+                results.append(
+                    {
+                        "id": r.id,
+                        "user_id": r.user_id,
+                        "title": self.governance.decrypt(r.title_encrypted),
+                        "time": r.reminder_time,
+                        "email": email,
+                        "last_triggered": r.last_triggered,
+                    }
+                )
+            return results
+        except Exception as e:
+            logger.error(f"Failed to get all active reminders: {e}")
+            return []
+        finally:
+            db.close()
+
+    def mark_reminder_triggered(self, reminder_id: int):
+        """Mark that a reminder was triggered (Sync — for scheduler thread)."""
+        from database.models import Reminder
+
+        db = SessionLocal()
+        try:
+            rem = db.query(Reminder).filter(Reminder.id == reminder_id).first()
+            if rem:
+                rem.last_triggered = datetime.datetime.utcnow()
+                db.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to mark reminder triggered: {e}")
+            db.rollback()
+            return False
+        finally:
+            db.close()
+
+    async def get_reports_by_patient(self, patient_id: str):
+        """Retrieve medical reports by patient ID (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = (
+                    select(MedicalReport)
+                    .filter(MedicalReport.patient_id == patient_id)
+                    .order_by(MedicalReport.generated_at.desc())
+                )
+                res = await db.execute(stmt)
+                reports = res.scalars().all()
+                results = []
+                for r in reports:
+                    content = ""
+                    try:
+                        content = self.governance.decrypt(r.report_content_encrypted)
+                    except Exception:
+                        content = "encrypted"
+                    results.append(
+                        {
+                            "id": r.id,
+                            "generated_at": (
+                                r.generated_at.isoformat() if r.generated_at else ""
+                            ),
+                            "report_type": r.report_type,
+                            "content": content,
+                            "version": r.version,
+                        }
+                    )
+                return results
+            except Exception as e:
+                logger.error(f"Failed to get reports: {e}")
+                return []
+
+    async def delete_account(self, user_id: str):
+        """Soft-delete a user account by marking it inactive (Async)."""
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = select(UserAccount).filter(UserAccount.id == user_id)
+                res = await db.execute(stmt)
+                user = res.scalars().first()
+                if user:
+                    user.account_status = "deleted"
+                    user.email = f"deleted_{user_id[:8]}@anon"
+                    user.phone = f"000-{user_id[:8]}"
+                    user.full_name_encrypted = self.governance.encrypt("Deleted User")
+                    await db.commit()
+                    self.audit.log_change(
+                        user_id, "SYSTEM", "DELETE_ACCOUNT", f"User#{user_id}"
+                    )
+                    return True
+                return False
+            except Exception as e:
+                logger.error(f"Failed to delete account: {e}")
+                await db.rollback()
+                return False
 
     def close(self):
         self.governance.close()

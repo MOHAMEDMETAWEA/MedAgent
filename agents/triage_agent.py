@@ -37,7 +37,7 @@ class TriageAgent:
             logger.error(f"Error loading prompt {filename}: {e}")
             raise
 
-    def process(self, state: dict):
+    async def process(self, state: dict):
         from langchain_core.messages import SystemMessage
 
         from utils.audit_logger import AuditLogger
@@ -94,7 +94,7 @@ class TriageAgent:
             prompt_template = self._load_prompt("triage_agent.txt")
             system_msg = SystemMessage(content=prompt_template)
             llm = self._get_llm(state)
-            response = llm.invoke([system_msg] + list(messages))
+            response = await llm.ainvoke([system_msg] + list(messages))
             content = response.content
 
             # Parse Urgency (Map framework risk to agent urgency)

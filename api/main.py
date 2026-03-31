@@ -34,7 +34,8 @@ if str(_root) not in sys.path:
 import time
 
 import httpx
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import (Depends, FastAPI, File, HTTPException, Request,
+                     UploadFile, WebSocket, WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -78,8 +79,9 @@ from api.deps import (check_admin_auth, get_audit_agent, get_auth_agent,
                       get_orchestrator, get_persistence, get_report_agent,
                       get_review_agent, get_verification_agent, oauth2_scheme)
 from api.routes import (analytics, auth, clinical, docs, ehr, feedback,
-                        governance, imaging, learning, patient, pediatric,
-                        system)
+                        governance, imaging, learning, medications, patient,
+                        pediatric, system)
+from api.ws_manager import manager
 
 
 @asynccontextmanager
@@ -97,8 +99,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="MedAgent Global System", version="5.3.0-PRODUCTION", lifespan=lifespan
+    title="MedAgent Global System", version="5.4.0-GOLD-READY", lifespan=lifespan
 )
+
 
 # Register Modular Routers
 app.include_router(auth.router)
@@ -113,6 +116,7 @@ app.include_router(ehr.router)
 app.include_router(docs.router)
 app.include_router(analytics.router)
 app.include_router(pediatric.router)
+app.include_router(medications.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -144,12 +148,12 @@ except Exception:
 
 @app.get("/")
 async def root():
-    return {"status": "Online", "version": "5.3.0"}
+    return {"status": "Online", "version": "5.4.0-GOLD-READY"}
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "5.3.0"}
+    return {"status": "ok", "version": "5.4.0-GOLD-READY"}
 
 
 @app.get("/health/live")
@@ -445,6 +449,63 @@ async def docs_soap(req: SOAPRequest, user: dict = Depends(get_current_user)):
 
 class TTSRequest(BaseModel):
     text: str
+
+
+@app.websocket("/ws/chat/{user_id}")
+async def websocket_chat(websocket: WebSocket, user_id: str):
+    """Real-time clinical consultation chat endpoint."""
+    orchestrator = get_orchestrator()
+    await manager.connect(websocket, user_id, role="patient")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                msg_data = json.loads(data)
+                user_input = msg_data.get("text", "")
+                mode = msg_data.get("mode", "patient")
+                image_path = msg_data.get("image_path")
+            except Exception:
+                user_input = data
+                mode = "patient"
+                image_path = None
+
+            # Stream from Orchestrator
+            async for update in orchestrator.stream_run(
+                initial_input=user_input,
+                user_id=user_id,
+                interaction_mode=mode,
+                image_path=image_path,
+            ):
+                await manager.send_personal_message(update, user_id)
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, user_id)
+    except Exception as e:
+        logger.error(f"WS Chat error: {e}")
+        manager.disconnect(websocket, user_id)
+
+
+@app.websocket("/ws/audit")
+async def websocket_audit(websocket: WebSocket):
+    """Real-time system transparency for staff (admins/doctors)."""
+    # For simplicity, we connect as 'admin' to hear broadcasts
+    await manager.connect(websocket, "staff_broadcast", role="admin")
+    try:
+        while True:
+            await websocket.receive_text()  # Keep alive
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, "staff_broadcast")
+
+
+@app.websocket("/ws/analytics")
+async def websocket_analytics(websocket: WebSocket):
+    """Real-time system health metrics broadcasting."""
+    await manager.connect(websocket, "analytics_broadcast", role="admin")
+    try:
+        while True:
+            await websocket.receive_text()  # Keep alive
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, "analytics_broadcast")
 
 
 @app.post("/system/tts")

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
-from . import auth, clinical, feedback, governance, imaging, patient, system
+from . import (analytics, auth, clinical, feedback, governance, imaging,
+               medications, patient, system)
 
 router = APIRouter()
 # Routers will be included in main.py directly or here.

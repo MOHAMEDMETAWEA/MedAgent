@@ -18,7 +18,7 @@ class FeedbackRLLoop:
         self._db_factory = SessionLocal
 
     def analyze_clinical_trends(self, limit: int = 100) -> Dict[str, Any]:
-        """Compute aggregate performance metrics from doctor feedback."""
+        """Compute aggregate performance metrics with Weighted Role Influence."""
         db = self._db_factory()
         try:
             # Aggregate rating by role
@@ -32,12 +32,27 @@ class FeedbackRLLoop:
                 .all()
             )
 
-            stats = {
-                row.role: {"avg": float(row.avg_rating), "count": row.total_count}
-                for row in results
-            }
+            # WEIGHTING LOGIC: Doctor feedback (2.0) vs Patient (1.0)
+            total_weighted_sum = 0
+            total_weight = 0
 
-            # Detect low-confidence clusters (Potential Hallucinations)
+            stats = {}
+            for row in results:
+                role = getattr(row.role, "value", row.role)
+                avg = float(row.avg_rating)
+                count = row.total_count
+
+                weight = 2.0 if role == "doctor" else 1.0
+                total_weighted_sum += avg * count * weight
+                total_weight += count * weight
+
+                stats[role] = {"avg": avg, "count": count, "weight": weight}
+
+            stats["system_weighted_score"] = (
+                round(total_weighted_sum / total_weight, 2) if total_weight > 0 else 0.0
+            )
+
+            # Detect low-confidence clusters
             low_confidence_incidents = (
                 db.query(Interaction)
                 .filter(
@@ -47,11 +62,46 @@ class FeedbackRLLoop:
             )
 
             stats["safety_alerts"] = low_confidence_incidents
-            logger.info("RL Brain: Clinical trend analysis complete.")
+            logger.info(
+                f"RL Brain: Clinical trend analysis complete. Weighted Score: {stats['system_weighted_score']}"
+            )
             return stats
         except Exception as e:
             logger.error(f"Feedback analysis fail: {e}")
             return {}
+        finally:
+            db.close()
+
+    def get_latest_clinical_corrections(self, limit: int = 5) -> str:
+        """Fetch the most recent high-quality doctor corrections for reasoning context."""
+        db = self._db_factory()
+        try:
+            corrections = (
+                db.query(Feedback)
+                .filter(
+                    Feedback.role == "doctor",
+                    Feedback.rating >= 4,
+                    Feedback.corrected_response_encrypted.isnot(None),
+                )
+                .order_by(Feedback.timestamp.desc())
+                .limit(limit)
+                .all()
+            )
+
+            from agents.governance_agent import GovernanceAgent
+
+            gov = GovernanceAgent()
+
+            correction_text = ""
+            for fb in corrections:
+                orig = gov.decrypt(fb.ai_response_encrypted)
+                corr = gov.decrypt(fb.corrected_response_encrypted)
+                correction_text += f"[PREVIOUS ERROR]: {orig[:100]}...\n[DOCTOR CORRECTION]: {corr}\n---\n"
+
+            return correction_text
+        except Exception as e:
+            logger.error(f"Failed to fetch RL corrections: {e}")
+            return ""
         finally:
             db.close()
 

@@ -13,7 +13,7 @@ from pydantic import BaseModel, field_validator
 from api.deps import (get_current_user, get_generative_engine,
                       get_orchestrator, get_persistence)
 
-router = APIRouter(tags=["Clinical"])
+router = APIRouter(prefix="/clinical", tags=["Clinical"])
 
 
 class PatientRequest(BaseModel):

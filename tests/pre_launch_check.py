@@ -36,6 +36,13 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# --- LOGGING ---
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("PreLaunchCheck")
+
 # --- AI MOCKS (Crucial for CI/CD and pre-launch checks without real API keys) ---
 try:
     import tests.ai_mocks
@@ -45,12 +52,6 @@ except ImportError:
     logger.warning("tests.ai_mocks not found. Proceeding with real API calls.")
 
 import asyncio
-
-# --- LOGGING ---
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-logger = logging.getLogger("PreLaunchCheck")
 
 # ═══════════════════════════════════════════
 # RESULTS TRACKING
@@ -387,7 +388,7 @@ def test_safety():
         ("I have a headache", False),
     ]
     for text, should_block in inj_tests:
-        is_inj, _ = detect_prompt_injection(text)
+        is_inj = detect_prompt_injection(text)
         passed = is_inj == should_block
         record(
             f"Injection detection: '{text[:40]}...'",

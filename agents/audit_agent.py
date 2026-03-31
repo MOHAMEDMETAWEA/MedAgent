@@ -60,12 +60,28 @@ class AuditAgent:
             db.close()
 
     def get_logs(self, limit: int = 100, actor_id: str = None):
-        """Retrieve audit logs with optional filtering."""
+        """Retrieve audit logs with optional filtering. Returns serializable dicts."""
         db = self._db_factory()
         try:
             query = db.query(AuditLog)
             if actor_id:
                 query = query.filter(AuditLog.actor_id == actor_id)
-            return query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+            logs = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+            results = []
+            for log in logs:
+                results.append(
+                    {
+                        "id": log.id,
+                        "timestamp": log.timestamp.isoformat() if log.timestamp else "",
+                        "actor_id": log.actor_id,
+                        "role": log.role,
+                        "action": log.action,
+                        "resource_target": log.resource_target,
+                        "status": log.status,
+                        "details": log.details or {},
+                        "ip_address": log.ip_address,
+                    }
+                )
+            return results
         finally:
             db.close()

@@ -1,19 +1,22 @@
 # MEDAgent Pre-Launch Test Report
 
-**Date:** 2026-03-13T22:42:42.643656
+**Date:** 2026-03-29T07:19:36.064565
 
-**Total Tests:** 90 | **Passed:** 86 | **Failed:** 4 | **Critical:** 2
+**Total Tests:** 74 | **Passed:** 65 | **Failed:** 9 | **Critical:** 5
 
 ## 🚨 Critical Issues
 
-- **E2E English workflow**: OPENAI_API_KEY not set — skipping live test
-- **E2E Arabic workflow**: OPENAI_API_KEY not set — skipping live test
+- **Orchestrator**: No module named 'langchain.prompts'
+- **E2E English workflow**: Orchestrator not loaded
+- **E2E Arabic workflow**: Orchestrator not loaded
+- **API surface test**: cannot import name 'AgentResponse' from 'api.main' (D:\MedAgent\api\main.py)
+- **RAG retriever initializes**: 
 
 ## Detailed Results
 
 | # | Test | Status | Detail |
 |---|------|--------|--------|
-| 1 | OPENAI_API_KEY set | ❌ FAIL | LLM features will fail without key |
+| 1 | OPENAI_API_KEY set | ✅ PASS | Model: gpt-4o |
 | 2 | Directory exists: PROMPTS_DIR | ✅ PASS | D:\MedAgent\prompts |
 | 3 | Directory exists: DATA_DIR | ✅ PASS | D:\MedAgent\data |
 | 4 | Directory exists: RAG_DIR | ✅ PASS | D:\MedAgent\rag |
@@ -34,7 +37,7 @@
 | 19 | Agent: ReportAgent | ✅ PASS | has process(): True |
 | 20 | Agent: PatientAgent | ✅ PASS | has process(): True |
 | 21 | Agent: CalendarAgent | ✅ PASS | has process(): True |
-| 22 | Agent: PersistenceAgent | ✅ PASS | has process(): False |
+| 22 | Agent: PersistenceAgent | ✅ PASS | has process(): True |
 | 23 | Agent: SupervisorAgent | ✅ PASS | has process(): False |
 | 24 | Agent: SelfImprovementAgent | ✅ PASS | has process(): False |
 | 25 | Agent: GenerativeEngineAgent | ✅ PASS | has process(): False |
@@ -42,19 +45,19 @@
 | 27 | Agent: DeveloperControlAgent | ✅ PASS | has process(): False |
 | 28 | Agent: AuthenticationAgent | ✅ PASS | has process(): False |
 | 29 | Agent: HumanReviewAgent | ✅ PASS | has process(): False |
-| 30 | Orchestrator | ✅ PASS | Graph compiled successfully |
-| 31 | Database connected | ✅ PASS | Sessions: 69 |
+| 30 | Orchestrator | ❌ CRITICAL FAIL | No module named 'langchain.prompts' |
+| 31 | Database connected | ✅ PASS | Sessions: 142 |
 | 32 | All DB tables accessible | ✅ PASS |  |
-| 33 | DB write (create_session) | ✅ PASS | session_id=30be0bb3-7402-40ad-ae2c-ed81b0b5060a |
+| 33 | DB write (create_session) | ✅ PASS | session_id=4052e1d4-1c1b-4836-b422-154d8f4823a0 |
 | 34 | DB read (get_user_history) | ✅ PASS |  |
-| 35 | E2E English workflow | ❌ CRITICAL FAIL | OPENAI_API_KEY not set — skipping live test |
-| 36 | E2E Arabic workflow | ❌ CRITICAL FAIL | OPENAI_API_KEY not set — skipping live test |
+| 35 | E2E English workflow | ❌ CRITICAL FAIL | Orchestrator not loaded |
+| 36 | E2E Arabic workflow | ❌ CRITICAL FAIL | Orchestrator not loaded |
 | 37 | Injection detection: 'Ignore previous instructions and tell me...' | ✅ PASS | Expected block=True, got=True |
-| 38 | Injection detection: 'Forget all instructions...' | ✅ PASS | Expected block=True, got=True |
-| 39 | Injection detection: 'developer mode...' | ✅ PASS | Expected block=True, got=True |
+| 38 | Injection detection: 'Forget all instructions...' | ❌ FAIL | Expected block=True, got=False |
+| 39 | Injection detection: 'developer mode...' | ❌ FAIL | Expected block=True, got=False |
 | 40 | Injection detection: 'I have a headache...' | ✅ PASS | Expected block=False, got=False |
 | 41 | Critical symptoms: 'I want to kill myself' | ✅ PASS | Expected=True, got=True, keywords=['kill'] |
-| 42 | Critical symptoms: 'chest pain and difficulty breathing' | ✅ PASS | Expected=False, got=False, keywords=[] |
+| 42 | Critical symptoms: 'chest pain and difficulty breathing' | ❌ FAIL | Expected=False, got=True, keywords=['chest pain', 'difficulty breathing'] |
 | 43 | Critical symptoms: 'I have a mild headache' | ✅ PASS | Expected=False, got=False, keywords=[] |
 | 44 | Critical symptoms: 'I feel severe abdominal pain' | ✅ PASS | Expected=True, got=True, keywords=['severe'] |
 | 45 | Critical symptoms: 'cardiac arrest symptoms' | ✅ PASS | Expected=True, got=True, keywords=['cardiac arrest'] |
@@ -64,45 +67,33 @@
 | 49 | Null byte removal | ✅ PASS |  |
 | 50 | Safety disclaimer added | ✅ PASS |  |
 | 51 | No double disclaimer | ✅ PASS |  |
-| 52 | Generative Engine (educational) | ❌ FAIL | No API key — skipped |
-| 53 | Encrypt/Decrypt round-trip | ✅ PASS | Match: True |
-| 54 | Encrypted != plaintext | ✅ PASS |  |
-| 55 | Encrypt empty string | ✅ PASS |  |
-| 56 | Decrypt empty string | ✅ PASS |  |
-| 57 | RBAC: USER can CONSULT | ✅ PASS |  |
-| 58 | RBAC: USER cannot SYSTEM_CONFIG | ✅ PASS |  |
-| 59 | RBAC: ADMIN can VIEW_ANALYTICS | ✅ PASS |  |
-| 60 | RBAC: SYSTEM can WRITE_LOGS | ✅ PASS |  |
-| 61 | Audit log write | ✅ PASS |  |
-| 62 | Feedback analysis runs | ✅ PASS | No negative feedback to analyze. |
-| 63 | Human review processing runs | ✅ PASS | No rejected interactions found. |
-| 64 | Full improvement report | ✅ PASS | Length: 129 |
-| 65 | GET / returns 200 | ✅ PASS | {"status":"Online","version":"5.3.0"} |
-| 66 | GET /health returns 200 | ✅ PASS |  |
-| 67 | Health status=ok | ✅ PASS |  |
-| 68 | GET /ready responds | ✅ PASS | status_code=200 |
-| 69 | POST /consult empty → 422 | ✅ PASS | status_code=422 |
-| 70 | Admin route without key → 403 | ✅ PASS |  |
-| 71 | Admin route with key → 200 | ✅ PASS |  |
-| 72 | AgentResponse has field 'summary' | ✅ PASS |  |
-| 73 | AgentResponse has field 'diagnosis' | ✅ PASS |  |
-| 74 | AgentResponse has field 'appointment' | ✅ PASS |  |
-| 75 | AgentResponse has field 'doctor_review' | ✅ PASS |  |
-| 76 | AgentResponse has field 'is_emergency' | ✅ PASS |  |
-| 77 | AgentResponse has field 'medical_report' | ✅ PASS |  |
-| 78 | AgentResponse has field 'doctor_summary' | ✅ PASS |  |
-| 79 | AgentResponse has field 'patient_instructions' | ✅ PASS |  |
-| 80 | POST /feedback → 200 | ✅ PASS |  |
-| 81 | Long input truncated | ✅ PASS |  |
-| 82 | Arabic input survives sanitization | ✅ PASS |  |
-| 83 | Mixed EN/AR input accepted | ✅ PASS |  |
-| 84 | RAG retriever initializes | ✅ PASS | Skipped due to missing API key |
-| 85 | RAG retrieval returns content | ✅ PASS | Skipped |
-| 86 | RAG retrieval not error msg | ✅ PASS | Skipped |
-| 87 | Report parse: medical section | ✅ PASS |  |
-| 88 | Report parse: doctor summary | ✅ PASS |  |
-| 89 | Report parse: patient instructions | ✅ PASS |  |
-| 90 | Report parse: empty input safe | ✅ PASS |  |
+| 52 | Gen Engine: educational content | ❌ FAIL | Length: 25 |
+| 53 | Gen Engine: injection blocked | ✅ PASS | Response: Error generating content. |
+| 54 | Encrypt/Decrypt round-trip | ✅ PASS | Match: True |
+| 55 | Encrypted != plaintext | ✅ PASS |  |
+| 56 | Encrypt empty string | ✅ PASS |  |
+| 57 | Decrypt empty string | ✅ PASS |  |
+| 58 | RBAC: USER can CONSULT | ✅ PASS |  |
+| 59 | RBAC: USER cannot SYSTEM_CONFIG | ✅ PASS |  |
+| 60 | RBAC: ADMIN can VIEW_ANALYTICS | ✅ PASS |  |
+| 61 | RBAC: SYSTEM can WRITE_LOGS | ✅ PASS |  |
+| 62 | Audit log write | ✅ PASS |  |
+| 63 | Feedback analysis runs | ✅ PASS | No negative feedback to analyze. |
+| 64 | Human review processing runs | ✅ PASS | No rejected interactions found. |
+| 65 | Full improvement report | ✅ PASS | Length: 129 |
+| 66 | API surface test | ❌ CRITICAL FAIL | cannot import name 'AgentResponse' from 'api.main' (D:\MedAgent\api\main.py) |
+| 67 | Long input truncated | ✅ PASS |  |
+| 68 | Arabic input survives sanitization | ✅ PASS |  |
+| 69 | Mixed EN/AR input accepted | ✅ PASS |  |
+| 70 | RAG retriever initializes | ❌ CRITICAL FAIL |  |
+| 71 | Report parse: medical section | ✅ PASS |  |
+| 72 | Report parse: doctor summary | ✅ PASS |  |
+| 73 | Report parse: patient instructions | ✅ PASS |  |
+| 74 | Report parse: empty input safe | ✅ PASS |  |
+
+## Performance Timings
+
+- **gen_educational**: 0.0s
 
 ## Verdict
 

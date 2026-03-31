@@ -5,7 +5,7 @@ Optimized for performance with lazy agent loading.
 
 import logging
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langdetect import detect
 from langgraph.graph import END, StateGraph
 
@@ -324,6 +324,14 @@ class MedAgentOrchestrator:
         session_id = await persistence.create_session(user_id=user_id, mode=final_mode)
         lang = self.detect_language(sanitized)
 
+        # Load conversation history for multi-turn session memory
+        history = await persistence.get_session_history(session_id)
+        past_messages = []
+
+        for h in history:
+            past_messages.append(HumanMessage(content=h["user"]))
+            past_messages.append(AIMessage(content=h["ai"]))
+
         # Phase 11: Scalability - Prediction Caching
         from intelligence.inference_cache import inference_cache
 
@@ -337,7 +345,7 @@ class MedAgentOrchestrator:
 
         try:
             state = {
-                "messages": [HumanMessage(content=sanitized)],
+                "messages": past_messages + [HumanMessage(content=sanitized)],
                 "user_id": user_id,
                 "session_id": session_id,
                 "patient_info": {"ehr": ehr_data, "vitals": ehr_data.get("vitals", {})},
@@ -424,4 +432,92 @@ class MedAgentOrchestrator:
             return {
                 "final_response": "The system encountered a critical error. Please try again.",
                 "status": "error",
+            }
+
+    async def stream_run(
+        self,
+        initial_input: str,
+        user_id: str = "guest",
+        image_path: str = None,
+        request_second_opinion: bool = False,
+        interaction_mode: str = None,
+    ):
+        """
+        Asynchronous generator that yields state updates for real-time progress tracking.
+        """
+        persistence = self.get_agent("persistence")
+        sanitized = sanitize_input(initial_input)
+
+        # Identity retrieval
+        user_profile = {}
+        ehr_data = {}
+        from integrations.ehr_integration import ehr_manager
+
+        if user_id != "guest":
+            ehr_data = await ehr_manager.sync_patient_record(user_id)
+            from sqlalchemy import select
+
+            from database.models import AsyncSessionLocal, UserAccount
+
+            async with AsyncSessionLocal() as db:
+                try:
+                    stmt = select(UserAccount).filter(UserAccount.id == user_id)
+                    res = await db.execute(stmt)
+                    user_acc = res.scalars().first()
+                    if user_acc:
+                        user_profile = {
+                            "role": getattr(user_acc.role, "value", user_acc.role),
+                            "doctor_verified": user_acc.doctor_verified,
+                            "interaction_mode": user_acc.interaction_mode,
+                        }
+                except Exception:
+                    pass
+
+        final_mode = interaction_mode or user_profile.get("interaction_mode", "patient")
+        session_id = await persistence.create_session(user_id=user_id, mode=final_mode)
+
+        # History
+        history = await persistence.get_session_history(session_id)
+        past_messages = []
+
+        for h in history:
+            past_messages.append(HumanMessage(content=h["user"]))
+            past_messages.append(AIMessage(content=h["ai"]))
+
+        from learning.model_registry import model_registry
+
+        current_model = model_registry.get_latest_model()
+
+        state = {
+            "messages": past_messages + [HumanMessage(content=sanitized)],
+            "user_id": user_id,
+            "session_id": session_id,
+            "patient_info": {"ehr": ehr_data, "vitals": ehr_data.get("vitals", {})},
+            "final_response": "",
+            "status": "Initializing...",
+            "image_path": image_path,
+            "request_second_opinion": request_second_opinion,
+            "interaction_mode": final_mode,
+            "prompt_version": current_model.get("version", "1.0.0"),
+            "model_used": current_model.get("version", "base"),
+        }
+
+        # Yield status updates
+        try:
+            async for event in self.graph.astream(state):
+                for node_name, output in event.items():
+                    logger.info(f"Node Complete: {node_name}")
+                    yield {
+                        "node": node_name,
+                        "status": output.get("status", f"Processing {node_name}..."),
+                        "preliminary_diagnosis": output.get("preliminary_diagnosis"),
+                        "final_response": output.get("final_response"),
+                        "session_id": session_id,
+                    }
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield {
+                "node": "error",
+                "status": f"System Error: {str(e)}",
+                "session_id": session_id,
             }

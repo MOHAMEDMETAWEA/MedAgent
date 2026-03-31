@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from api.deps import (get_current_user, get_export_agent, get_governance,
-                      get_persistence)
+from api.deps import (check_admin_auth, get_current_user, get_export_agent,
+                      get_governance, get_persistence)
+from database.models import AIAuditLog, Interaction, UserSession
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -110,3 +111,63 @@ async def export_analytics_report(user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=500, detail="PDF generation failed")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/overview")
+async def get_analytics_overview(admin: dict = Depends(check_admin_auth)):
+    """Retrieve global system health and clinical performance metrics (Admin only)."""
+    pers = get_persistence()
+    db = pers.db
+    try:
+        from sqlalchemy import func
+
+        from learning.feedback_loop import FeedbackRLLoop
+
+        rl_loop = FeedbackRLLoop()
+        learning_stats = rl_loop.analyze_clinical_trends()
+
+        total_sessions = db.query(UserSession).count()
+        total_interactions = db.query(Interaction).count()
+
+        # Risk distribution
+        high_risk_count = (
+            db.query(Interaction).filter(Interaction.risk_level == "High").count()
+        )
+        emergency_count = (
+            db.query(Interaction).filter(Interaction.risk_level == "Emergency").count()
+        )
+
+        # Safety Blocks
+
+        safety_alerts = learning_stats.get("safety_alerts", 0)
+
+        # Latency (Avg)
+        avg_latency_raw = db.query(func.avg(Interaction.latency_ms)).scalar()
+        avg_latency = float(avg_latency_raw) if avg_latency_raw is not None else 0.0
+
+        # Agent Performance (Mocked for now)
+        agent_perf = {
+            "TriageAgent": 0.92,
+            "ReasoningAgent": 0.88,
+            "VisionAgent": 0.85,
+            "ValidationAgent": 0.98,
+        }
+
+        return {
+            "total_interactions": total_interactions,
+            "total_sessions": total_sessions,
+            "safety_alerts": safety_alerts,
+            "avg_latency": round(avg_latency / 1000.0, 2),  # Convert ms to s
+            "weighted_score": float(learning_stats.get("system_weighted_score", 0.0)),
+            "risk_distribution": {
+                "Emergency": emergency_count,
+                "High": high_risk_count,
+                "Stable": total_interactions - high_risk_count - emergency_count,
+            },
+            "agent_performance": agent_perf,
+            "feedback_stats": learning_stats,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Metrics aggregation failed: {str(e)}"
+        )

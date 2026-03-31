@@ -1,6 +1,6 @@
 # MEDAgent — Complete Engineering Reference Book
 
-> **Version**: 5.3.0 | **Architecture**: Multi-Agent LangGraph Orchestration | **License**: Hospital-Grade Clinical AI
+> **Version**: 5.4.0-GOLD-READY | **Architecture**: Multi-Agent LangGraph Orchestration | **License**: Hospital-Grade Clinical AI
 
 ---
 
@@ -11,6 +11,7 @@
 MEDAgent is a **multi-agent clinical intelligence platform** built on LangGraph and FastAPI. It coordinates 20+ specialized AI agents through a stateful directed graph to process patient symptoms, medical images, and clinical data — producing diagnosed, safety-checked, explainable medical recommendations.
 
 Unlike simple chatbot wrappers around an LLM, MEDAgent implements a **full clinical pipeline** with:
+
 - Triage (risk classification)
 - Knowledge retrieval (RAG with FAISS)
 - Tree-of-Thought reasoning
@@ -20,7 +21,14 @@ Unlike simple chatbot wrappers around an LLM, MEDAgent implements a **full clini
 - SOAP note generation for doctors
 - Encrypted persistence with audit chains
 
-## 1.2 Clinical Use Cases
+## 1.2 5.4.0-GOLD-READY Final Hardening Updates
+
+- **Async Database Strategy**: `PersistenceAgent`, `GovernanceAgent` now strictly utilize `AsyncSessionLocal` providing non-blocking queries, solving previous connection-pool thread starvation.
+- **Strict Exception Controls**: System logic uses explicit exception catching (`WebSocketException`, `RequestException`) significantly improving debug predictability.
+- **REST Fallback Optimization**: Frontend proxy mapping explicitly parses and standardizes legacy `/data` route shifts into `/patient/data`.
+- **Database Persistence**: Legacy simulated structures (e.g., `Reminders`, `Medications`) are fully migrated to SQLite tracking via generic asynchronous DB persistence models.
+
+## 1.3 Clinical Use Cases
 
 | Use Case | Agents Involved | Output |
 |:---|:---|:---|
@@ -134,6 +142,7 @@ Each agent is loaded only when first requested via `get_agent(name)`, which uses
 ### Node Wrapping
 
 Every node is wrapped with `wrap_node()` which:
+
 1. Detects if the agent's `process()` is async via `inspect.iscoroutinefunction`
 2. Wraps with try/except for self-healing model fallback
 3. On failure: imports `model_registry`, gets fallback model, swaps `agent.llm`, retries once
@@ -190,6 +199,7 @@ Prompts are stored as `.txt` files in `prompts/` directory. Each agent loads its
 ## 3.1 Configuration — `config.py`
 
 ### Purpose
+
 Central configuration hub. Uses Pydantic `BaseSettings` to load environment variables from `.env` with type validation.
 
 ### Key Settings Groups
@@ -216,6 +226,7 @@ Central configuration hub. Uses Pydantic `BaseSettings` to load environment vari
 ## 3.2 Agent State — `agents/state.py`
 
 ### Purpose
+
 Defines the `AgentState` TypedDict — the **shared mutable state** that flows through the entire LangGraph pipeline.
 
 ### Line-by-Line
@@ -223,16 +234,19 @@ Defines the `AgentState` TypedDict — the **shared mutable state** that flows t
 ```python
 messages: Annotated[Sequence[BaseMessage], operator.add]
 ```
+
 → Uses LangGraph's **reducer** pattern. The `operator.add` annotation means that when any agent returns `{"messages": [...]}`, the new messages are **appended** to the existing list, not replaced. This preserves the full conversation history.
 
 ```python
 user_age: str
 ```
+
 → Typed as `str` (not `int`) because it may be `"Unknown"` for guest users. All agents check `state.get("user_age", 0)` with int coercion where needed.
 
 ```python
 correction_count: int
 ```
+
 → Tracks self-correction loop iterations. The orchestrator's `route_validation()` checks `correction_count < 2` to prevent infinite retry loops.
 
 ---
@@ -240,6 +254,7 @@ correction_count: int
 ## 3.3 Orchestrator — `agents/orchestrator.py`
 
 ### Purpose
+
 The **brain** of the system. Builds and compiles the LangGraph `StateGraph`, manages agent lifecycle, and runs the async pipeline.
 
 ### Class: `MedAgentOrchestrator`
@@ -255,6 +270,7 @@ The **brain** of the system. Builds and compiles the LangGraph `StateGraph`, man
 ```python
 workflow = StateGraph(AgentState)
 ```
+
 → Creates a new LangGraph state graph typed to `AgentState`.
 
 ```python
@@ -263,6 +279,7 @@ def wrap_node(node_name):
     method = getattr(agent, "process", None) or getattr(agent, "run", None)
     is_async = inspect.iscoroutinefunction(method)
 ```
+
 → Every agent is wrapped. The wrapper looks for `process()` first, then `run()`. It detects if the method is async.
 
 ```python
@@ -270,6 +287,7 @@ if is_async:
     return await method(state)
 return method(state)
 ```
+
 → Supports both sync and async agents transparently. The LangGraph framework handles async wrapping.
 
 ```python
@@ -277,6 +295,7 @@ from learning.model_registry import model_registry
 fallback = model_registry.get_fallback_model()
 agent.llm = get_model(model_name=fallback.get("version"))
 ```
+
 → **Self-healing fallback**: If any agent crashes, the wrapper dynamically swaps the agent's LLM to a backup model and retries once.
 
 #### Edge Structure (Post-Audit Fix)
@@ -299,6 +318,7 @@ The graph flow after the production audit fix:
 ## 3.4 Patient Agent — `agents/patient_agent.py`
 
 ### Purpose
+
 First agent in the pipeline. Loads patient profile, medical history, and memory graph context. Summarizes the patient's input for downstream agents.
 
 ### Key Logic
@@ -309,11 +329,13 @@ long_term_memory = await persistence.get_long_term_memory(user_id)
 memory_graph = await persistence.get_memory_graph_context(user_id)
 case_id = await persistence.get_or_create_case(user_id)
 ```
+
 → Four async database lookups that build a comprehensive patient context. The `memory_graph` retrieves a summarized graph of all past symptoms, diagnoses, and medications.
 
 ```python
 response = await llm.ainvoke([system_msg, intake_msg])
 ```
+
 → Uses the LLM to generate a structured patient summary from the raw input + context.
 
 ---
@@ -321,6 +343,7 @@ response = await llm.ainvoke([system_msg, intake_msg])
 ## 3.5 Triage Agent — `agents/triage_agent.py`
 
 ### Purpose
+
 Classifies symptom urgency and structures patient data. Integrates FHIR EMR data and the MedicalSafetyFramework for regulatory risk classification.
 
 ### Key Logic
@@ -329,17 +352,20 @@ Classifies symptom urgency and structures patient data. Integrates FHIR EMR data
 risk_level = MedicalSafetyFramework.classify_risk(user_input)
 mandatory_disclaimer = MedicalSafetyFramework.get_mandatory_disclaimer(risk_level)
 ```
+
 → Keyword-based risk classification: scans for "chest pain", "suicide", "seizure" etc. Returns "Emergency" / "High" / "Medium" / "Low".
 
 ```python
 fhir_client = FHIRClient()
 bg = fhir_client.fetch_patient_background(fhir_id)
 ```
+
 → If the patient has a FHIR ID, pulls EMR conditions and medications to enrich the triage context.
 
 ```python
 is_sufficient = "STRUCTURED_CASE:" in content
 ```
+
 → The LLM is prompted to output `STRUCTURED_CASE:` followed by JSON if it has enough data for structured analysis. If missing, the case is marked "incomplete".
 
 ---
@@ -347,6 +373,7 @@ is_sufficient = "STRUCTURED_CASE:" in content
 ## 3.6 Knowledge Agent — `agents/knowledge_agent.py`
 
 ### Purpose
+
 Retrieves clinical evidence from the FAISS vector store and FHIR EMR system.
 
 ### Key Logic
@@ -356,18 +383,21 @@ fhir = FHIRConnector(base_url=settings.FHIR_BASE_URL)
 conditions = await fhir.get_conditions(patient_id)
 meds = await fhir.get_medications(patient_id)
 ```
+
 → Fetches real EMR data using the HL7 FHIR R4 standard.
 
 ```python
 retriever = self.get_retriever()
 knowledge = retriever.retrieve(patient_summary)
 ```
+
 → Semantic search against the FAISS index. Returns top-K matching medical guideline chunks.
 
 ```python
 trusted_domains = ["who.int", "nih.gov", "pubmed", "cdc.gov"]
 is_verified = any(domain in knowledge.lower() for domain in trusted_domains)
 ```
+
 → Source verification: flags whether retrieved knowledge comes from trusted clinical sources.
 
 ---
@@ -375,6 +405,7 @@ is_verified = any(domain in knowledge.lower() for domain in trusted_domains)
 ## 3.7 Reasoning Agent — `agents/reasoning_agent.py`
 
 ### Purpose
+
 Core diagnostic engine. Uses **Tree-of-Thought (ToT)** reasoning for high-risk cases and fast-path single-shot for lower-risk.
 
 ### Key Logic
@@ -383,6 +414,7 @@ Core diagnostic engine. Uses **Tree-of-Thought (ToT)** reasoning for high-risk c
 cdss_data = await cdss_engine.generate_cdss_payload(state)
 state["risk_level"] = cdss_data["cdss_risk"]
 ```
+
 → Integrates the CDSS (Clinical Decision Support System) to set a NEWS2-style risk score.
 
 ```python
@@ -394,11 +426,13 @@ else:
     paths_response = await llm.ainvoke([...])
     final_selection = await llm.ainvoke([...])
 ```
+
 → **Performance optimization**: Low-risk cases get a single LLM call. High-risk cases get 3 reasoning branches + expert selection (2 LLM calls). This balances cost vs clinical safety.
 
 ```python
 explanation = await clinical_explainer.generate_explanation(state, target_role=role)
 ```
+
 → Role-adapted explanations: doctors get technical reasoning traces; patients get simplified explanations.
 
 ---
@@ -406,6 +440,7 @@ explanation = await clinical_explainer.generate_explanation(state, target_role=r
 ## 3.8 Validation Agent — `agents/validation_agent.py`
 
 ### Purpose
+
 Cross-checks the reasoning output against the retrieved evidence. Prevents hallucinations at the validation layer.
 
 ### Key Logic
@@ -416,6 +451,7 @@ if "VALID" in result and "ISSUE" not in result:
 else:
     return {"validation_status": "invalid", "retry_reason": result}
 ```
+
 → The LLM is asked to output "VALID" or "ISSUE: <explanation>". If invalid, `retry_reason` triggers the self-correction loop back to reasoning.
 
 ---
@@ -423,6 +459,7 @@ else:
 ## 3.9 Hallucination Detector — `agents/hallucination_detector.py`
 
 ### Purpose
+
 Specialized auditor that scores the factual integrity of the diagnosis against retrieved evidence.
 
 ### Key Logic
@@ -431,12 +468,14 @@ Specialized auditor that scores the factual integrity of the diagnosis against r
 state["hallucination_score"] = score
 state["is_hallucinating"] = score < 85
 ```
+
 → If the score falls below 85/100, the detector flags it and sets `validation_status = "invalid"` to trigger the correction loop.
 
 ```python
 def _parse_score(self, text: str) -> int:
     match = re.search(r'Score:\s*(\d+)', text, re.IGNORECASE)
 ```
+
 → Regex extraction of the numerical score from the LLM's free-text response.
 
 ---
@@ -444,6 +483,7 @@ def _parse_score(self, text: str) -> int:
 ## 3.10 Uncertainty Calibrator — `agents/uncertainty_calibrator.py`
 
 ### Purpose
+
 Determines if AI confidence is high enough for autonomous output, or if human review is mandatory.
 
 ### Key Logic
@@ -454,12 +494,14 @@ if state.get("is_hallucinating"):
 if state.get("correction_count", 0) > 1:
     confidence -= 10
 ```
+
 → Penalizes confidence for hallucination or repeated corrections.
 
 ```python
 if state["calibrated_confidence"] < self.threshold:
     state["requires_human_review"] = True
 ```
+
 → If calibrated confidence drops below 85%, mandatory human review is triggered.
 
 ---
@@ -467,6 +509,7 @@ if state["calibrated_confidence"] < self.threshold:
 ## 3.11 Safety Agent — `agents/safety_agent.py`
 
 ### Purpose
+
 LLM-powered safety auditor that checks the diagnosis for harmful content, red flags, and prompt injection.
 
 ### Key Logic
@@ -476,6 +519,7 @@ from utils.safety import detect_critical_symptoms, _detect_injection_patterns
 is_critical, keywords = detect_critical_symptoms(diagnosis)
 is_injection, injection_patterns = _detect_injection_patterns(diagnosis)
 ```
+
 → Dual check: keyword-based critical symptom detection + regex-based injection pattern detection.
 
 ```python
@@ -483,6 +527,7 @@ response = llm.invoke([...])
 parsed = json.loads(result[start:end])
 risk_level = parsed.get("risk_level", "LOW")
 ```
+
 → LLM generates a structured JSON safety assessment. Falls back to keyword heuristic if JSON parsing fails.
 
 ---
@@ -490,12 +535,15 @@ risk_level = parsed.get("risk_level", "LOW")
 ## 3.12 Specialty Agents
 
 ### Pediatric Agent (`agents/pediatric_agent.py`) — "Theo"
+
 Transforms clinical findings into child-friendly explanations using metaphors and encouraging language. The LLM is persona-prompted as "Theo", a friendly pediatric specialist.
 
 ### Pregnancy Agent (`agents/pregnancy_agent.py`) — "Maya"
+
 OB/GYN specialist. Provides pregnancy-safe advice, categorizes medications (A/B/C/D/X), and tailors to trimester.
 
 ### Mental Health Agent (`agents/mental_health_agent.py`) — "Aria"
+
 Clinical psychologist. Screens for suicide/self-harm risk, uses trauma-informed language, and provides coping mechanisms. Calculates a basic distress score (1-10).
 
 ---
@@ -503,6 +551,7 @@ Clinical psychologist. Screens for suicide/self-harm risk, uses trauma-informed 
 ## 3.13 Response Agent — `agents/response_agent.py`
 
 ### Purpose
+
 Final polish of the system response based on interaction mode, role, language, and communication preferences.
 
 ### Key Logic
@@ -515,6 +564,7 @@ prompt = base_prompt.format(
     input_content=final_response
 )
 ```
+
 → Uses a structured communication template that adapts based on 9 context variables.
 
 ```python
@@ -522,6 +572,7 @@ from .patient_adapter import PatientCommunicationAdapter
 adapter = PatientCommunicationAdapter()
 adapted_response = adapter.transform(adapted_response, state)
 ```
+
 → Additional simplification for patient-mode users through the Patient Communication Adapter.
 
 ---
@@ -529,6 +580,7 @@ adapted_response = adapter.transform(adapted_response, state)
 ## 3.14 Safety Guardrail Agent — `agents/safety_guardrail_agent.py`
 
 ### Purpose
+
 **Final node** before SOAP. Injects mandatory disclaimers and overrides the response in emergency cases.
 
 ### Key Logic
@@ -539,6 +591,7 @@ disclaimer = MedicalSafetyFramework.get_mandatory_disclaimer(risk_level)
 if disclaimer not in final_response:
     state["final_response"] = f"{final_response}\n\n---\n{disclaimer}"
 ```
+
 → Ensures every response has a risk-appropriate disclaimer. For emergencies, completely overrides with a call-911 message.
 
 ---
@@ -546,6 +599,7 @@ if disclaimer not in final_response:
 ## 3.15 SOAP Agent — `agents/soap_agent.py`
 
 ### Purpose
+
 Clinical documentation. Generates structured SOAP notes (Subjective, Objective, Assessment, Plan) for doctor dashboards.
 
 ### Key Logic
@@ -559,6 +613,7 @@ chain = prompt | self.llm
 response = await chain.ainvoke({})
 state["soap_notes"] = response.content
 ```
+
 → Uses `prompt | llm` LangChain chain syntax to generate structured SOAP documentation.
 
 ---
@@ -566,6 +621,7 @@ state["soap_notes"] = response.content
 ## 3.16 Clinical Review Agent — `agents/clinical_review_agent.py`
 
 ### Purpose
+
 Human-in-the-loop (HITL) workflow. When triage detects high-risk, this agent flags the case for doctor review and pauses execution.
 
 ### Key Logic
@@ -574,11 +630,13 @@ Human-in-the-loop (HITL) workflow. When triage detects high-risk, this agent fla
 def process(self, state: dict):
     return self.process_high_risk_case(state)
 ```
+
 → The `process()` method (required by the orchestrator) delegates to `process_high_risk_case()` which sets `requires_human_review = True` and returns a HITL-active status.
 
 ```python
 def submit_review(self, interaction_id, action, comment):
 ```
+
 → API endpoint handler for when a doctor approves, rejects, or escalates a flagged case.
 
 ---
@@ -586,6 +644,7 @@ def submit_review(self, interaction_id, action, comment):
 ## 3.17 Vision Agent — `agents/vision_agent.py`
 
 ### Purpose
+
 Analyzes medical images (X-ray, MRI, skin lesions) using GPT-4o Vision with clinical-grade structured prompts.
 
 ### Key Logic
@@ -596,6 +655,7 @@ def _encode_image(self, image_path: str) -> str:
         ds = pydicom.dcmread(image_path)
         img_array = ds.pixel_array.astype(float)
 ```
+
 → DICOM support: reads medical imaging format, rescales pixel data to 0-255, converts to PNG, then base64-encodes.
 
 ---
@@ -603,6 +663,7 @@ def _encode_image(self, image_path: str) -> str:
 ## 3.18 Persistence Agent — `agents/persistence_agent.py`
 
 ### Purpose
+
 566-line agent managing all database operations: sessions, interactions, profiles, memory graph, medical cases, and reports.
 
 ### Key Methods
@@ -624,18 +685,22 @@ All text data is encrypted via `GovernanceAgent.encrypt()` (AES-256 Fernet) befo
 ## 3.19 Governance Agent — `agents/governance_agent.py`
 
 ### Purpose
+
 232-line security hub managing encryption, JWT authentication, password hashing, RBAC, and token revocation.
 
 ### Key Methods
 
 **Encryption**:
+
 ```python
 def encrypt(self, data: str) -> str:
     return self.cipher.encrypt(data.encode()).decode()
 ```
+
 → Uses Fernet (AES-256-CBC) encryption. Key from `DATA_ENCRYPTION_KEY` env var. Generates warning-level temp key if missing.
 
 **JWT with Revocation**:
+
 ```python
 def verify_token(self, token: str):
     payload = jwt.decode(token, self.jwt_secret, algorithms=["HS256"])
@@ -643,6 +708,7 @@ def verify_token(self, token: str):
     if inference_cache._redis.exists(f"token_blacklist:{jti}"):
         return None  # Token has been revoked
 ```
+
 → Every JWT gets a unique `jti` (JWT ID). On logout, the `jti` is added to a Redis blacklist with the token's remaining TTL.
 
 ---
@@ -650,6 +716,7 @@ def verify_token(self, token: str):
 ## 3.20 Utilities — `utils/`
 
 ### `utils/safety.py`
+
 | Function | Returns | Purpose |
 |:---|:---|:---|
 | `detect_prompt_injection(text)` | `bool` | Detects 10 common LLM adversarial patterns |
@@ -660,18 +727,23 @@ def verify_token(self, token: str):
 | `add_safety_disclaimer(response)` | `str` | Appends medical disclaimer |
 
 ### `utils/audit_logger.py`
+
 Implements an **immutable audit chain** using SHA-256 hash linking:
+
 ```python
 prev_hash = last_log.audit_hash if last_log else "GENESIS_BLOCK"
 raw_content = f"{prev_hash}-{user_id}-{agent_name}-{input_data[:50]}-{output_data[:50]}"
 audit_hash = hashlib.sha256(raw_content.encode()).hexdigest()
 ```
+
 Each log entry links to the previous entry's hash, creating a blockchain-like chain that detects tampering.
 
 ### `utils/phi_redactor.py`
+
 Regex-based PHI stripping for 6 pattern types: email, phone, SSN, DOB, credit card, name prefixes.
 
 ### `utils/medical_safety_framework.py`
+
 Static methods for risk classification and mandatory disclaimers. Includes forbidden topics list (dosage recommendations, surgical instructions, euthanasia).
 
 ---
@@ -681,6 +753,7 @@ Static methods for risk classification and mandatory disclaimers. Includes forbi
 ## 4.1 Orchestrator → Agents
 
 The orchestrator uses a **lazy registry pattern**:
+
 ```
 orchestrator.get_agent("reasoning")
   → _agent_cache["reasoning"] ? return cached
@@ -718,6 +791,7 @@ Interaction Flow:
 ## 4.5 Safety → Final Output
 
 Triple-layer safety:
+
 1. **Input**: `sanitize_input()` → prompt injection + PHI redaction
 2. **Pipeline**: `SafetyAgent` → LLM-based risk audit + keyword detection
 3. **Output**: `SafetyGuardrailAgent` → mandatory disclaimers + emergency override
@@ -739,6 +813,7 @@ For lower-risk cases, a single LLM call with the same structured output format i
 ## 5.2 Confidence Scoring
 
 Confidence flows through 3 stages:
+
 1. **Reasoning**: LLM self-reports `confidence` in its JSON output
 2. **Calibration**: `UncertaintyCalibrator` adjusts: -20 for hallucination, -10 for multiple corrections
 3. **Threshold**: If calibrated confidence < 85%, mandatory human review
@@ -746,12 +821,14 @@ Confidence flows through 3 stages:
 ## 5.3 Risk Classification
 
 Two independent systems:
+
 1. **MedicalSafetyFramework** (keyword-based): 18 emergency keywords, 3 high-risk triggers
 2. **CDSS Engine** (vital-based): NEWS2-style scoring on heart rate, SpO2, temperature
 
 ## 5.4 RL Feedback System
 
 `learning/feedback_loop.py`:
+
 - Aggregates doctor feedback ratings by role
 - Identifies low-confidence + high-risk interaction clusters
 - Finds doctor-corrected responses for fine-tuning extraction
@@ -760,6 +837,7 @@ Two independent systems:
 ## 5.5 Model Registry
 
 `learning/model_registry.py`:
+
 - JSON-based registry at `data/models/registry.json`
 - Tracks model versions, metrics, deployment status
 - `promote_to_production()` swaps the active model
@@ -807,6 +885,7 @@ Medication ──1:N──→ Reminder
 ## 6.3 Memory Graph
 
 The `MemoryNode` + `MemoryEdge` tables form a **personal medical knowledge graph** per user:
+
 - **Node types**: Symptom, Diagnosis, Image, Report, Medication, Case
 - **Edge types**: `relates_to`, `caused_by`, `diagnosed_as`, `follow_up_of`, `based_on`
 - Used by `PatientAgent` to provide longitudinal medical context
@@ -814,11 +893,13 @@ The `MemoryNode` + `MemoryEdge` tables form a **personal medical knowledge graph
 ## 6.4 Audit Chain
 
 The `ai_audit_logs` table implements an immutable chain:
+
 ```
 Log 1: audit_hash = SHA256("GENESIS_BLOCK-user-agent-in-out")
 Log 2: audit_hash = SHA256("{hash_1}-user-agent-in-out"), previous_hash = hash_1
 Log 3: audit_hash = SHA256("{hash_2}-user-agent-in-out"), previous_hash = hash_2
 ```
+
 Any tampering breaks the chain and is detectable.
 
 ---
@@ -834,6 +915,7 @@ Any tampering breaks the chain and is detectable.
 ## 7.2 AES-256 Encryption
 
 All PHI (Protected Health Information) is encrypted at rest using Fernet (AES-256-CBC):
+
 - Key: `DATA_ENCRYPTION_KEY` environment variable
 - If missing: temporary key generated with warning (data lost on restart)
 - Applied to: patient names, medical history, diagnoses, responses, image paths, symptoms, medications
@@ -841,6 +923,7 @@ All PHI (Protected Health Information) is encrypted at rest using Fernet (AES-25
 ## 7.3 PHI Handling
 
 Three layers of PHI protection:
+
 1. **Input**: `phi_redactor.redact()` strips emails, phones, SSNs, DOBs, credit cards, name prefixes
 2. **Storage**: All text encrypted before database write
 3. **Logs**: `PHIRedactor.cleanup_logs()` available for log processors
@@ -848,6 +931,7 @@ Three layers of PHI protection:
 ## 7.4 Prompt Injection Defense
 
 Two detection systems:
+
 1. **Primary** (`detect_prompt_injection`): 10 patterns including "ignore instructions", "DAN mode", "jailbreak"
 2. **Extended** (`_detect_injection_patterns`): 11 patterns including system/assistant prefix injection, token markers
 
@@ -871,6 +955,7 @@ When detected: input is replaced with error message, request is logged as securi
 ## 8.2 Redis Caching
 
 `intelligence/inference_cache.py`:
+
 - SHA-256 hash of `symptoms + interaction_mode` as cache key
 - 1-hour TTL (configurable)
 - Falls back to local dict cache if Redis unavailable
@@ -879,6 +964,7 @@ When detected: input is replaced with error message, request is logged as securi
 ## 8.3 Lazy Agent Loading
 
 Agents are instantiated on first use via `importlib.import_module`. This reduces:
+
 - Startup time: ~8s → ~2s
 - Memory: only used agents are loaded
 - Import errors: isolated to the agent that fails
@@ -896,6 +982,7 @@ Agents are instantiated on first use via `importlib.import_module`. This reduces
 ## 9.1 Test Structure
 
 Tests are located in `tests/` directory. Key test files:
+
 - Medical safety framework validation
 - Triage classification accuracy
 - Prompt injection detection coverage
@@ -954,6 +1041,7 @@ CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ## 10.4 Kubernetes
 
 K8s manifests in `k8s/` directory provide:
+
 - Deployment with health probes (`/health/live`, `/health/ready`)
 - Service exposure
 - ConfigMap for environment variables

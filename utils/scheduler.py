@@ -67,6 +67,7 @@ class MedicationScheduler:
     def _trigger_reminder(self, rem):
         logger.info(f"Triggering reminder: {rem['title']} for {rem['email']}")
         try:
+            # 1. Email Notification (Backup)
             success = self.notifier.send_email(
                 rem["email"],
                 f"MedAgent Reminder: {rem['title']}",
@@ -76,6 +77,31 @@ class MedicationScheduler:
                 f"<p>Scheduled Time: {rem['time']}</p>"
                 f"<hr><p style='font-size: 10px; color: #666;'>Sent by MedAgent Clinical Scheduler</p></div>",
             )
+
+            # 2. Real-time WebSocket Notification (Primary UI Alert)
+            try:
+                import asyncio
+
+                from api.ws_manager import manager
+
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(
+                        manager.send_personal_message(
+                            {
+                                "type": "medication_reminder",
+                                "title": rem["title"],
+                                "time": rem["time"],
+                                "id": rem["id"],
+                            },
+                            rem["user_id"],
+                        )
+                    )
+            except Exception as ws_err:
+                logger.error(
+                    f"WS Medication broadcast failed for user {rem['user_id']}: {ws_err}"
+                )
+
             if success:
                 self.persistence.mark_reminder_triggered(rem["id"])
         except Exception as e:

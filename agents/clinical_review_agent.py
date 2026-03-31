@@ -14,14 +14,14 @@ class ClinicalReviewAgent:
     def __init__(self):
         pass
 
-    def process(self, state: dict):
+    async def process(self, state: dict):
         """
         Standard entry point for the LangGraph orchestrator.
         Flags any case routed here for mandatory human review.
         """
-        return self.process_high_risk_case(state)
+        return await self.process_high_risk_case(state)
 
-    def process_high_risk_case(self, state: dict):
+    async def process_high_risk_case(self, state: dict):
         """
         Flags a case specifically for doctor review.
         In a real-world system, this would trigger a notification and wait.

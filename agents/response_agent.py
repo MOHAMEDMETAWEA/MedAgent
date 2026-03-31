@@ -15,10 +15,11 @@ class ResponseAgent:
         self.model = model or settings.OPENAI_MODEL
         self.temperature = settings.LLM_TEMPERATURE_PATIENT
 
-    def _get_llm(self):
+    def _get_llm(self, state: dict):
         from models.model_router import get_model
 
-        return get_model(model_name=self.model, temperature=self.temperature)
+        model = state.get("model_used") or self.model
+        return get_model(model_name=model, temperature=self.temperature)
 
     def process(self, state: dict):
         """Final polish of the system response for the user based on Interaction Mode."""
@@ -72,7 +73,7 @@ class ResponseAgent:
             prompt = final_response
 
         try:
-            llm = self._get_llm()
+            llm = self._get_llm(state)
             response = llm.invoke(
                 [
                     SystemMessage(

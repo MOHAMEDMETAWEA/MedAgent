@@ -8,9 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
 
-from api.deps import (check_admin_auth, get_audit_agent, get_developer_agent,
-                      get_governance, get_improver, get_persistence,
-                      get_review_agent)
+from api.deps import (check_admin_auth, get_audit_agent, get_current_user,
+                      get_developer_agent, get_governance, get_improver,
+                      get_persistence, get_review_agent)
 
 router = APIRouter(prefix="/system", tags=["System"])
 
@@ -84,7 +84,18 @@ async def admin_health():
 
 @router.get("/audit-logs", dependencies=[Depends(check_admin_auth)])
 async def get_audit_logs(limit: int = 100):
-    """Retrieve system audit logs."""
+    """Retrieve system audit logs (Admin API Key auth)."""
+    audit = get_audit_agent()
+    return audit.get_logs(limit=limit)
+
+
+@router.get("/audit-trail")
+async def get_audit_trail(limit: int = 100, user: dict = Depends(get_current_user)):
+    """Retrieve audit logs for doctor/admin users via JWT auth.
+    This is the endpoint the frontend Audit tab uses."""
+    role = user.get("role", "")
+    if role not in ["admin", "doctor"]:
+        raise HTTPException(status_code=403, detail="Admin/Doctor clearance required")
     audit = get_audit_agent()
     return audit.get_logs(limit=limit)
 

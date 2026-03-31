@@ -1,5 +1,5 @@
 <p align="center">
-  <strong>🏥 MEDAgent — Enterprise Medical AI Platform</strong>
+  <strong>🏥 MEDAgent — Enterprise Medical AI Platform v5.4.0-GOLD-READY</strong>
 </p>
 
 <p align="center">
@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Version-5.4.0--GOLD--READY-gold" alt="Version"/>
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python"/>
   <img src="https://img.shields.io/badge/FastAPI-0.100+-green" alt="FastAPI"/>
   <img src="https://img.shields.io/badge/LangGraph-0.0.20+-purple" alt="LangGraph"/>
@@ -37,6 +38,13 @@
 ## 🌟 Overview
 
 **MEDAgent** is an enterprise-grade, multi-agent medical AI platform built on **LangGraph** and **FastAPI**. It orchestrates a team of **16+ specialized AI agents** to deliver clinical-grade diagnostic support, patient communication, automated documentation, and continuous self-improvement from doctor feedback.
+
+### What's New in 5.4.0-GOLD-READY
+- **Fully Asynchronous Architecture**: Implemented `AsyncSessionLocal` across all agents (Persistence, Governance, API routers) to eliminate connection pool blocking and support high concurrency.
+- **Improved Type Safety & Hardening**: Eliminated bare `except` blocks in favor of strongly-typed `WebSocketException` and `RequestException` handling.
+- **Integrated Database Persistence**: Moved away from in-memory simulations for Reminders and Medications to synchronous SQLite persistence.
+- **Clinical Sapphire 2.0 UX**: Beautifully glassmorphic UI integrated with `Inter` and `Outfit` typography.
+- **REST Fallback Optimization**: Standardized `api_call` routing for seamless fallback from WebSockets with aligned `/data`, `/system`, and `/ehr` prefixes.
 
 ### What Makes MEDAgent Different
 

@@ -70,13 +70,23 @@ class ReasoningAgent:
             state["cdss_score"] = cdss_data["cdss_score"]
             state["guideline_ref"] = cdss_data["guideline_ref"]
 
+            # Phase 6: RLHF - Inject Clinical Corrections
+            from learning.feedback_loop import feedback_loop
+
+            rlhf_corrections = feedback_loop.get_latest_clinical_corrections(limit=3)
+            rlhf_context = (
+                f"\n\n[CLINICAL LEARNING - DOCTOR VERIFIED]:\n{rlhf_corrections}"
+                if rlhf_corrections
+                else ""
+            )
+
             base_template = self._load_prompt("clinical_cognitive_layer.txt")
             retry_context = (
                 f"\n\n[SELF-CORRECTION FEEDBACK]: Your previous response had issues: {state.get('retry_reason')}. PLEASE CORRECT THESE."
                 if state.get("retry_reason")
                 else ""
             )
-            context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}\nCDSS_RISK: {state['risk_level']}\nGUIDELINES: {state['guideline_ref']}{retry_context}"
+            context_data = f"PATIENT SUMMARY: {patient_summary}\nVISUAL: {visual}\nHISTORY: {history}\nCDSS_RISK: {state['risk_level']}\nGUIDELINES: {state['guideline_ref']}{retry_context}{rlhf_context}"
 
             routing_prompt = base_template.format(
                 mode=mode.upper(),

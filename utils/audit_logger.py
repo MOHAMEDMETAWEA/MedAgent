@@ -54,6 +54,29 @@ class AuditLogger:
                     f"Audit chain updated for {agent_name} (Link: {audit_hash[:8]}...)"
                 )
 
+                # Real-time staff broadcast
+                try:
+                    import asyncio
+
+                    from api.ws_manager import manager
+
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.create_task(
+                            manager.broadcast_staff(
+                                {
+                                    "type": "audit_log",
+                                    "agent": agent_name,
+                                    "input": input_data[:100],
+                                    "output": output_data[:100],
+                                    "risk": risk_level,
+                                    "timestamp": log_entry.timestamp.isoformat(),
+                                }
+                            )
+                        )
+                except Exception as ws_err:
+                    logger.error(f"WS Audit broadcast failed: {ws_err}")
+
         except Exception as e:
             logger.error(f"Failed to generate audit log: {e}")
 

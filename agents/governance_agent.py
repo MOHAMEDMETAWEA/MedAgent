@@ -17,8 +17,9 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from config import settings
-from database.models import (AuditLog, Interaction, SessionLocal, SystemConfig,
-                             UserAccount, UserActivity, UserRole, UserSession)
+from database.models import (AsyncSessionLocal, AuditLog, Interaction,
+                             SystemConfig, UserAccount, UserActivity, UserRole,
+                             UserSession)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class GovernanceAgent:
     """
 
     def __init__(self):
-        self._db_factory = SessionLocal
+        self._db_factory = AsyncSessionLocal
         # Initialize Encryption Key
         self._key = os.getenv("DATA_ENCRYPTION_KEY")
         if not self._key:
@@ -138,7 +139,7 @@ class GovernanceAgent:
             return False
 
     # --- AUDIT LOGGING ---
-    def log_action(
+    async def log_action(
         self,
         actor_id: str,
         role: str,
@@ -149,24 +150,22 @@ class GovernanceAgent:
         ip: str = None,
     ):
         """Create an immutable audit record."""
-        db = self._db_factory()
-        try:
-            audit = AuditLog(
-                actor_id=actor_id,
-                role=role,
-                action=action,
-                resource_target=target,
-                status=status,
-                details=details or {},
-                ip_address=ip,
-            )
-            db.add(audit)
-            db.commit()
-        except Exception as e:
-            logger.critical(f"AUDIT FAILURE: {e}")
-            db.rollback()
-        finally:
-            db.close()
+        async with self._db_factory() as db:
+            try:
+                audit = AuditLog(
+                    actor_id=actor_id,
+                    role=role,
+                    action=action,
+                    resource_target=target,
+                    status=status,
+                    details=details or {},
+                    ip_address=ip,
+                )
+                db.add(audit)
+                await db.commit()
+            except Exception as e:
+                logger.critical(f"AUDIT FAILURE: {e}")
+                await db.rollback()
 
     # --- RBAC ---
     def check_permission(self, role: str, action: str) -> bool:
