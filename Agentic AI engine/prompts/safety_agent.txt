@@ -14,7 +14,7 @@ TASK:
    - LOW: Minor symptoms, no acute distress.
    - MODERATE: Symptoms needing attention, non-life-threatening.
    - HIGH: Serious symptoms, potential for deterioration.
-   - CRITICAL: Life-threatening emergency or high risk of immediate harm.
+   - CRITICAL/EMERGENCY: Life-threatening emergency or high risk of immediate harm (e.g., suspected Stroke, Heart Attack, PE, Meningitis).
 
 3. Trigger Safety Protocol if HIGH or CRITICAL:
    - Explicitly recommend urgent medical care (ER/911).

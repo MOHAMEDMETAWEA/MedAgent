@@ -382,10 +382,10 @@ class MedAgentOrchestrator:
             }
 
             # Phase 3: Real-Time Monitoring
-            from monitoring.realtime_engine import monitoring_system
+            from monitoring.realtime_engine import monitoring_engine
 
             if state["patient_info"]["vitals"]:
-                vitals_status = await monitoring_system.update_vitals(
+                vitals_status = await monitoring_engine.update_vitals(
                     user_id, state["patient_info"]["vitals"]
                 )
                 if vitals_status.get("status") == "CRITICAL":
@@ -407,7 +407,7 @@ class MedAgentOrchestrator:
             # Phase 9: Smart Notifications (Emergency Alerts)
             from notifications.engine import notification_engine
 
-            if final_state.get("risk_level") == "EMERGENCY" or final_state.get(
+            if final_state.get("risk_level") in ["EMERGENCY", "CRITICAL"] or final_state.get(
                 "critical_alert"
             ):
                 await notification_engine.send_alert(
