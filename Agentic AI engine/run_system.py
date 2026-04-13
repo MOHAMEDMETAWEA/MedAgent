@@ -102,7 +102,16 @@ def pre_flight_checks():
 
 def run_backend():
     print("[SYSTEM] Starting Backend API (Uvicorn)...")
-    # Using sys.executable to ensure we use the same python environment
+    
+    # Environment Hardening: Inject system paths and site-packages
+    my_env = os.environ.copy()
+    user_site = os.path.expanduser("~\\AppData\\Roaming\\Python\\Python314\\site-packages")
+    if os.path.exists(user_site):
+        # Prepend to PYTHONPATH
+        existing_path = my_env.get("PYTHONPATH", "")
+        my_env["PYTHONPATH"] = f"{user_site};{existing_path}" if existing_path else user_site
+        print(f"[DEBUG] Injected user-site: {user_site}")
+
     return subprocess.Popen(
         [
             sys.executable,
@@ -113,13 +122,20 @@ def run_backend():
             "0.0.0.0",
             "--port",
             "8000",
-        ]
+        ],
+        env=my_env
     )
 
 
 def run_frontend():
     print("[SYSTEM] Starting Frontend UI (Streamlit)...")
-    # Streamlit usually needs special handling to run via python -m
+    
+    my_env = os.environ.copy()
+    user_site = os.path.expanduser("~\\AppData\\Roaming\\Python\\Python314\\site-packages")
+    if os.path.exists(user_site):
+        existing_path = my_env.get("PYTHONPATH", "")
+        my_env["PYTHONPATH"] = f"{user_site};{existing_path}" if existing_path else user_site
+
     return subprocess.Popen(
         [
             sys.executable,
@@ -131,7 +147,8 @@ def run_frontend():
             "8501",
             "--server.headless",
             "true",
-        ]
+        ],
+        env=my_env
     )
 
 
