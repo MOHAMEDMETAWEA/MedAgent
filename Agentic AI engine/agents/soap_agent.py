@@ -48,13 +48,20 @@ class SoapAgent:
                 ("system", self.system_prompt),
                 (
                     "user",
-                    f"SYMPTOMS: {symptoms}\nVITALS: {vitals}\nIMAGING: {findings}\nDIAGNOSIS: {diagnosis}",
+                    "SYMPTOMS: {symptoms}\nVITALS: {vitals}\nIMAGING: {findings}\nDIAGNOSIS: {diagnosis}",
                 ),
             ]
         )
 
         chain = prompt | self.llm
-        response = await chain.ainvoke({})
+        response = await chain.ainvoke(
+            {
+                "symptoms": symptoms,
+                "vitals": vitals,
+                "findings": findings,
+                "diagnosis": diagnosis,
+            }
+        )
 
         state["soap_notes"] = response.content
         logger.info("UX: Generated professional SOAP notes.")
