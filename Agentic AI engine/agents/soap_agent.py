@@ -6,7 +6,7 @@ Automates the generation of SOAP notes (Subjective, Objective, Assessment, Plan)
 import logging
 from typing import Any, Dict
 
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 from models.model_router import get_model
 

@@ -6,7 +6,7 @@ Focuses on fetal development, maternal health, and pregnancy-safe protocols.
 import logging
 from typing import Any, Dict
 
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 from models.model_router import get_model
 

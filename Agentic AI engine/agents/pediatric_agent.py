@@ -6,7 +6,7 @@ Transforms complex clinical data into child-friendly explanations and visual aid
 import logging
 from typing import Dict
 
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 from config import settings
 from models.model_router import get_model
