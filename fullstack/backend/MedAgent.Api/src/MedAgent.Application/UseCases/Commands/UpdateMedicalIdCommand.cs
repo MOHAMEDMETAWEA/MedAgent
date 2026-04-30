@@ -2,7 +2,6 @@ using MediatR;
 using MedAgent.Application.DTOs.MedicalId;
 using MedAgent.Domain.Interfaces;
 using MedAgent.Domain.Entities;
-using System.Linq;
 
 namespace MedAgent.Application.UseCases.Commands;
 
@@ -19,82 +18,67 @@ public class UpdateMedicalIdCommandHandler : IRequestHandler<UpdateMedicalIdComm
 
     public async Task<bool> Handle(UpdateMedicalIdCommand request, CancellationToken cancellationToken)
     {
+        var dto = request.Dto;
+        dto.Allergies ??= new List<AllergyDto>();
+        dto.ChronicConditions ??= new List<ChronicConditionDto>();
+        dto.Prescriptions ??= new List<PrescriptionDto>();
+        dto.EmergencyContacts ??= new List<EmergencyContactDto>();
+        dto.Insurance ??= new InsuranceDto();
+
         var user = await _userRepository.GetByIdAsync(request.UserId);
         if (user == null) throw new KeyNotFoundException("User not found.");
 
-        // Update User Metadata
-        user.FirstName = request.Dto.FirstName;
-        user.LastName = request.Dto.LastName;
-        user.BloodType = request.Dto.BloodType;
-        user.Gender = request.Dto.Gender;
-        
-        if (request.Dto.ProfileImageId.HasValue) 
-        {
-            user.ProfileImageId = request.Dto.ProfileImageId;
-        }
-        
-        user.Weight = request.Dto.Weight;
-        user.Height = request.Dto.Height;
-        user.NationalId = request.Dto.NationalId;
-        user.OrganDonor = request.Dto.OrganDonor;
-        user.AdvanceDirectives = request.Dto.AdvanceDirectives;
-        
-        // Update Collections (Allergies, Conditions, Prescriptions) - Only if provided to prevent accidental wipes during partial updates
-        if (request.Dto.Allergies != null && request.Dto.Allergies.Any())
-        {
-            user.Allergies.Clear();
-            foreach (var a in request.Dto.Allergies)
-            {
-                user.Allergies.Add(new Allergy { UserId = user.Id, Name = a.Name, Severity = a.Severity });
-            }
-        }
+        user.FirstName = dto.FirstName;
+        user.LastName = dto.LastName;
+        user.BloodType = dto.BloodType;
+        user.Gender = dto.Gender;
 
-        if (request.Dto.ChronicConditions != null && request.Dto.ChronicConditions.Any())
-        {
-            user.ChronicConditions.Clear();
-            foreach (var c in request.Dto.ChronicConditions)
-            {
-                user.ChronicConditions.Add(new ChronicCondition { UserId = user.Id, Name = c.Name, Description = c.Description });
-            }
-        }
+        if (dto.ProfileImageId.HasValue)
+            user.ProfileImageId = dto.ProfileImageId;
 
-        if (request.Dto.Prescriptions != null && request.Dto.Prescriptions.Any())
-        {
-            user.Prescriptions.Clear();
-            foreach (var p in request.Dto.Prescriptions)
-            {
-                user.Prescriptions.Add(new Prescription { UserId = user.Id, Name = p.Name, Freq = p.Freq, Time = p.Time });
-            }
-        }
+        user.Weight = dto.Weight;
+        user.Height = dto.Height;
+        user.NationalId = dto.NationalId;
+        user.OrganDonor = dto.OrganDonor;
+        user.AdvanceDirectives = dto.AdvanceDirectives;
+        user.UpdatedAt = DateTime.UtcNow;
 
-        // Update Insurance
-        if (user.Insurance == null)
-        {
-            user.Insurance = new InsuranceData { UserId = user.Id };
-        }
-        user.Insurance.ProviderName = request.Dto.Insurance.ProviderName;
-        user.Insurance.MemberId = request.Dto.Insurance.MemberId;
-        user.Insurance.GroupNumber = request.Dto.Insurance.GroupNumber;
-        user.Insurance.PlanType = request.Dto.Insurance.PlanType;
-        user.Insurance.CardImageUrl = request.Dto.Insurance.CardImage;
+        var newAllergies = dto.Allergies
+            .Select(a => new Allergy { UserId = user.Id, Name = a.Name, Severity = a.Severity })
+            .ToList();
 
-        // Update Emergency Contacts (Replacement approach for simplicity/safety in batch)
-        user.EmergencyContacts.Clear();
-        foreach (var contactDto in request.Dto.EmergencyContacts)
-        {
-            user.EmergencyContacts.Add(new EmergencyContact
+        var newConditions = dto.ChronicConditions
+            .Select(c => new ChronicCondition { UserId = user.Id, Name = c.Name, Description = c.Description })
+            .ToList();
+
+        var newPrescriptions = dto.Prescriptions
+            .Select(p => new Prescription { UserId = user.Id, Name = p.Name, Freq = p.Freq, Time = p.Time })
+            .ToList();
+
+        var newContacts = dto.EmergencyContacts
+            .Select(c => new EmergencyContact
             {
                 UserId = user.Id,
-                Name = contactDto.Name,
-                Phone = contactDto.Phone,
-                Relation = contactDto.Relation,
-                AvatarUrl = contactDto.Avatar,
-                Type = contactDto.Type
-            });
-        }
+                Name = c.Name,
+                Phone = c.Phone,
+                Relation = c.Relation,
+                AvatarUrl = c.Avatar,
+                Type = c.Type
+            })
+            .ToList();
 
-        user.UpdatedAt = DateTime.UtcNow;
-        await _userRepository.UpdateAsync(user);
+        var insuranceData = new InsuranceData
+        {
+            UserId = user.Id,
+            ProviderName = dto.Insurance.ProviderName,
+            MemberId = dto.Insurance.MemberId,
+            GroupNumber = dto.Insurance.GroupNumber,
+            PlanType = dto.Insurance.PlanType,
+            CardImageUrl = dto.Insurance.CardImage
+        };
+
+        await _userRepository.SaveMedicalUpdateAsync(
+            user, newAllergies, newConditions, newPrescriptions, newContacts, insuranceData);
 
         return true;
     }
