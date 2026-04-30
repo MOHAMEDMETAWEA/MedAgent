@@ -19,49 +19,57 @@ public class UpdateMedicalIdCommandHandler : IRequestHandler<UpdateMedicalIdComm
 
     public async Task<bool> Handle(UpdateMedicalIdCommand request, CancellationToken cancellationToken)
     {
-        var user = await _userRepository.GetByIdAsync(request.UserId);
+        var dto = request.Dto;
+        // Normalize null collections from JSON (explicit null overrides property initializers).
+        dto.Allergies ??= new List<AllergyDto>();
+        dto.ChronicConditions ??= new List<ChronicConditionDto>();
+        dto.Prescriptions ??= new List<PrescriptionDto>();
+        dto.EmergencyContacts ??= new List<EmergencyContactDto>();
+        dto.Insurance ??= new InsuranceDto();
+
+        var user = await _userRepository.GetByIdForMedicalUpdateAsync(request.UserId);
         if (user == null) throw new KeyNotFoundException("User not found.");
 
         // Update User Metadata
-        user.FirstName = request.Dto.FirstName;
-        user.LastName = request.Dto.LastName;
-        user.BloodType = request.Dto.BloodType;
-        user.Gender = request.Dto.Gender;
+        user.FirstName = dto.FirstName;
+        user.LastName = dto.LastName;
+        user.BloodType = dto.BloodType;
+        user.Gender = dto.Gender;
         
-        if (request.Dto.ProfileImageId.HasValue) 
+        if (dto.ProfileImageId.HasValue) 
         {
-            user.ProfileImageId = request.Dto.ProfileImageId;
+            user.ProfileImageId = dto.ProfileImageId;
         }
         
-        user.Weight = request.Dto.Weight;
-        user.Height = request.Dto.Height;
-        user.NationalId = request.Dto.NationalId;
-        user.OrganDonor = request.Dto.OrganDonor;
-        user.AdvanceDirectives = request.Dto.AdvanceDirectives;
+        user.Weight = dto.Weight;
+        user.Height = dto.Height;
+        user.NationalId = dto.NationalId;
+        user.OrganDonor = dto.OrganDonor;
+        user.AdvanceDirectives = dto.AdvanceDirectives;
         
         // Update Collections (Allergies, Conditions, Prescriptions) - Only if provided to prevent accidental wipes during partial updates
-        if (request.Dto.Allergies != null && request.Dto.Allergies.Any())
+        if (dto.Allergies.Any())
         {
             user.Allergies.Clear();
-            foreach (var a in request.Dto.Allergies)
+            foreach (var a in dto.Allergies)
             {
                 user.Allergies.Add(new Allergy { UserId = user.Id, Name = a.Name, Severity = a.Severity });
             }
         }
 
-        if (request.Dto.ChronicConditions != null && request.Dto.ChronicConditions.Any())
+        if (dto.ChronicConditions.Any())
         {
             user.ChronicConditions.Clear();
-            foreach (var c in request.Dto.ChronicConditions)
+            foreach (var c in dto.ChronicConditions)
             {
                 user.ChronicConditions.Add(new ChronicCondition { UserId = user.Id, Name = c.Name, Description = c.Description });
             }
         }
 
-        if (request.Dto.Prescriptions != null && request.Dto.Prescriptions.Any())
+        if (dto.Prescriptions.Any())
         {
             user.Prescriptions.Clear();
-            foreach (var p in request.Dto.Prescriptions)
+            foreach (var p in dto.Prescriptions)
             {
                 user.Prescriptions.Add(new Prescription { UserId = user.Id, Name = p.Name, Freq = p.Freq, Time = p.Time });
             }
@@ -72,15 +80,15 @@ public class UpdateMedicalIdCommandHandler : IRequestHandler<UpdateMedicalIdComm
         {
             user.Insurance = new InsuranceData { UserId = user.Id };
         }
-        user.Insurance.ProviderName = request.Dto.Insurance.ProviderName;
-        user.Insurance.MemberId = request.Dto.Insurance.MemberId;
-        user.Insurance.GroupNumber = request.Dto.Insurance.GroupNumber;
-        user.Insurance.PlanType = request.Dto.Insurance.PlanType;
-        user.Insurance.CardImageUrl = request.Dto.Insurance.CardImage;
+        user.Insurance.ProviderName = dto.Insurance.ProviderName;
+        user.Insurance.MemberId = dto.Insurance.MemberId;
+        user.Insurance.GroupNumber = dto.Insurance.GroupNumber;
+        user.Insurance.PlanType = dto.Insurance.PlanType;
+        user.Insurance.CardImageUrl = dto.Insurance.CardImage;
 
         // Update Emergency Contacts (Replacement approach for simplicity/safety in batch)
         user.EmergencyContacts.Clear();
-        foreach (var contactDto in request.Dto.EmergencyContacts)
+        foreach (var contactDto in dto.EmergencyContacts)
         {
             user.EmergencyContacts.Add(new EmergencyContact
             {

@@ -14,6 +14,12 @@ public class PhotosController : ControllerBase
 {
     private readonly IMediator _mediator;
 
+    public sealed class UploadPhotoRequest
+    {
+        public IFormFile File { get; init; } = null!;
+        public string Category { get; init; } = "General";
+    }
+
     public PhotosController(IMediator mediator)
     {
         _mediator = mediator;
@@ -23,15 +29,16 @@ public class PhotosController : ControllerBase
     /// Upload a new photo. Supports multipart form data.
     /// </summary>
     [HttpPost]
+    [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UploadPhoto([FromForm] IFormFile file, [FromForm] string category = "General")
+    public async Task<IActionResult> UploadPhoto([FromForm] UploadPhotoRequest request)
     {
-        if (file == null || file.Length == 0)
+        if (request.File == null || request.File.Length == 0)
             return BadRequest("No file uploaded.");
 
         using var ms = new MemoryStream();
-        await file.CopyToAsync(ms);
+        await request.File.CopyToAsync(ms);
         var bytes = ms.ToArray();
 
         var userId = GetCurrentUserId();
@@ -39,9 +46,9 @@ public class PhotosController : ControllerBase
             UserId: userId,
             Base64Data: null,
             BinaryData: bytes,
-            ContentType: file.ContentType,
-            Category: category,
-            FileName: file.FileName
+            ContentType: request.File.ContentType,
+            Category: request.Category,
+            FileName: request.File.FileName
         );
 
         var result = await _mediator.Send(command);

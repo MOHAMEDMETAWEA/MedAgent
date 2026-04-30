@@ -3,6 +3,19 @@ import apiClient from '../services/apiClient';
 
 const AuthContext = createContext({});
 
+/** Only send a real GUID; URLs or junk values break System.Text.Json Guid binding. */
+function normalizeProfileImageIdForApi(value) {
+  if (value == null || value === '') return null;
+  const s = String(value).trim();
+  const uuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (uuid.test(s)) return s;
+  const m = s.match(
+    /\/api\/photos\/content\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i
+  );
+  return m ? m[1] : null;
+}
+
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -181,7 +194,7 @@ export function AuthProvider({ children }) {
           patientId: updated.patientId || userData.patientId || "",
           bloodType: updated.bloodType || "Unknown",
           gender: updated.gender || "M",
-          profileImageId: (updated.profileImageId && updated.profileImageId !== "") ? updated.profileImageId : null,
+          profileImageId: normalizeProfileImageIdForApi(updated.profileImageId ?? userData.profileImageId),
           weight: String(updated.weight || ""),
           height: String(updated.height || ""),
           nationalId: updated.nationalId || "",

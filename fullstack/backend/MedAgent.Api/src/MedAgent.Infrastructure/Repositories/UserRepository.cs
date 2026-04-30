@@ -26,6 +26,17 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(u => u.Id == id);
     }
 
+    public async Task<User?> GetByIdForMedicalUpdateAsync(Guid id)
+    {
+        return await _context.Users
+            .Include(u => u.EmergencyContacts)
+            .Include(u => u.Insurance)
+            .Include(u => u.Allergies)
+            .Include(u => u.ChronicConditions)
+            .Include(u => u.Prescriptions)
+            .FirstOrDefaultAsync(u => u.Id == id);
+    }
+
     public async Task<User?> GetByEmailAsync(string email)
     {
         return await _context.Users
@@ -47,7 +58,12 @@ public class UserRepository : IUserRepository
 
     public async Task<User> UpdateAsync(User user)
     {
-        _context.Users.Update(user);
+        // Never call DbSet.Update() on an entity that is already tracked with Includes.
+        // That re-attaches the whole graph and commonly breaks collection relationships on SaveChanges.
+        var entry = _context.Entry(user);
+        if (entry.State == EntityState.Detached)
+            _context.Users.Update(user);
+
         await _context.SaveChangesAsync();
         return user;
     }
