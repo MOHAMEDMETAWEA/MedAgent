@@ -37,6 +37,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Domain
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IPhotoRepository, PhotoRepository>();
+builder.Services.AddScoped<IMedicineRepository, MedicineRepository>();
 
 // Application
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -157,6 +158,23 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+    db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Medicines"" (
+    ""Id"" TEXT NOT NULL CONSTRAINT ""PK_Medicines"" PRIMARY KEY,
+    ""UserId"" TEXT NOT NULL,
+    ""Name"" TEXT NOT NULL DEFAULT '',
+    ""Dosage"" TEXT NOT NULL DEFAULT '',
+    ""Desc"" TEXT NOT NULL DEFAULT '',
+    ""Type"" TEXT NOT NULL DEFAULT 'Chronic Care',
+    ""Freq"" TEXT NOT NULL DEFAULT '',
+    ""Time"" TEXT NOT NULL DEFAULT '',
+    ""Supply"" TEXT NOT NULL DEFAULT '30',
+    ""Status"" TEXT NOT NULL DEFAULT 'scheduled',
+    ""Archived"" INTEGER NOT NULL DEFAULT 0,
+    ""Category"" TEXT NOT NULL DEFAULT 'primary',
+    ""CreatedAt"" TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT ""FK_Medicines_Users_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""Users"" (""Id"") ON DELETE CASCADE
+)");
+    db.Database.ExecuteSqlRaw(@"CREATE INDEX IF NOT EXISTS ""IX_Medicines_UserId"" ON ""Medicines"" (""UserId"")");
 }
 
 app.Run();

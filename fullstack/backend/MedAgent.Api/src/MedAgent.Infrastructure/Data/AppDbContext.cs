@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<Allergy> Allergies => Set<Allergy>();
     public DbSet<ChronicCondition> ChronicConditions => Set<ChronicCondition>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
+    public DbSet<Medicine> Medicines => Set<Medicine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,6 +72,16 @@ public class AppDbContext : DbContext
                 .WithMany(u => u.Prescriptions)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Medicine>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("datetime('now')");
         });
 
         modelBuilder.Entity<User>(entity =>
