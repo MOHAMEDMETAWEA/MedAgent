@@ -2,7 +2,6 @@ using MediatR;
 using MedAgent.Application.DTOs.MedicalId;
 using MedAgent.Domain.Interfaces;
 using MedAgent.Domain.Entities;
-using System.Linq;
 
 namespace MedAgent.Application.UseCases.Commands;
 
@@ -20,89 +19,66 @@ public class UpdateMedicalIdCommandHandler : IRequestHandler<UpdateMedicalIdComm
     public async Task<bool> Handle(UpdateMedicalIdCommand request, CancellationToken cancellationToken)
     {
         var dto = request.Dto;
-        // Normalize null collections from JSON (explicit null overrides property initializers).
         dto.Allergies ??= new List<AllergyDto>();
         dto.ChronicConditions ??= new List<ChronicConditionDto>();
         dto.Prescriptions ??= new List<PrescriptionDto>();
         dto.EmergencyContacts ??= new List<EmergencyContactDto>();
         dto.Insurance ??= new InsuranceDto();
 
-        var user = await _userRepository.GetByIdForMedicalUpdateAsync(request.UserId);
+        var user = await _userRepository.GetByIdAsync(request.UserId);
         if (user == null) throw new KeyNotFoundException("User not found.");
 
-        // Update User Metadata
         user.FirstName = dto.FirstName;
         user.LastName = dto.LastName;
         user.BloodType = dto.BloodType;
         user.Gender = dto.Gender;
-        
-        if (dto.ProfileImageId.HasValue) 
-        {
+
+        if (dto.ProfileImageId.HasValue)
             user.ProfileImageId = dto.ProfileImageId;
-        }
-        
+
         user.Weight = dto.Weight;
         user.Height = dto.Height;
         user.NationalId = dto.NationalId;
         user.OrganDonor = dto.OrganDonor;
         user.AdvanceDirectives = dto.AdvanceDirectives;
-        
-        // Update Collections (Allergies, Conditions, Prescriptions) - Only if provided to prevent accidental wipes during partial updates
-        if (dto.Allergies.Any())
-        {
-            user.Allergies.Clear();
-            foreach (var a in dto.Allergies)
-            {
-                user.Allergies.Add(new Allergy { UserId = user.Id, Name = a.Name, Severity = a.Severity });
-            }
-        }
+        user.UpdatedAt = DateTime.UtcNow;
 
-        if (dto.ChronicConditions.Any())
-        {
-            user.ChronicConditions.Clear();
-            foreach (var c in dto.ChronicConditions)
-            {
-                user.ChronicConditions.Add(new ChronicCondition { UserId = user.Id, Name = c.Name, Description = c.Description });
-            }
-        }
+        var newAllergies = dto.Allergies
+            .Select(a => new Allergy { UserId = user.Id, Name = a.Name, Severity = a.Severity })
+            .ToList();
 
-        if (dto.Prescriptions.Any())
-        {
-            user.Prescriptions.Clear();
-            foreach (var p in dto.Prescriptions)
-            {
-                user.Prescriptions.Add(new Prescription { UserId = user.Id, Name = p.Name, Freq = p.Freq, Time = p.Time });
-            }
-        }
+        var newConditions = dto.ChronicConditions
+            .Select(c => new ChronicCondition { UserId = user.Id, Name = c.Name, Description = c.Description })
+            .ToList();
 
-        // Update Insurance
-        if (user.Insurance == null)
-        {
-            user.Insurance = new InsuranceData { UserId = user.Id };
-        }
-        user.Insurance.ProviderName = dto.Insurance.ProviderName;
-        user.Insurance.MemberId = dto.Insurance.MemberId;
-        user.Insurance.GroupNumber = dto.Insurance.GroupNumber;
-        user.Insurance.PlanType = dto.Insurance.PlanType;
-        user.Insurance.CardImageUrl = dto.Insurance.CardImage;
+        var newPrescriptions = dto.Prescriptions
+            .Select(p => new Prescription { UserId = user.Id, Name = p.Name, Freq = p.Freq, Time = p.Time })
+            .ToList();
 
-        // Update Emergency Contacts (Replacement approach for simplicity/safety in batch)
-        user.EmergencyContacts.Clear();
-        foreach (var contactDto in dto.EmergencyContacts)
-        {
-            user.EmergencyContacts.Add(new EmergencyContact
+        var newContacts = dto.EmergencyContacts
+            .Select(c => new EmergencyContact
             {
                 UserId = user.Id,
-                Name = contactDto.Name,
-                Phone = contactDto.Phone,
-                Relation = contactDto.Relation,
-                AvatarUrl = contactDto.Avatar,
-                Type = contactDto.Type
-            });
-        }
+                Name = c.Name,
+                Phone = c.Phone,
+                Relation = c.Relation,
+                AvatarUrl = c.Avatar,
+                Type = c.Type
+            })
+            .ToList();
 
-        user.UpdatedAt = DateTime.UtcNow;
-        await _userRepository.UpdateAsync(user);
+        var insuranceData = new InsuranceData
+        {
+            UserId = user.Id,
+            ProviderName = dto.Insurance.ProviderName,
+            MemberId = dto.Insurance.MemberId,
+            GroupNumber = dto.Insurance.GroupNumber,
+            PlanType = dto.Insurance.PlanType,
+            CardImageUrl = dto.Insurance.CardImage
+        };
+
+        await _userRepository.SaveMedicalUpdateAsync(
+            user, newAllergies, newConditions, newPrescriptions, newContacts, insuranceData);
 
         return true;
     }

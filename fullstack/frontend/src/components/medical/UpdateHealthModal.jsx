@@ -417,7 +417,7 @@ export function UpdateHealthModal({ isOpen, onClose }) {
         </React.Fragment>
       )}
 
-      <style jsx>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
         }

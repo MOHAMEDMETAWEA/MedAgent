@@ -147,8 +147,9 @@ export function AuthProvider({ children }) {
   }, [userData]);
 
   const updateUser = async (newData) => {
+    const previous = userData;
     const updated = { ...userData, ...newData };
-    
+
     // Optimistically update local state
     setUserData(updated);
 
@@ -156,8 +157,6 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('medagent_token');
     if (token) {
       try {
-        console.log("Current UserData for Sync:", userData);
-        console.log("New Data for Sync:", newData);
 
         // --- SURGICAL DTO MAPPING ---
         // We MUST strip 'id' fields from collections because the backend DTOs (AllergyDto, etc.) 
@@ -215,7 +214,8 @@ export function AuthProvider({ children }) {
         
         await apiClient.put('/medical-id', payload);
       } catch (error) {
-        console.error("Failed to sync batch update to backend", error);
+        console.error("Failed to sync batch update to backend", error.response?.data ?? error.message);
+        setUserData(previous);
       }
     }
   };
@@ -223,35 +223,49 @@ export function AuthProvider({ children }) {
   const login = async (token, userProfile) => {
     localStorage.setItem('medagent_token', token);
     setIsAuthenticated(true);
-    if (userProfile) {
-      // Robust mapping for case-resilience
-      const profile = {
-        firstName: userProfile.FirstName || userProfile.firstName,
-        lastName: userProfile.LastName || userProfile.lastName,
-        email: userProfile.Email || userProfile.email,
-        patientId: userProfile.PatientId || userProfile.patientId,
-        bloodType: userProfile.BloodType || userProfile.bloodType,
-        gender: userProfile.Gender || userProfile.gender,
-        profileImageId: userProfile.ProfileImageId || userProfile.profileImageId,
-        ...userProfile
-      };
 
-      // Map ProfileImageId to a URL if it exists
-      const profileImageUrl = profile.profileImageId 
-        ? `/api/photos/content/${profile.profileImageId}`
-        : profile.profileImage;
+    // Always fetch the full medical profile so allergies, conditions,
+    // prescriptions, insurance, and contacts are present immediately —
+    // the login response only contains basic identity fields.
+    try {
+      const response = await apiClient.get('/medical-id');
+      const cloudData = response.data;
+
+      const profileImageUrl = cloudData.profileImageId
+        ? `/api/photos/content/${cloudData.profileImageId}`
+        : (userProfile?.profileImage ?? null);
 
       setUserData(prev => {
-        const updated = { 
-          ...prev, 
-          ...userProfile, 
-          profileImage: profileImageUrl, 
-          profileImageId: userProfile.profileImageId || prev.profileImageId,
-          isRegistered: true 
+        const updated = {
+          ...prev,
+          ...cloudData,
+          profileImage: profileImageUrl,
+          profileImageId: cloudData.profileImageId || prev.profileImageId,
+          isRegistered: true,
         };
         localStorage.setItem('medagent_user_data', JSON.stringify(updated));
         return updated;
       });
+    } catch {
+      // /medical-id unreachable — fall back to the basic profile from the
+      // login response so the user is at least authenticated.
+      if (userProfile) {
+        const profileImageUrl = userProfile.profileImageId
+          ? `/api/photos/content/${userProfile.profileImageId}`
+          : userProfile.profileImage ?? null;
+
+        setUserData(prev => {
+          const updated = {
+            ...prev,
+            ...userProfile,
+            profileImage: profileImageUrl,
+            profileImageId: userProfile.profileImageId || prev.profileImageId,
+            isRegistered: true,
+          };
+          localStorage.setItem('medagent_user_data', JSON.stringify(updated));
+          return updated;
+        });
+      }
     }
   };
 
