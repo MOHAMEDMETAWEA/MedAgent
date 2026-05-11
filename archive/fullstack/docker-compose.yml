@@ -10,6 +10,7 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      - Swagger__Enabled=true
       - Jwt__Secret=${JWT_SECRET:-MedAgent-Prod-Secret-Key-Change-This-In-Production-2024!@#$}
       - Jwt__Issuer=MedAgent
       - Jwt__Audience=MedAgentApp

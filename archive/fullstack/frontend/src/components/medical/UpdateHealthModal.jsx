@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Activity, X, Info, Save, Plus, Trash2, Heart, FileText, Pill, Bolt, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +13,25 @@ export function UpdateHealthModal({ isOpen, onClose }) {
   const { t, i18n } = useTranslation();
   const isRtl = i18n.dir() === 'rtl';
   const { userData, updateUser } = useAuth();
+
+  const generateId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
+
+  const ensureUniqueIds = (items, prefix) => {
+    const used = new Set();
+    return (items ?? []).map((item) => {
+      const rawId = item?.id;
+      const id = typeof rawId === 'string' || typeof rawId === 'number' ? String(rawId) : '';
+      const finalId = id && !used.has(id) ? id : `${prefix}-${generateId()}`;
+      used.add(finalId);
+      return { ...item, id: finalId };
+    });
+  };
+
   const [formData, setFormData] = useState({
     weight: userData.weight || '',
     height: userData.height || '',
@@ -20,11 +39,29 @@ export function UpdateHealthModal({ isOpen, onClose }) {
     nationalId: userData.nationalId || '',
     organDonor: userData.organDonor || '',
     advanceDirectives: userData.advanceDirectives || '',
-    allergies: userData.allergies || [],
+    allergies: ensureUniqueIds(userData.allergies, 'allergy'),
     prescriptions: userData.prescriptions || [],
-    chronicConditions: userData.chronicConditions || [],
+    chronicConditions: ensureUniqueIds(userData.chronicConditions, 'condition'),
     emergencyAccessibility: userData.emergencyAccessibility || ''
   });
+
+  // When opening the modal, re-sync from the latest userData and guarantee stable unique IDs for list keys.
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData({
+      weight: userData.weight || '',
+      height: userData.height || '',
+      bloodType: userData.bloodType || '',
+      nationalId: userData.nationalId || '',
+      organDonor: userData.organDonor || '',
+      advanceDirectives: userData.advanceDirectives || '',
+      allergies: ensureUniqueIds(userData.allergies, 'allergy'),
+      prescriptions: userData.prescriptions || [],
+      chronicConditions: ensureUniqueIds(userData.chronicConditions, 'condition'),
+      emergencyAccessibility: userData.emergencyAccessibility || ''
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,7 +73,7 @@ export function UpdateHealthModal({ isOpen, onClose }) {
       ...prev,
       allergies: [
         ...prev.allergies,
-        { id: Date.now().toString(), name: '', severity: t('medicalId.mild') }
+        { id: `allergy-${generateId()}`, name: '', severity: t('medicalId.mild') }
       ]
     }));
   };
@@ -51,7 +88,7 @@ export function UpdateHealthModal({ isOpen, onClose }) {
   const handleAddCondition = () => {
     setFormData(prev => ({
       ...prev,
-      chronicConditions: [...prev.chronicConditions, { id: Date.now(), name: '', description: '' }]
+      chronicConditions: [...prev.chronicConditions, { id: `condition-${generateId()}`, name: '', description: '' }]
     }));
   };
 
@@ -94,7 +131,7 @@ export function UpdateHealthModal({ isOpen, onClose }) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <React.Fragment>
+        <React.Fragment key="update-health-modal">
           {/* Backdrop */}
           <motion.div 
             initial={{ opacity: 0 }}
@@ -380,7 +417,7 @@ export function UpdateHealthModal({ isOpen, onClose }) {
         </React.Fragment>
       )}
 
-      <style jsx>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
         }

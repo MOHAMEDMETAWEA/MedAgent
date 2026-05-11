@@ -25,8 +25,9 @@ public class MedicalIdController : ControllerBase
     {
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userIdString)) return Unauthorized();
+        if (!Guid.TryParse(userIdString, out var userId)) return Unauthorized();
 
-        var query = new GetMedicalIdQuery(Guid.Parse(userIdString));
+        var query = new GetMedicalIdQuery(userId);
         var result = await _mediator.Send(query);
         return Ok(result);
     }
@@ -36,8 +37,9 @@ public class MedicalIdController : ControllerBase
     {
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userIdString)) return Unauthorized();
+        if (!Guid.TryParse(userIdString, out var userId)) return Unauthorized();
 
-        var command = new UpdateMedicalIdCommand(Guid.Parse(userIdString), dto);
+        var command = new UpdateMedicalIdCommand(userId, dto);
         await _mediator.Send(command);
         return NoContent();
     }

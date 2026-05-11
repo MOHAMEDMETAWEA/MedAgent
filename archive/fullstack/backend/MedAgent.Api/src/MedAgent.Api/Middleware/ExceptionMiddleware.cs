@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 
 namespace MedAgent.Api.Middleware;
 
@@ -12,11 +14,13 @@ public class ExceptionMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionMiddleware> _logger;
+    private readonly IHostEnvironment _environment;
 
-    public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
+    public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger, IHostEnvironment environment)
     {
         _next = next;
         _logger = logger;
+        _environment = environment;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -28,11 +32,11 @@ public class ExceptionMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "An unhandled exception occurred: {Message}", ex.Message);
-            await HandleExceptionAsync(context, ex);
+            await HandleExceptionAsync(context, ex, _environment);
         }
     }
 
-    private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private static async Task HandleExceptionAsync(HttpContext context, Exception exception, IHostEnvironment environment)
     {
         context.Response.ContentType = "application/json";
 
@@ -79,12 +83,24 @@ public class ExceptionMiddleware
                 }
             ),
 
+            DbUpdateConcurrencyException => (
+                (int)HttpStatusCode.Conflict,
+                new ErrorResponse
+                {
+                    Status = (int)HttpStatusCode.Conflict,
+                    Title = exception.Message
+                }
+            ),
+
             _ => (
                 (int)HttpStatusCode.InternalServerError,
                 new ErrorResponse
                 {
                     Status = (int)HttpStatusCode.InternalServerError,
-                    Title = "An unexpected error occurred."
+                    Title = environment.IsDevelopment()
+                        ? exception.GetType().Name + ": " + exception.Message
+                        : "An unexpected error occurred.",
+                    Detail = environment.IsDevelopment() ? exception.ToString() : null
                 }
             )
         };
@@ -101,4 +117,5 @@ public class ErrorResponse
     public int Status { get; set; }
     public string Title { get; set; } = string.Empty;
     public Dictionary<string, string[]>? Errors { get; set; }
+    public string? Detail { get; set; }
 }

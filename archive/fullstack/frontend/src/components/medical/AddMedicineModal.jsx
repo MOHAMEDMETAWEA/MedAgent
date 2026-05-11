@@ -57,8 +57,8 @@ export function AddMedicineModal({ isOpen, onClose, onSave, pxToEdit = null }) {
     onSave({
       ...formData,
       time: isCustom ? customTime : formData.time,
-      id: pxToEdit?.id || Date.now(),
-      status: pxToEdit?.status || 'impending',
+      ...(pxToEdit?.id ? { id: pxToEdit.id } : {}),
+      status: pxToEdit?.status || 'scheduled',
       category: formData.time.includes('Morning') ? 'primary' : formData.time.includes('Noon') ? 'tertiary' : 'secondary'
     });
     onClose();

@@ -199,7 +199,7 @@ export function FirstAidModal({ isOpen, onClose }) {
             </motion.div>
           </div>
 
-          <style jsx>{`
+          <style>{`
             .custom-scrollbar::-webkit-scrollbar {
               width: 4px;
             }

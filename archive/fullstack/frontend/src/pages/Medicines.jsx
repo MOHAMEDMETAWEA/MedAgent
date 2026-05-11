@@ -12,6 +12,7 @@ export default function Medicines() {
   const { t } = useTranslation();
   const { userData, updateUser } = useAuth();
   const {
+    prescriptions,
     activePrescriptions,
     archivedPrescriptions,
     handleToggleStatus,
@@ -20,13 +21,12 @@ export default function Medicines() {
     handleToggleArchive,
     lowSupplyPx
   } = usePrescriptions();
-  
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('today');
   const [isRefillDismissed, setIsRefillDismissed] = useState(false);
   const [editingPx, setEditingPx] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
-  const prescriptions = userData.prescriptions || [];
 
   const handleEdit = (px) => {
     setEditingPx(px);
@@ -411,8 +411,8 @@ export default function Medicines() {
           setIsAddModalOpen(false);
           setEditingPx(null);
         }} 
-        onAdd={handleAddMedicine}
-        editingPx={editingPx}
+        onSave={handleAddMedicine}
+        pxToEdit={editingPx}
       />
     </div>
   );

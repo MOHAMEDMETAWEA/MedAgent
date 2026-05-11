@@ -234,7 +234,7 @@ export function UniversalImagePicker({
         )}
       </AnimatePresence>
 
-      <style jsx>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
         }

@@ -136,7 +136,7 @@ export function StudyReportModal({ isOpen, onClose, scan }) {
           </motion.div>
         </div>
       )}
-      <style jsx>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
         }

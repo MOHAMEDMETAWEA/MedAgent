@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MedAgent.Api.Middleware;
+using MedAgent.Api.Swagger;
 using MedAgent.Application.Interfaces;
 using MedAgent.Application.UseCases.Commands;
 using MedAgent.Domain.Interfaces;
@@ -16,14 +17,27 @@ using MedAgent.Infrastructure.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // ──────────────────────────────── Database ────────────────────────────────
-var dbPath = Path.Combine(builder.Environment.ContentRootPath, "medagent.db");
+var configuredConnString = builder.Configuration.GetConnectionString("Default");
+if (string.IsNullOrWhiteSpace(configuredConnString))
+{
+    configuredConnString = null;
+}
+
+// Docker compose mounts a persistent volume at /app/data in the runtime container.
+// In local dev, we keep the DB next to the API by default.
+var dbPath = builder.Environment.IsProduction()
+    ? Path.Combine(builder.Environment.ContentRootPath, "data", "medagent.db")
+    : Path.Combine(builder.Environment.ContentRootPath, "medagent.db");
+
+Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+    options.UseSqlite(configuredConnString ?? $"Data Source={dbPath}"));
 
 // ──────────────────────────────── Dependency Injection ────────────────────
 // Domain
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IPhotoRepository, PhotoRepository>();
+builder.Services.AddScoped<IMedicineRepository, MedicineRepository>();
 
 // Application
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -108,6 +122,9 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+
+    // Fix Swagger generation for endpoints that use [FromForm] IFormFile (multipart/form-data uploads)
+    c.OperationFilter<FormFileOperationFilter>();
 });
 
 var app = builder.Build();
@@ -115,7 +132,8 @@ var app = builder.Build();
 // ──────────────────────────────── Middleware Pipeline ─────────────────────
 app.UseMiddleware<ExceptionMiddleware>();
 
-if (app.Environment.IsDevelopment())
+var swaggerEnabled = app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("Swagger:Enabled");
+if (swaggerEnabled)
 {
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "MedAgent API v1"));
@@ -140,7 +158,25 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+    db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Medicines"" (
+    ""Id"" TEXT NOT NULL CONSTRAINT ""PK_Medicines"" PRIMARY KEY,
+    ""UserId"" TEXT NOT NULL,
+    ""Name"" TEXT NOT NULL DEFAULT '',
+    ""Dosage"" TEXT NOT NULL DEFAULT '',
+    ""Desc"" TEXT NOT NULL DEFAULT '',
+    ""Type"" TEXT NOT NULL DEFAULT 'Chronic Care',
+    ""Freq"" TEXT NOT NULL DEFAULT '',
+    ""Time"" TEXT NOT NULL DEFAULT '',
+    ""Supply"" TEXT NOT NULL DEFAULT '30',
+    ""Status"" TEXT NOT NULL DEFAULT 'scheduled',
+    ""Archived"" INTEGER NOT NULL DEFAULT 0,
+    ""Category"" TEXT NOT NULL DEFAULT 'primary',
+    ""CreatedAt"" TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT ""FK_Medicines_Users_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""Users"" (""Id"") ON DELETE CASCADE
+)");
+    db.Database.ExecuteSqlRaw(@"CREATE INDEX IF NOT EXISTS ""IX_Medicines_UserId"" ON ""Medicines"" (""UserId"")");
 }
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
-app.Run($"http://0.0.0.0:{port}");
+app.Run();
+// var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
+// app.Run($"http://0.0.0.0:{port}");
