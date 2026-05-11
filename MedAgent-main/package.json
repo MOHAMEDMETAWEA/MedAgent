@@ -1,0 +1,20 @@
+{
+  "name": "medagent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bilingual (AR/EN) medical triage AI assistant",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.0"
+  }
+}

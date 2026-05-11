@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>أسلوب الرد - MedAgent</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+      color: #38bdf8;
+    }
+    .sub {
+      text-align: center;
+      color: #94a3b8;
+      margin-bottom: 32px;
+      font-size: 0.95rem;
+    }
+    .mermaid {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 32px 16px;
+      overflow-x: auto;
+    }
+    .legend {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+    }
+    .legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🩺 أسلوب الرد في نظام MedAgent</h1>
+  <p class="sub">التدفق الكامل من رسالة المستخدم → استجابة الذكاء الاصطناعي</p>
+
+  <div class="mermaid">
+    graph TB
+      USER["👤 المستخدم يرسل رسالة"]
+
+      subgraph PRE["🔐 مرحلة ما قبل المعالجة"]
+        direction TB
+        AUTH["المصادقة JWT + حد المعدل"] --> PII["تنقية المعلومات الشخصية PII"]
+        PII --> RF{"فحص الطوارئ ⚡"}
+        RF -->|"غير طارئة"| BRANCH{"كشف الفرع السريري"}
+        RF -->|"طارئة 🚨"| FP["مسار سريع: استجابة طارئة فورية<br/>تجاوز LLM مباشرة"]
+        BRANCH -->|"👶 أطفال"| PED["موجه النظام (أطفال)"]
+        BRANCH -->|"🤰 حمل"| PREG["موجه النظام (حمل)"]
+        BRANCH -->|"🧑 عام"| GEN["موجه النظام (عام)"]
+      end
+
+      USER --> AUTH
+      PED --> BUILD
+      PREG --> BUILD
+      GEN --> BUILD
+
+      subgraph REACT["🔄 حلقة ReAct (أقصى 5 دورات)"]
+        direction TB
+        BUILD["بناء الموجه: النظام + السياق + الأدوات"] --> LLM["استدعاء LLM"]
+        LLM --> DEC{"قرار النموذج"}
+        DEC -->|"💬 إجابة"| EXIT["خروج من الحلقة"]
+        DEC -->|"🔧 أداة"| EXEC["تنفيذ الأداة"]
+        EXEC --> OBS["مراقبة + إلحاق بالسياق"]
+        OBS --> LLM
+      end
+
+      EXEC -.-> TOOLBOX
+
+      subgraph TOOLBOX["🧰 الأدوات السريرية (10 أدوات)"]
+        direction LR
+        T1["🚨 كشف الطوارئ"]
+        T2["📊 فرز الحالة"]
+        T3["📚 استرجاع طبي"]
+        T4["💊 تداخل الأدوية"]
+        T5["🧠 الصحة النفسية"]
+        T6["👶 سلامة الأطفال"]
+        T7["🤰 سلامة الحمل"]
+        T8["🌳 تشخيص تفريعي"]
+        T9["📝 تلخيص SOAP"]
+        T10["🖼️ تحليل الصور"]
+      end
+
+      EXIT --> SAFE
+      FP   --> SSE_START
+
+      subgraph SAFE["🛡️ بوابة الأمان (ما بعد LLM)"]
+        direction TB
+        SAFE["فحص الهلوسة والادعاءات"] --> REW["إعادة صياغة العبارات الممنوعة"]
+        REW --> CONS["التحقق من اتساق التصنيف"]
+      end
+
+      CONS --> SSE_START
+
+      subgraph STREAM["📤 البث عبر SSE"]
+        direction TB
+        SSE_START["الرموز Tokens"] --> S2["التفكير Thinking"]
+        S2 --> S3["نتائج الأدوات"]
+        S3 --> S4["التصنيف Triage"]
+        S4 --> S5["الاستشهادات"]
+        S5 --> S6["تقرير الأمان"]
+      end
+
+      S6 --> DB["💾 حفظ في قاعدة البيانات"]
+
+      style FP fill:#e74c3c,stroke:#c0392b,color:#fff
+      style RF fill:#f39c12,stroke:#e67e22,color:#fff
+      style DEC fill:#f39c12,stroke:#e67e22,color:#fff
+      style BRANCH fill:#f39c12,stroke:#e67e22,color:#fff
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#e74c3c"></div> مسار الطوارئ السريع</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f39c12"></div> نقاط اتخاذ القرار</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div> مراحل المعالجة</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> الأدوات / البث</div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '15px',
+        primaryColor: '#1e3a5f',
+        primaryTextColor: '#e2e8f0',
+        primaryBorderColor: '#3b82f6',
+        lineColor: '#64748b',
+        secondaryColor: '#1e293b',
+        tertiaryColor: '#0f172a',
+        edgeLabelBackground: '#1e293b',
+        nodeBorder: '#475569',
+        clusterBkg: '#1e293b',
+        clusterBorder: '#334155',
+        titleColor: '#38bdf8',
+      },
+    });
+  </script>
+</body>
+</html>

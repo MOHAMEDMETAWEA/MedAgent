@@ -1,0 +1,62 @@
+{
+  "phq9": {
+    "title": "Patient Health Questionnaire (PHQ-9)",
+    "instructions": "Over the last 2 weeks, how often have you been bothered by any of the following problems?",
+    "frequency_options": [
+      {"value": 0, "label_en": "Not at all", "label_ar": "أبداً"},
+      {"value": 1, "label_en": "Several days", "label_ar": "عدة أيام"},
+      {"value": 2, "label_en": "More than half the days", "label_ar": "أكثر من نصف الأيام"},
+      {"value": 3, "label_en": "Nearly every day", "label_ar": "تقريباً كل يوم"}
+    ],
+    "questions": [
+      {"id": 1, "en": "Little interest or pleasure in doing things", "ar": "قلة الاهتمام أو المتعة في ممارسة الأنشطة"},
+      {"id": 2, "en": "Feeling down, depressed, or hopeless", "ar": "الشعور بالحزن أو الاكتئاب أو اليأس"},
+      {"id": 3, "en": "Trouble falling or staying asleep, or sleeping too much", "ar": "صعوبة في النوم أو البقاء نائماً، أو النوم أكثر من اللازم"},
+      {"id": 4, "en": "Feeling tired or having little energy", "ar": "الشعور بالتعب أو قلة الطاقة"},
+      {"id": 5, "en": "Poor appetite or overeating", "ar": "ضعف الشهية أو الإفراط في الأكل"},
+      {"id": 6, "en": "Feeling bad about yourself — or that you are a failure or have let yourself or your family down", "ar": "الشعور بالسوء تجاه نفسك — أو أنك فاشل أو خذلت نفسك أو عائلتك"},
+      {"id": 7, "en": "Trouble concentrating on things, such as reading the newspaper or watching television", "ar": "صعوبة في التركيز على الأشياء، مثل قراءة الجريدة أو مشاهدة التلفزيون"},
+      {"id": 8, "en": "Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual", "ar": "التحرك أو التحدث ببطء شديد لدرجة أن الآخرين قد لاحظوا ذلك؟ أو العكس — التململ أو عدم الراحة لدرجة أنك تتحرك أكثر من المعتاد"},
+      {"id": 9, "en": "Thoughts that you would be better off dead or of hurting yourself in some way", "ar": "أفكار بأنه سيكون من الأفضل لو كنت ميتاً أو إيذاء نفسك بطريقة ما"}
+    ],
+    "scoring": [
+      {"range": [0, 4], "severity": "none", "label_en": "No depression", "label_ar": "لا يوجد اكتئاب", "recommendation_en": "No action needed", "recommendation_ar": "لا حاجة لإجراء"},
+      {"range": [5, 9], "severity": "mild", "label_en": "Mild depression", "label_ar": "اكتئاب خفيف", "recommendation_en": "Watchful waiting; repeat PHQ-9 at follow-up", "recommendation_ar": "انتظار يقظ؛ كرر الفحص في المتابعة"},
+      {"range": [10, 14], "severity": "moderate", "label_en": "Moderate depression", "label_ar": "اكتئاب متوسط", "recommendation_en": "Counseling and/or pharmacotherapy; follow-up within 6 weeks", "recommendation_ar": "استشارة نفسية و/أو علاج دوائي؛ متابعة خلال 6 أسابيع"},
+      {"range": [15, 19], "severity": "moderately_severe", "label_en": "Moderately severe depression", "label_ar": "اكتئاب متوسط الشدة", "recommendation_en": "Active treatment with pharmacotherapy and/or psychotherapy", "recommendation_ar": "علاج فعال بالأدوية و/أو العلاج النفسي"},
+      {"range": [20, 27], "severity": "severe", "label_en": "Severe depression", "label_ar": "اكتئاب شديد", "recommendation_en": "Immediate initiation of pharmacotherapy and expedited referral to mental health specialist", "recommendation_ar": "بدء فوري للعلاج الدوائي وإحالة عاجلة لأخصائي الصحة النفسية"}
+    ]
+  },
+  "gad7": {
+    "title": "Generalized Anxiety Disorder (GAD-7)",
+    "instructions": "Over the last 2 weeks, how often have you been bothered by the following problems?",
+    "frequency_options": [
+      {"value": 0, "label_en": "Not at all", "label_ar": "أبداً"},
+      {"value": 1, "label_en": "Several days", "label_ar": "عدة أيام"},
+      {"value": 2, "label_en": "More than half the days", "label_ar": "أكثر من نصف الأيام"},
+      {"value": 3, "label_en": "Nearly every day", "label_ar": "تقريباً كل يوم"}
+    ],
+    "questions": [
+      {"id": 1, "en": "Feeling nervous, anxious, or on edge", "ar": "الشعور بالتوتر أو القلق أو الانفعال"},
+      {"id": 2, "en": "Not being able to stop or control worrying", "ar": "عدم القدرة على التوقف عن القلق أو التحكم فيه"},
+      {"id": 3, "en": "Worrying too much about different things", "ar": "القلق المفرط بشأن أشياء مختلفة"},
+      {"id": 4, "en": "Trouble relaxing", "ar": "صعوبة في الاسترخاء"},
+      {"id": 5, "en": "Being so restless that it is hard to sit still", "ar": "التململ لدرجة صعوبة الجلوس بهدوء"},
+      {"id": 6, "en": "Becoming easily annoyed or irritable", "ar": "الانزعاج أو سرعة الغضب بسهولة"},
+      {"id": 7, "en": "Feeling afraid as if something awful might happen", "ar": "الشعور بالخوف وكأن شيئاً فظيعاً قد يحدث"}
+    ],
+    "scoring": [
+      {"range": [0, 4], "severity": "none", "label_en": "No anxiety", "label_ar": "لا يوجد قلق", "recommendation_en": "No action needed", "recommendation_ar": "لا حاجة لإجراء"},
+      {"range": [5, 9], "severity": "mild", "label_en": "Mild anxiety", "label_ar": "قلق خفيف", "recommendation_en": "Watchful waiting; repeat GAD-7 at follow-up", "recommendation_ar": "انتظار يقظ؛ كرر الفحص في المتابعة"},
+      {"range": [10, 14], "severity": "moderate", "label_en": "Moderate anxiety", "label_ar": "قلق متوسط", "recommendation_en": "Consider counseling and/or pharmacotherapy", "recommendation_ar": "النظر في الاستشارة النفسية و/أو العلاج الدوائي"},
+      {"range": [15, 21], "severity": "severe", "label_en": "Severe anxiety", "label_ar": "قلق شديد", "recommendation_en": "Active treatment with pharmacotherapy and expedited mental health referral", "recommendation_ar": "علاج فعال بالأدوية وإحالة عاجلة للصحة النفسية"}
+    ]
+  },
+  "crisis_resources": {
+    "egypt": {
+      "hotline": "0800 8888 800",
+      "name": "Ministry of Health Mental Health Hotline",
+      "name_ar": "الخط الساخن للصحة النفسية - وزارة الصحة"
+    }
+  }
+}

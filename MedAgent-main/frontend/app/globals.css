@@ -1,0 +1,323 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   MedAgent Design System v3 — Calm, minimal, trustworthy
+   ------------------------------------------------------------
+   - Primary: Teal on soft white surfaces
+   - Bilingual: Inter (Latin) + Cairo (Arabic)
+   - Tokens follow shadcn/ui conventions
+   ============================================================ */
+
+@theme inline {
+  --font-sans: var(--font-inter), var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter), var(--font-cairo), ui-sans-serif, sans-serif;
+  --font-arabic: var(--font-cairo), ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-base: var(--base);
+  --color-base-2: var(--base-2);
+  --color-white: #ffffff;
+
+  --color-primary: var(--primary);
+  --color-primary-2: var(--primary-2);
+  --color-primary-3: var(--primary-3);
+  --color-primary-tint: var(--primary-tint);
+  --color-primary-deep: var(--primary-deep);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-emergency: var(--emergency);
+  --color-urgent: var(--urgent);
+  --color-routine: var(--routine);
+  --color-destructive: var(--emergency);
+  --color-destructive-foreground: #ffffff;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  /* Single shadow system */
+  --shadow-1: 0 1px 2px rgb(15 42 56 / 0.04), 0 2px 8px rgb(15 42 56 / 0.04);
+}
+
+/* ----- Light theme ------------------------------------------ */
+:root {
+  --ink:   #0f172a;
+  --ink-2: #1e293b;
+  --ink-3: #475569;
+  --ink-4: #94a3b8;
+
+  --line:   #e5e8ec;
+  --line-2: #eff1f4;
+  --base:   #f6f8f9;
+  --base-2: #eef1f3;
+
+  --primary:        #0f766e;
+  --primary-2:      #0d5d57;
+  --primary-3:      #5eead4;
+  --primary-tint:   #ccfbf1;
+  --primary-deep:   #134e4a;
+  --primary-foreground: #ffffff;
+
+  --accent:        #14b8a6;
+  --accent-2:      #0d9488;
+  --accent-tint:   #d1fae5;
+  --accent-foreground: #0d9488;
+
+  --emergency: #e5484d;
+  --urgent:    #f0883e;
+  --routine:   #0d9488;
+
+  --background:           var(--base);
+  --foreground:           var(--ink);
+  --card:                 #ffffff;
+  --card-foreground:      var(--ink);
+  --popover:              #ffffff;
+  --popover-foreground:   var(--ink);
+  --muted:                var(--base-2);
+  --muted-foreground:     var(--ink-3);
+  --secondary:            var(--base-2);
+  --secondary-foreground: var(--ink-2);
+  --border:               var(--line);
+  --input:                var(--line);
+  --ring:                 var(--primary);
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--primary-tint);
+  --sidebar-accent-foreground: var(--primary);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--primary);
+}
+
+/* ----- Dark theme ------------------------------------------ */
+.dark {
+  --ink:   #e6edf3;
+  --ink-2: #c9d1d9;
+  --ink-3: #8b949e;
+  --ink-4: #6e7681;
+
+  --line:   #1f2a37;
+  --line-2: #161e28;
+  --base:   #0b1117;
+  --base-2: #0f1721;
+
+  --primary:        #2dd4bf;
+  --primary-2:      #14b8a6;
+  --primary-3:      #5eead4;
+  --primary-tint:   #122a28;
+  --primary-deep:   #0f766e;
+  --primary-foreground: #0b1117;
+
+  --accent:        #34d399;
+  --accent-2:      #10b981;
+  --accent-tint:   #0d2a22;
+  --accent-foreground: #34d399;
+
+  --emergency: #f87171;
+  --urgent:    #fbbf24;
+  --routine:   #34d399;
+
+  --background:           var(--base);
+  --foreground:           var(--ink);
+  --card:                 #0e1830;
+  --card-foreground:      var(--ink);
+  --popover:              #0e1830;
+  --popover-foreground:   var(--ink);
+  --muted:                var(--base-2);
+  --muted-foreground:     var(--ink-3);
+  --secondary:            var(--base-2);
+  --secondary-foreground: var(--ink-2);
+  --border:               var(--line);
+  --input:                var(--line);
+  --ring:                 var(--primary);
+
+  --sidebar: #0a1428;
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--primary-tint);
+  --sidebar-accent-foreground: var(--primary);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--primary);
+}
+
+/* ----- Base layer ------------------------------------------ */
+@layer base {
+  * { border-color: var(--border); }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    min-height: 100dvh;
+  }
+  html[lang="ar"] body { font-family: var(--font-arabic); }
+  html[lang="ar"] .font-display,
+  html[lang="ar"] .display { font-family: var(--font-arabic); }
+
+  ::selection { background: var(--primary-tint); color: var(--foreground); }
+
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ----- Utilities ------------------------------------------ */
+
+/* Legacy background utility — kept for auth/profile pages */
+.bg-mesh { background: var(--background); }
+
+.brand-mark {
+  background: var(--primary);
+  box-shadow:
+    0 2px 6px rgb(15 118 110 / .25),
+    inset 0 1px 0 rgb(255 255 255 / .25);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-1);
+  transition: background-color 160ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-2);
+}
+.btn-primary:active:not(:disabled) { background: var(--primary-deep); }
+.btn-primary:disabled { cursor: not-allowed; opacity: .5; }
+
+.btn-secondary {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  transition: all 200ms ease;
+}
+.btn-secondary:hover {
+  border-color: var(--primary);
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--primary); background: var(--primary-tint);
+  padding: 5px 12px; border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.display, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-weight: 700;
+}
+html[dir="rtl"] .display { letter-spacing: -0.005em; }
+
+.font-cairo {
+  font-family: var(--font-arabic);
+  font-feature-settings: "liga", "calt";
+}
+
+.lang-ar {
+  font-family: var(--font-arabic);
+  font-weight: 600;
+  letter-spacing: 0;
+  unicode-bidi: isolate;
+}
+.lang-en {
+  font-family: var(--font-sans);
+  unicode-bidi: isolate;
+}
+
+/* Triage badges — legacy utility, kept for app-wide usage */
+.badge-emergency {
+  background: color-mix(in srgb, var(--emergency) 12%, transparent);
+  color: var(--emergency);
+  border: 1px solid color-mix(in srgb, var(--emergency) 25%, transparent);
+}
+.badge-urgent {
+  background: color-mix(in srgb, var(--urgent) 12%, transparent);
+  color: var(--urgent);
+  border: 1px solid color-mix(in srgb, var(--urgent) 25%, transparent);
+}
+.badge-routine {
+  background: color-mix(in srgb, var(--routine) 14%, transparent);
+  color: var(--routine);
+  border: 1px solid color-mix(in srgb, var(--routine) 25%, transparent);
+}
+
+.scroll-fancy::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-fancy::-webkit-scrollbar-track { background: transparent; }
+.scroll-fancy::-webkit-scrollbar-thumb {
+  background: var(--line); border-radius: 9999px;
+}
+.scroll-fancy::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+
+[dir="rtl"] .rtl-flip { transform: scaleX(-1); }
+
+/* Print styles */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  aside, header[role="banner"], nav[aria-label] { display: none !important; }
+  main { padding: 0 !important; }
+  .print\:hidden { display: none !important; }
+  .print\:p-0 { padding: 0 !important; }
+  .print\:space-y-3 > * + * { margin-top: 0.75rem !important; }
+  [data-slot="card"] { box-shadow: none !important; border: 1px solid #d4d4d8 !important; background: #fff !important; }
+}

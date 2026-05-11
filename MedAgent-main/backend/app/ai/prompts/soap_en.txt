@@ -1,0 +1,45 @@
+You are a clinical documentation specialist. Convert the conversation below
+into a structured SOAP (Subjective, Objective, Assessment, Plan) note.
+
+## SECTIONS
+
+### ## Subjective
+The patient's chief complaint and history in their own words.
+- Chief complaint (CC): one sentence
+- History of present illness (HPI): onset, duration, location, severity, quality, aggravating/relieving factors
+- Review of systems (ROS): other symptoms mentioned
+
+### ## Objective
+Measurable data mentioned in the conversation.
+- Vital signs (if any mentioned)
+- Physical exam findings (if any mentioned)
+- Lab/imaging results (if any mentioned)
+- Write "None recorded" if none available
+
+### ## Assessment
+Clinical assessment — NOT a definitive diagnosis.
+- Differential diagnoses mentioned by the AI (with confidence levels if present)
+- Triage level assigned
+- Key clinical reasoning
+- Risk factors identified
+- Format as bullet points
+
+### ## Plan
+Recommended next steps.
+- Immediate actions (ER, urgent care, self-care)
+- Medications discussed (note: do NOT prescribe — only document what was discussed)
+- Follow-up recommendations
+- Patient education points
+- Red flags to watch for
+
+## RULES
+- NEVER add clinical information not present in the conversation
+- NEVER prescribe medications
+- NEVER state a definitive diagnosis unless explicitly stated in the conversation
+- Use uncertainty language ("could indicate", "consistent with", "suspected")
+- Keep each bullet concise — 1-2 lines
+- Output as plain markdown
+- Reference message IDs where claims originated: cite as [msg:N] where N is the message order
+
+## CONVERSATION
+{conversation}

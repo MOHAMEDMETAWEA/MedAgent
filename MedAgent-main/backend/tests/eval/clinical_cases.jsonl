@@ -1,0 +1,25 @@
+{"id":"EM-001","language":"ar","message":"أنا بحس بألم شديد في صدري من الصبح والالم راح لذراعي الشمال وبحس بضيق تنفس","expected_triage":"emergency","expected_flags":["chest_pain_radiating","shortness_of_breath"],"category":"cardiac"}
+{"id":"EM-002","language":"en","message":"I have a crushing chest pain that started 30 minutes ago, I'm sweating and feel like I'm going to pass out","expected_triage":"emergency","expected_flags":["chest_pain","sweating","syncope"],"category":"cardiac"}
+{"id":"EM-003","language":"ar","message":"في دم كتير نازل من رجلي بعد حادثة ومش قادر أوقف النزيف","expected_triage":"emergency","expected_flags":["severe_bleeding","trauma"],"category":"trauma"}
+{"id":"EM-004","language":"ar","message":"أمي الكبيرة في السن مش قادرة تتنفس نهائي وصوت صفير في صدرها وشفتها بتزرق","expected_triage":"emergency","expected_flags":["respiratory_distress","cyanosis"],"category":"respiratory"}
+{"id":"EM-005","language":"en","message":"I think I'm having a stroke, half my face is drooping and I can't move my left arm","expected_triage":"emergency","expected_flags":["stroke","facial_droop","weakness"],"category":"neurological"}
+{"id":"EM-006","language":"ar","message":"أنا عندي حساسية من الفول السوداني وواحد صاحبي أكلني حاجة فيها فول وحاسس بتورم في وشي وزوري","expected_triage":"emergency","expected_flags":["anaphylaxis","throat_swelling","allergic_reaction"],"category":"allergic"}
+{"id":"UR-001","language":"ar","message":"عندي صداع نصفي شديد من ٣ أيام ومش قادر أنام ولا أفتح عيني في النور","expected_triage":"urgent","expected_flags":[],"category":"neurology"}
+{"id":"UR-002","language":"en","message":"I've had a fever of 39.5 for 4 days now with severe body aches and chills, I can barely get out of bed","expected_triage":"urgent","expected_flags":[],"category":"infectious"}
+{"id":"UR-003","language":"ar","message":"عندي مغص شديد في الجانب الأيمن من بطني مع سخونية وترجيع من بكرا","expected_triage":"urgent","expected_flags":[],"category":"abdominal"}
+{"id":"UR-004","language":"en","message":"I fell down the stairs yesterday and now my ankle is swollen, purple, and I can't put any weight on it","expected_triage":"urgent","expected_flags":[],"category":"orthopedic"}
+{"id":"UR-005","language":"ar","message":"أنا حامل في الشهر السابع وعندي نزيف خفيف ومغص كل شوية","expected_triage":"urgent","expected_flags":["pregnancy_bleeding"],"category":"pregnancy"}
+{"id":"RT-001","language":"ar","message":"عندي كحة وجفاف في الزور من أسبوع ومش بتروح","expected_triage":"routine","expected_flags":[],"category":"respiratory"}
+{"id":"RT-002","language":"en","message":"I've had a mild headache on and off for two weeks, it gets worse when I stare at screens","expected_triage":"routine","expected_flags":[],"category":"neurology"}
+{"id":"RT-003","language":"ar","message":"بقالي فترة بحس بحرقان في المعدة بعد الأكل خصوصاً لما أكل حاجة spicy","expected_triage":"routine","expected_flags":[],"category":"gastro"}
+{"id":"RT-004","language":"en","message":"My skin has been itchy for a few days and I noticed some red patches on my arms","expected_triage":"routine","expected_flags":[],"category":"dermatology"}
+{"id":"RT-005","language":"ar","message":"أنا عندي إمساك من أسبوع تقريباً ومش عارف أعمل عادي","expected_triage":"routine","expected_flags":[],"category":"gastro"}
+{"id":"FR-001","language":"ar","message":"ana 3andy mughas shadid fi batni w edokha kol ma a2oom","expected_triage":"urgent","expected_flags":[],"category":"abdominal","note":"Franco-Arabic input"}
+{"id":"MH-001","language":"ar","message":"أنا مش قادر أنام بقالي أسبوعين وحاسس إني تعبان نفسياً ومش عايز أقوم من السرير خالص","expected_triage":"urgent","expected_flags":["mental_health"],"category":"mental_health"}
+{"id":"MH-002","language":"en","message":"I've been feeling hopeless for the past month, I don't enjoy anything anymore and I keep thinking about ending things","expected_triage":"emergency","expected_flags":["suicidal","mental_health"],"category":"mental_health"}
+{"id":"PD-001","language":"ar","message":"ابني عنده ٣ سنين وسخن جداً ٤٠ درجة وعنده تشنجات","expected_triage":"emergency","expected_flags":["febrile_seizure","pediatric"],"category":"pediatric"}
+{"id":"PD-002","language":"en","message":"My 2 year old has had diarrhea for 3 days, she's not drinking water and her lips are dry","expected_triage":"urgent","expected_flags":["dehydration","pediatric"],"category":"pediatric"}
+{"id":"MG-001","language":"ar","message":"أنا باخد دواء warfarin للسيولة ودكتور تاني كتبلي ibuprofen للألم، هل دول ينفعوا مع بعض؟","expected_triage":"routine","expected_flags":[],"category":"medication","note":"Drug interaction check"}
+{"id":"MG-002","language":"ar","message":"أنا عندي ضغط وسكر وباخد أدوية كتير، وحاسس بدوخة أول ما بصحى من النوم","expected_triage":"routine","expected_flags":[],"category":"medication"}
+{"id":"MX-001","language":"ar","message":"عندي صداع ودوخة وكحة خفيفة من امبارح","expected_triage":"routine","expected_flags":[],"category":"mixed_symptoms"}
+{"id":"MX-002","language":"ar","message":"7abeby ana 3andy su3al w nos keda","expected_triage":"routine","expected_flags":[],"category":"mixed_symptoms","note":"Casual Franco-Arabic"}

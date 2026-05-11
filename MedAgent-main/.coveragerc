@@ -1,0 +1,6 @@
+[run]
+source = backend/app/core
+
+[report]
+fail_under = 80
+show_missing = True

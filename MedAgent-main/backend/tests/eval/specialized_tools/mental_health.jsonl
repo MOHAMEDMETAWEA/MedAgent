@@ -1,0 +1,10 @@
+{"id":"MH01","scale":"phq9","responses":[0,0,0,0,0,0,0,0,0],"expected_score":0,"expected_severity":"none"}
+{"id":"MH02","scale":"phq9","responses":[1,1,1,1,1,1,1,1,1],"expected_score":9,"expected_severity":"mild"}
+{"id":"MH03","scale":"phq9","responses":[2,2,2,2,2,2,2,2,2],"expected_score":18,"expected_severity":"moderately severe"}
+{"id":"MH04","scale":"phq9","responses":[3,3,3,3,3,3,3,3,3],"expected_score":27,"expected_severity":"severe"}
+{"id":"MH05","scale":"phq9","responses":[2,2,2,2,2,2,2,2,3],"expected_score":19,"expected_severity":"severe","note":"suicidality Q9 > 0 must trigger crisis escalation"}
+{"id":"MH06","scale":"gad7","responses":[0,0,0,0,0,0,0],"expected_score":0,"expected_severity":"minimal"}
+{"id":"MH07","scale":"gad7","responses":[1,1,1,1,1,1,1],"expected_score":7,"expected_severity":"mild"}
+{"id":"MH08","scale":"gad7","responses":[2,2,2,2,2,2,2],"expected_score":14,"expected_severity":"moderate"}
+{"id":"MH09","scale":"gad7","responses":[3,3,3,3,3,3,3],"expected_score":21,"expected_severity":"severe"}
+{"id":"MH10","scale":"phq9","responses":[0,0,1,0,0,0,0,0,2],"expected_score":3,"expected_severity":"mild","note":"suicidality Q9 = 2 → crisis escalation required"}

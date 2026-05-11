@@ -1,0 +1,259 @@
+emergency_keywords:
+  en:
+    # Chest pain radiating
+    - "crushing chest pain"
+    - "chest pain radiating to arm"
+    - "chest pain radiating to jaw"
+    - "pressure in chest"
+    - "heavy chest"
+
+    # Stroke FAST signs
+    - "facial drooping"
+    - "face drooping"
+    - "face is drooping"
+    - "one sided weakness"
+    - "sudden weakness"
+    - "slurred speech"
+    - "cannot speak"
+    - "sudden confusion"
+    - "sudden severe headache"
+    - "can't move my"
+    - "can't move my arm"
+    - "can't move my leg"
+    - "can't feel my"
+    - "numbness on one side"
+    - "stroke"
+
+    # Severe bleeding
+    - "bleeding heavily"
+    - "cannot stop bleeding"
+    - "gushing blood"
+    - "severe bleeding"
+    - "hemorrhage"
+
+    # Anaphylaxis
+    - "throat closing"
+    - "cannot breathe"
+    - "tongue swelling"
+    - "lip swelling"
+    - "anaphylaxis"
+    - "anaphylactic"
+    - "severe allergic reaction"
+    - "face swelling"
+    - "throat swelling"
+    - "swelling in my face"
+    - "swelling in my throat"
+    - "lips swelling"
+    - "tongue swollen"
+
+    # Respiratory distress
+    - "severe shortness of breath"
+    - "cannot catch breath"
+    - "respiratory distress"
+    - "turning blue"
+    - "lips turning blue"
+
+    # Suicidal ideation
+    - "want to kill myself"
+    - "suicidal"
+    - "going to end my life"
+    - "don't want to live"
+    - "ending things"
+    - "end my life"
+    - "kill myself"
+    - "thinking about ending"
+    - "want to die"
+    - "no reason to live"
+    - "better off dead"
+
+    # Sepsis red flags
+    - "high fever with confusion"
+    - "fever and confusion"
+    - "septic"
+    - "cannot stay awake"
+    - "unresponsive"
+
+    # Other emergencies
+    - "seizure"
+    - "convulsion"
+    - "overdose"
+    - "poisoning"
+    - "loss of consciousness"
+    - "passed out"
+    - "fainted"
+    - "severe burn"
+    - "electrocution"
+    - "drowning"
+
+  ar:
+    # Chest pain - ألم الصدر
+    - "ألم شديد في الصدر"
+    - "ألم شديد في صدري"
+    - "ألم في الصدر"
+    - "ألم في صدري"
+    - "وجع في صدري"
+    - "وجع في الصدر"
+    - "ألم في الصدر يمتد للذراع"
+    - "ألم في الصدر يمتد للفك"
+    - "ضغط في الصدر"
+    - "ثقل في الصدر"
+    - "وجع قوي في صدري"
+    - "الم في صدري"
+    - "الم في الصدر"
+
+    # Stroke - جلطة
+    - "تنميل في الوجه"
+    - "ارتخاء في الوجه"
+    - "ضعف في جهة واحدة"
+    - "ضعف مفاجئ"
+    - "كلام متغير"
+    - "مش قادر أتكلم"
+    - "تخليط في الكلام"
+    - "صداع شديد مفاجئ"
+    - "صعوبة في الكلام"
+    - "نص جسمي مش شغال"
+    - "تنميل نص الجسم"
+    - "مش قادر أحرك ذراعي"
+    - "مش قادر أحرك رجلي"
+
+    # Bleeding - نزيف
+    - "نزيف حاد"
+    - "دم كتير"
+    - "مش قادر أوقف الدم"
+    - "نزيف شديد"
+
+    # Anaphylaxis - حساسية شديدة
+    - "حساسية شديدة"
+    - "حلقي بينغلق"
+    - "لساني وارم"
+    - "مش قادر أتنفس"
+    - "تنفس صعب جدا"
+    - "تورم في الحلق"
+    - "تورم في وشي"
+    - "وشي وارم"
+    - "حساسية من"
+    - "حساسية عندي"
+    - "حاسس بتورم"
+    - "حاسة بتورم"
+    - "تورم في الوجه"
+    - "تورم الوجه"
+
+    # Respiratory - تنفس
+    - "ضيق تنفس شديد"
+    - "ضيق تنفس"
+    - "صعوبة في التنفس"
+    - "مش قادر أتنفس"
+    - "مش قادر أتنفس خالص"
+    - "مش قادرة تتنفس"
+    - "قادرة تتنفس"
+    - "تنفس صعب جدا"
+    - "بتحول للأزرق"
+    - "شفايفي زرقا"
+    - "بتزرق"
+    - "صوت صفير"
+    - "بحس بضيق تنفس"
+    - "بحس بضيق في التنفس"
+    - "مش قادر يتنفس"
+
+    # Suicidal - إيذاء النفس
+    - "عاوز أموت نفسي"
+    - "عاوز أنتحر"
+    - "مش عاوز أعيش"
+    - "بفكر في الانتحار"
+    - "بفكر أموت"
+    - "عاوز أموت"
+    - "خلصت من الحياة"
+    - "مش قادر أكمل"
+    - "تعبان نفسيا"
+    - "مكتئب"
+    - "بفكر في إيذاء نفسي"
+
+    # Sepsis
+    - "حرارة عالية مع تشوش"
+    - "مش قادر أصحى"
+    - "مش مدرك اللي حواليا"
+
+    # Other
+    - "تشنجات"
+    - "صرع"
+    - "جرعة زايدة"
+    - "تسمم"
+    - "فقدت الوعي"
+    - "أغمى عليا"
+    - "حروق شديدة"
+    - "صعق كهربائي"
+    - "غرق"
+    - "حاسس إني هموت"
+    - "حاسة إني هموت"
+
+urgent_keywords:
+  en:
+    - "persistent chest pain"
+    - "chest discomfort"
+    - "severe abdominal pain"
+    - "cannot keep fluids down"
+    - "high fever"
+    - "fever above 39"
+    - "temperature 39"
+    - "severe headache"
+    - "worst headache"
+    - "sudden vision changes"
+    - "blood in stool"
+    - "blood in urine"
+    - "coughing blood"
+    - "vomiting blood"
+    - "severe dehydration"
+    - "severe pain"
+    - "unbearable pain"
+    - "rapid heart rate"
+    - "heart racing"
+    - "severe dizziness"
+
+  ar:
+    - "ألم مستمر في الصدر"
+    - "ألم شديد في البطن"
+    - "مش قادر أبلع"
+    - "حرارة عالية"
+    - "سخونية فوق 39"
+    - "صداع شديد"
+    - "أسوأ صداع"
+    - "تغير مفاجئ في النظر"
+    - "دم في البراز"
+    - "دم في البول"
+    - "بكح دم"
+    - "ترجيع دم"
+    - "جفاف شديد"
+    - "ألم لا يحتمل"
+    - "وجع لا يحتمل"
+    - "ضربات قلب سريعة"
+    - "دوخة شديدة"
+    - "دوار شديد"
+    - "مغص شديد"
+    - "ترجيع مستمر"
+    - "إسهال شديد"
+
+rule_patterns:
+  - keywords: ["fever", "stiff neck"]
+    level: emergency
+    reason: "Possible meningitis"
+  - keywords: ["fever", "confusion"]
+    level: emergency
+    reason: "Possible sepsis"
+  - keywords: ["chest pain", "shortness of breath"]
+    level: emergency
+    reason: "Possible cardiac event or PE"
+  - keywords: ["abdominal pain", "vomiting blood"]
+    level: emergency
+    reason: "Possible GI bleed"
+  - keywords: ["ألم في الصدر", "ضيق تنفس"]
+    level: emergency
+    reason: "نوبة قلبية محتملة"
+  - keywords: ["ألم في صدري", "ضيق تنفس"]
+    level: emergency
+    reason: "نوبة قلبية محتملة"
+  - keywords: ["صداع", "تشنجات"]
+    level: emergency
+    reason: "التهاب سحايا أو ورم"
+  - keywords: ["حرارة", "تشوش"]
+    level: emergency
+    reason: "تسمم محتمل"

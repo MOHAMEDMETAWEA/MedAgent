@@ -1,0 +1,71 @@
+{
+  "interactions": [
+    {"drug_a": "warfarin", "drug_b": "aspirin", "severity": "major", "reason": "Increased bleeding risk — concurrent use doubles GI bleed risk", "source": "UpToDate 2024"},
+    {"drug_a": "warfarin", "drug_b": "ibuprofen", "severity": "major", "reason": "NSAIDs increase warfarin anticoagulation effect", "source": "Lexicomp"},
+    {"drug_a": "warfarin", "drug_b": "acetaminophen", "severity": "moderate", "reason": "High-dose acetaminophen (>2g/day) may elevate INR", "source": "FDA"},
+    {"drug_a": "aspirin", "drug_b": "ibuprofen", "severity": "moderate", "reason": "Ibuprofen may reduce aspirin's cardioprotective effect", "source": "FDA"},
+    {"drug_a": "aspirin", "drug_b": "clopidogrel", "severity": "major", "reason": "Dual antiplatelet increases bleeding risk — use only when indicated", "source": "AHA/ACC Guidelines"},
+    {"drug_a": "metformin", "drug_b": "contrast_dye", "severity": "major", "reason": "Risk of lactic acidosis — hold metformin 48h before and after contrast", "source": "ACR Guidelines"},
+    {"drug_a": "ACE_inhibitor", "drug_b": "spironolactone", "severity": "major", "reason": "Hyperkalemia risk — monitor K+ closely", "source": "ESC Heart Failure Guidelines"},
+    {"drug_a": "ACE_inhibitor", "drug_b": "potassium_supplement", "severity": "major", "reason": "Severe hyperkalemia risk — avoid combination", "source": "NICE"},
+    {"drug_a": "digoxin", "drug_b": "amiodarone", "severity": "major", "reason": "Amiodarone increases digoxin levels — reduce digoxin dose by 50%", "source": "Lexicomp"},
+    {"drug_a": "digoxin", "drug_b": "furosemide", "severity": "moderate", "reason": "Hypokalemia from diuretic increases digoxin toxicity risk", "source": "AHFS"},
+    {"drug_a": "statin", "drug_b": "clarithromycin", "severity": "contraindicated", "reason": "Clarithromycin inhibits CYP3A4 — statin myopathy/rhabdomyolysis risk", "source": "FDA"},
+    {"drug_a": "statin", "drug_b": "grapefruit_juice", "severity": "moderate", "reason": "Grapefruit inhibits CYP3A4 — increases statin levels", "source": "FDA"},
+    {"drug_a": "SSRI", "drug_b": "MAOI", "severity": "contraindicated", "reason": "Serotonin syndrome risk — 14-day washout required", "source": "FDA"},
+    {"drug_a": "SSRI", "drug_b": "tramadol", "severity": "major", "reason": "Increased serotonin syndrome risk", "source": "Lexicomp"},
+    {"drug_a": "SSRI", "drug_b": "NSAID", "severity": "moderate", "reason": "Increased GI bleeding risk with combined use", "source": "NICE"},
+    {"drug_a": "methotrexate", "drug_b": "NSAID", "severity": "major", "reason": "NSAIDs reduce methotrexate clearance — toxicity risk", "source": "EULAR"},
+    {"drug_a": "methotrexate", "drug_b": "trimethoprim", "severity": "contraindicated", "reason": "Combined folate antagonism — severe bone marrow suppression", "source": "BNF"},
+    {"drug_a": "lithium", "drug_b": "NSAID", "severity": "major", "reason": "NSAIDs increase lithium levels — toxicity risk", "source": "Lexicomp"},
+    {"drug_a": "lithium", "drug_b": "ACE_inhibitor", "severity": "major", "reason": "ACE inhibitors increase lithium levels — monitor closely", "source": "NICE"},
+    {"drug_a": "ciprofloxacin", "drug_b": "theophylline", "severity": "major", "reason": "Ciprofloxacin inhibits theophylline metabolism — toxicity risk", "source": "FDA"},
+    {"drug_a": "rifampicin", "drug_b": "oral_contraceptive", "severity": "major", "reason": "Rifampicin induces CYP enzymes — reduces contraceptive efficacy", "source": "WHO"},
+    {"drug_a": "phenytoin", "drug_b": "oral_contraceptive", "severity": "major", "reason": "Reduced contraceptive efficacy — use barrier method", "source": "WHO"},
+    {"drug_a": "insulin", "drug_b": "beta_blocker", "severity": "moderate", "reason": "Beta-blockers may mask hypoglycemia symptoms", "source": "ADA Guidelines"},
+    {"drug_a": "sulfonylurea", "drug_b": "aspirin", "severity": "moderate", "reason": "High-dose aspirin may enhance sulfonylurea effect", "source": "Lexicomp"},
+    {"drug_a": "allopurinol", "drug_b": "azathioprine", "severity": "contraindicated", "reason": "Allopurinol inhibits azathioprine metabolism — severe myelotoxicity", "source": "FDA"},
+    {"drug_a": "azole_antifungal", "drug_b": "statin", "severity": "major", "reason": "Azoles inhibit CYP3A4 — increased statin levels", "source": "Lexicomp"}
+  ],
+  "brand_aliases": {
+    "warfarin": ["marevan", "coumadin", "jantoven", "وارفارين", "ماريفان"],
+    "aspirin": ["aspirin", "asa", "acetylsalicylic", "ecotrin", "أسبرين", "أسبرين"],
+    "ibuprofen": ["advil", "motrin", "brufen", "nurofen", "بروفين", "ايبوبروفين"],
+    "acetaminophen": ["tylenol", "paracetamol", "panadol", "باراسيتامول", "بنادول", "سيتال"],
+    "clopidogrel": ["plavix", "كلوبيدوجريل", "بلافيكس"],
+    "metformin": ["glucophage", "glumetza", "ميتفورمين", "جلوكوفاج", "سيدوفاج"],
+    "ACE_inhibitor": ["lisinopril", "enalapril", "captopril", "ramipril", "perindopril", "ليسينوبريل", "إنالابريل", "كابتوبريل", "راميبريل"],
+    "spironolactone": ["aldactone", "سبيرونولاكتون", "ألدكتون"],
+    "digoxin": ["lanoxin", "ديجوكسين", "لانوكسين"],
+    "amiodarone": ["cordarone", "pacerone", "أميودارون", "كوردارون"],
+    "furosemide": ["lasix", "فوروسيمايد", "لازيكس"],
+    "statin": ["atorvastatin", "lipitor", "rosuvastatin", "crestor", "simvastatin", "zocor", "أتورفاستاتين", "روسيوفاستاتين", "ليبيتور", "كريستور"],
+    "clarithromycin": ["biaxin", "كلاريثروميسين", "كلاسيد"],
+    "SSRI": ["fluoxetine", "prozac", "sertraline", "zoloft", "paroxetine", "paxil", "citalopram", "celexa", "escitalopram", "lexapro", "فلوكستين", "بروزاك", "سيرترالين", "زولفت", "سيتالوبرام"],
+    "MAOI": ["phenelzine", "nardil", "tranylcypromine", "parnate", "selegiline"],
+    "tramadol": ["ultram", "ترامادول", "ترامال"],
+    "NSAID": ["diclofenac", "voltaren", "naproxen", "aleve", "indomethacin", "meloxicam", "mobic", "celecoxib", "celebrex", "ديكلوفيناك", "فولتارين", "نابروكسين", "ميلوكسيكام"],
+    "methotrexate": ["trexall", "ميثوتريكسات"],
+    "sulfonylurea": ["glibenclamide", "glyburide", "gliclazide", "glimepiride", "amaryl", "جليبنكلاميد", "دوانيل", "جليكلازيد", "جليميبيريد"],
+    "oral_contraceptive": ["birth_control", "contraceptive_pill", "حبوب منع الحمل", "ياسمين", "جينيرا"],
+    "insulin": ["lantus", "humalog", "novolog", "novorapid", "tresiba", "levemir", "أنسولين", "لانتوس"],
+    "beta_blocker": ["atenolol", "tenormin", "metoprolol", "lopressor", "propranolol", "inderal", "bisoprolol", "carvedilol", "أتينولول", "ميتوبرولول", "بروبرانولول", "إنديرال"],
+    "phenytoin": ["dilantin", "فينيتوين"],
+    "gabapentin": ["neurontin", "جابابنتين", "نيورونتين"],
+    "allopurinol": ["zyloric", "ألوبيورينول", "زيلوريك"],
+    "azathioprine": ["imuran", "آزاثيوبرين"],
+    "azole_antifungal": ["fluconazole", "diflucan", "itraconazole", "ketoconazole", "voriconazole", "فلوكونازول", "ديفلوكان"],
+    "antibiotic": ["amoxicillin", "augmentin", "cefalexin", "keflex", "doxycycline", "azithromycin", "zithromax", "أموكسيسيلين", "أوجمنتين", "سيفاليكسين", "دوكسيسيكلين", "أزيثروميسين"],
+    "penicillin": ["penicillin", "بنسلين", "بنسلين"]
+  },
+  "allergy_severity_override": {
+    "penicillin_anaphylaxis": {
+      "avoid_classes": ["penicillin", "cephalosporin", "carbapenem"],
+      "reason": "History of penicillin anaphylaxis — cross-reactivity risk with beta-lactams"
+    },
+    "sulfa_anaphylaxis": {
+      "avoid_classes": ["sulfonamide_antibiotic", "sulfonylurea", "furosemide", "thiazide"],
+      "reason": "Sulfa allergy — possible cross-reactivity with sulfonamide-containing drugs"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{"id":"V01","image_kind":"xray","expected_urgency":"urgent","finding":"pneumonia consolidation","expected":"needs urgent review"}
+{"id":"V02","image_kind":"xray","expected_urgency":"urgent","finding":"possible fracture visible","expected":"needs orthopedic review"}
+{"id":"V03","image_kind":"xray","expected_urgency":"routine","finding":"normal chest X-ray","expected":"no acute findings"}
+{"id":"V04","image_kind":"ct","expected_urgency":"emergency","finding":"intracranial hemorrhage","expected":"emergency neurosurgery consult"}
+{"id":"V05","image_kind":"xray","expected_urgency":"urgent","finding":"pleural effusion","expected":"needs thoracentesis evaluation"}
+{"id":"V06","image_kind":"xray","expected_urgency":"routine","finding":"old healed rib fracture","expected":"no acute intervention"}
+{"id":"V07","image_kind":"photo","expected_urgency":"urgent","finding":"deep laceration with visible fat","expected":"needs sutures, possible infection risk"}
+{"id":"V08","image_kind":"photo","expected_urgency":"routine","finding":"minor abrasion","expected":"clean and bandage"}
+{"id":"V09","image_kind":"skin","expected_urgency":"urgent","finding":"ABCDE melanoma signs present","expected":"dermatology referral needed"}
+{"id":"V10","image_kind":"skin","expected_urgency":"routine","finding":"benign nevus, no changes","expected":"monitor, no urgent action"}
+{"id":"V11","image_kind":"xray","expected_urgency":"emergency","finding":"pneumothorax with tension","expected":"emergency chest decompression"}
+{"id":"V12","image_kind":"ct","expected_urgency":"emergency","finding":"subdural hematoma","expected":"emergency neurosurgical evaluation"}
+{"id":"V13","image_kind":"other","expected_urgency":"none","finding":"cat photo","expected":"refuse: not a clinical image"}
+{"id":"V14","image_kind":"other","expected_urgency":"none","finding":"screenshot of text","expected":"refuse: not a clinical image"}
+{"id":"V15","image_kind":"other","expected_urgency":"none","finding":"birthday party photo","expected":"refuse: not a clinical image"}

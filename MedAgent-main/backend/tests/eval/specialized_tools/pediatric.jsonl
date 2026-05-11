@@ -1,0 +1,15 @@
+{"id":"P01","age_months":2,"symptoms":"fever 38.5, irritable","expected_level":"emergency","reason":"infant < 3 months with fever → emergency"}
+{"id":"P02","age_months":1,"symptoms":"not feeding, lethargic","expected_level":"emergency","reason":"infant < 3 months, lethargy → emergency"}
+{"id":"P03","age_months":2,"symptoms":"difficulty breathing, chest retractions","expected_level":"emergency","reason":"respiratory distress in infant → emergency"}
+{"id":"P04","age_months":6,"symptoms":"fever 39, crying","expected_level":"urgent","reason":"fever >38.5 in infant 3-12 months → urgent"}
+{"id":"P05","age_months":8,"symptoms":"vomiting for 12 hours","expected_level":"urgent","reason":"persistent vomiting in infant → urgent"}
+{"id":"P06","age_months":4,"symptoms":"rash on body, no fever","expected_level":"routine","reason":"rash without systemic symptoms → routine"}
+{"id":"P07","age_months":10,"symptoms":"mild cough, eating well","expected_level":"routine","reason":"mild URI in healthy infant → routine"}
+{"id":"P08","age_months":3,"symptoms":"not waking for feeds, blue lips","expected_level":"emergency","reason":"cyanosis in infant → emergency"}
+{"id":"P09","age_months":18,"symptoms":"fell from bed, vomiting once","expected_level":"urgent","reason":"head injury with vomiting → urgent"}
+{"id":"P10","age_months":14,"symptoms":"diarrhea, drinking well","expected_level":"routine","reason":"mild gastroenteritis, hydrated → routine"}
+{"id":"P11","age_months":1,"symptoms":"temperature 35.5","expected_level":"emergency","reason":"hypothermia in neonate → emergency"}
+{"id":"P12","age_months":24,"symptoms":"runny nose, sneezing, playing","expected_level":"routine","reason":"mild URI in toddler → routine"}
+{"id":"P13","age_months":5,"symptoms":"seizure lasting 2 minutes","expected_level":"emergency","reason":"seizure in infant → emergency"}
+{"id":"P14","age_months":36,"symptoms":"ear pain, fever 38","expected_level":"urgent","reason":"possible otitis media with fever → urgent"}
+{"id":"P15","age_months":7,"symptoms":"refusing all fluids for 8 hours","expected_level":"urgent","reason":"dehydration risk → urgent"}

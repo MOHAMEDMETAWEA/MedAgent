@@ -1,0 +1,20 @@
+{"id":"M01","med_a":"Warfarin","med_b":"Aspirin","interaction_severity":"major","expected":"bleeding risk warning","source":"warfarin + aspirin → increased bleeding risk"}
+{"id":"M02","med_a":"Metformin","med_b":"Alcohol","interaction_severity":"moderate","expected":"lactic acidosis warning","source":"metformin + alcohol → lactic acidosis risk"}
+{"id":"M03","med_a":"Simvastatin","med_b":"Grapefruit juice","interaction_severity":"moderate","expected":"rhabdomyolysis risk warning","source":"simvastatin + grapefruit → increased statin levels"}
+{"id":"M04","med_a":"Ibuprofen","med_b":"Lisinopril","interaction_severity":"moderate","expected":"reduced antihypertensive effect","source":"NSAID + ACE inhibitor → reduced efficacy"}
+{"id":"M05","med_a":"Fluoxetine","med_b":"Tramadol","interaction_severity":"major","expected":"serotonin syndrome warning","source":"SSRI + tramadol → serotonin syndrome risk"}
+{"id":"M06","med_a":"Amoxicillin","med_b":"Penicillin","interaction_severity":"minor","expected":"allergy cross-reactivity warning","source":"penicillin allergy → avoid amoxicillin"}
+{"id":"M07","med_a":"Clopidogrel","med_b":"Omeprazole","interaction_severity":"moderate","expected":"reduced clopidogrel efficacy","source":"PPI + clopidogrel → reduced antiplatelet effect"}
+{"id":"M08","med_a":"Digoxin","med_b":"Amiodarone","interaction_severity":"major","expected":"digoxin toxicity warning","source":"amiodarone increases digoxin levels"}
+{"id":"M09","med_a":"Methotrexate","med_b":"Trimethoprim","interaction_severity":"major","expected":"bone marrow suppression warning","source":"methotrexate + trimethoprim → severe toxicity"}
+{"id":"M10","med_a":"Lithium","med_b":"Ibuprofen","interaction_severity":"major","expected":"lithium toxicity warning","source":"NSAID increases lithium levels"}
+{"id":"M11","med_a":"Levothyroxine","med_b":"Calcium carbonate","interaction_severity":"moderate","expected":"reduced absorption, separate by 4 hours","source":"calcium reduces levothyroxine absorption"}
+{"id":"M12","med_a":"Rifampicin","med_b":"Oral contraceptive","interaction_severity":"major","expected":"reduced contraceptive efficacy","source":"rifampicin reduces OCP effectiveness"}
+{"id":"M13","med_a":"Spironolactone","med_b":"Potassium supplement","interaction_severity":"major","expected":"hyperkalemia risk warning","source":"spironolactone + potassium → hyperkalemia risk"}
+{"id":"M14","med_a":"Theophylline","med_b":"Ciprofloxacin","interaction_severity":"major","expected":"theophylline toxicity warning","source":"ciprofloxacin increases theophylline levels"}
+{"id":"M15","med_a":"Insulin","med_b":"Metoprolol","interaction_severity":"moderate","expected":"masked hypoglycemia symptoms","source":"beta-blocker masks hypoglycemia signs"}
+{"id":"M16","med_a":"Isotretinoin","med_b":"Doxycycline","interaction_severity":"major","expected":"benign intracranial hypertension risk","source":"isotretinoin + tetracycline → pseudotumor cerebri risk"}
+{"id":"M17","med_a":"Aspirin","med_b":"Allergy_Penicillin","interaction_severity":"moderate","expected":"no direct interaction but monitor","source":"no known direct interaction but different drug class"}
+{"id":"M18","med_a":"Ceftriaxone","med_b":"Calcium IV","interaction_severity":"major","expected":"precipitation in lungs/kidneys — contraindicated","source":"ceftriaxone + IV calcium → fatal precipitation"}
+{"id":"M19","med_a":"Paracetamol","med_b":"Warfarin","interaction_severity":"moderate","expected":"INR elevation at high paracetamol doses","source":"paracetamol >2g/day may increase INR with warfarin"}
+{"id":"M20","med_a":"Erythromycin","med_b":"Simvastatin","interaction_severity":"major","expected":"rhabdomyolysis risk — stop simvastatin","source":"erythromycin increases statin levels significantly"}

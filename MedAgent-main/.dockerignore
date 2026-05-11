@@ -1,0 +1,12 @@
+**/__pycache__
+**/.venv
+**/.next
+**/node_modules
+**/.git
+**/.pytest_cache
+**/*.pyc
+.env
+*.log
+data/
+notebooks/
+docs/

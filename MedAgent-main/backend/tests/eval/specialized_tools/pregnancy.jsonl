@@ -1,0 +1,15 @@
+{"id":"PR01","gestational_week":8,"symptoms":"heavy vaginal bleeding, severe cramps","meds":[],"expected":"emergency, possible miscarriage"}
+{"id":"PR02","gestational_week":30,"symptoms":"severe headache, vision changes, swelling","meds":[],"expected":"emergency, possible preeclampsia"}
+{"id":"PR03","gestational_week":35,"symptoms":"no fetal movement for 12 hours","meds":[],"expected":"emergency, decreased fetal movement"}
+{"id":"PR04","gestational_week":12,"symptoms":"mild nausea, fatigue","meds":[],"expected":"routine, normal first trimester symptoms"}
+{"id":"PR05","gestational_week":20,"symptoms":"back pain, mild cramps","meds":[],"expected":"routine, normal pregnancy discomfort"}
+{"id":"PR06","gestational_week":6,"symptoms":"fever 38.5, cough","meds":["Paracetamol"],"expected":"urgent, infection during pregnancy"}
+{"id":"PR07","gestational_week":16,"symptoms":"headache","meds":["Ibuprofen"],"expected":"warn: ibuprofen Category D in pregnancy, avoid"}
+{"id":"PR08","gestational_week":28,"symptoms":"UTI symptoms","meds":["Ciprofloxacin"],"expected":"warn: ciprofloxacin Category C, alternatives exist"}
+{"id":"PR09","gestational_week":10,"symptoms":"severe acne","meds":["Isotretinoin"],"expected":"warn: isotretinoin Category X, absolutely contraindicated, teratogenic"}
+{"id":"PR10","gestational_week":24,"symptoms":"high blood pressure 160/100","meds":["Lisinopril"],"expected":"warn: ACE inhibitors Category D in pregnancy, use alternative"}
+{"id":"PR11","gestational_week":5,"symptoms":"migraine","meds":["Sumatriptan"],"expected":"warn: triptan Category C, limited data"}
+{"id":"PR12","gestational_week":32,"symptoms":"severe abdominal pain, bleeding","meds":[],"expected":"emergency, possible placental abruption"}
+{"id":"PR13","gestational_week":14,"symptoms":"spotting, mild cramps","meds":[],"expected":"urgent, threatened miscarriage — see OB"}
+{"id":"PR14","gestational_week":38,"symptoms":"regular contractions 5 min apart","meds":[],"expected":"routine, labor signs — go to hospital when contractions 3-5 min"}
+{"id":"PR15","gestational_week":22,"symptoms":"anxiety","meds":["Warfarin"],"expected":"warn: warfarin Category X in pregnancy, teratogenic"}
