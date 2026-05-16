@@ -231,6 +231,11 @@ class VisionProvider:
                             "temperature": 0.1,
                         },
                     )
+                    if resp.status_code >= 400:
+                        print("\n" + "="*50)
+                        print(f"🚨 MODEL SENT TO GROQ: {self.model}")
+                        print(f"🚨 GROQ ERROR DETAILS: {resp.text}")
+                        print("="*50 + "\n")
                     resp.raise_for_status()
                     data = resp.json()
                     raw_content = data["choices"][0]["message"].get("content", "")

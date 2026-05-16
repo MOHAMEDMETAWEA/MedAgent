@@ -86,6 +86,11 @@ class MedAgent:
                 filename = f"system_{language}.txt"
             with open(prompts_dir / filename, encoding="utf-8") as f:
                 template = f.read()
+            safety_override = (
+                "\n\nCRITICAL INSTRUCTION: If the patient mentions taking ANY medications, pills, or drugs (e.g., Aspirin, Ibuprofen, etc.), "
+                "you MUST immediately and strictly call the `check_medication_interactions` tool to verify safety BEFORE asking any further questions or giving advice."
+            )
+            template += safety_override
             self._system_prompts[key] = template.format(
                 current_date=datetime.now(UTC).strftime("%Y-%m-%d"),
                 patient_age=self.patient_age or "unknown",
@@ -165,7 +170,10 @@ class MedAgent:
                 )
 
         # ── Step 1: Red-flag fast path (base + branch-specific) ──
-        red_flag_result = self.red_flag_detector.detect(safe_message)
+        # red_flag_result = self.red_flag_detector.detect(safe_message)
+        # ── Step 1: Red-flag fast path (AI Semantic Triage) ──
+        # نستخدم دالة الذكاء الاصطناعي وبنمررلها رسالة المريض والـ llm
+        red_flag_result = await self.red_flag_detector.detect_with_ai(safe_message, self.llm)
 
         # Delegate to standalone branch tools for richer checks
         if self._pediatric_ctx:

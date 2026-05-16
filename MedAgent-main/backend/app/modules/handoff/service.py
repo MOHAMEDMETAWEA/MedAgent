@@ -322,19 +322,36 @@ def _build_summary_markdown(conv: Conversation | None, messages: list[Message]) 
         lines.append(patient_msgs[0].text[:500])
     lines.append("")
 
-    # Patient messages
-    lines.append("## Patient History")
-    for msg in patient_msgs[1:]:
-        lines.append(f"- {msg.text[:200]}")
-    lines.append("")
+    # # Patient messages
+    # lines.append("## Patient History")
+    # for msg in patient_msgs[1:]:
+    #     lines.append(f"- {msg.text[:200]}")
+    # lines.append("")
 
-    # AI Assessment
-    lines.append("## AI Assessment")
-    for msg in assistant_msgs:
-        lines.append(msg.text[:500])
+    # # AI Assessment
+    # lines.append("## AI Assessment")
+    # for msg in assistant_msgs:
+    #     lines.append(msg.text[:500])
+    #     lines.append("")
+    # lines.append("")
+# -------------
+    # Medical Interview (Q&A)
+    lines.append("## Patient History (Interview)")
+        
+    # هندمج كل سؤال من الـ AI مع الإجابة اللي بعده من المريض
+    # assistant_msgs فيها الأسئلة
+    # patient_msgs[1:] فيها الإجابات (لأن أول رسالة كانت الشكوى الأساسية)
+    for ai_msg, pt_msg in zip(assistant_msgs, patient_msgs[1:]):
+        lines.append(f"**Doctor (AI):** {ai_msg.text}")
+        lines.append(f"**Patient:** {pt_msg.text}")
         lines.append("")
-    lines.append("")
-
+    
+    # AI Assessment (ممكن نسيب التقييم المبدئي الأخير لو موجود)
+    lines.append("## AI Assessment")
+    if assistant_msgs:
+        # ناخد آخر رسالة بس من الـ AI اللي غالباً بيكون فيها التقييم النهائي
+        lines.append(assistant_msgs[-1].text)
+# -------------------
     # Red flags
     if conv and conv.red_flags_detected:
         lines.append("## Red Flags Detected")

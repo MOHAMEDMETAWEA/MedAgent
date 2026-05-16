@@ -94,6 +94,18 @@ class OpenAICompatProvider(LLMProvider):
 
         response = await self._request(body, stream=False)
         data = response.json()
+        #-------------------
+        # 🟢 الحماية في حالة عدم وجود الـ choices
+        if "error" in data:
+            err_msg = data["error"].get("message", str(data["error"]))
+            logger.error("llm_generate_error", error=err_msg)
+            return {"content": f"API Error: {err_msg}", "tool_calls": [], "usage": {}}
+            
+        choices = data.get("choices")
+        if not choices:
+            return {"content": "API Error: No choices returned.", "tool_calls": [], "usage": {}}
+        #-----------------
+
         choice = data["choices"][0]
         message = choice["message"]
         usage = data.get("usage", {})
@@ -159,8 +171,26 @@ class OpenAICompatProvider(LLMProvider):
                 break
 
             import json
+            
+            # data = json.loads(line[6:])
+            #------------
+            try:
+                data = json.loads(line[6:])
+            except json.JSONDecodeError:
+                continue
 
-            data = json.loads(line[6:])
+            # 🟢 درع الحماية: التأكد من وجود Error من الـ API داخل الستريم
+            if "error" in data:
+                err_msg = data["error"].get("message", str(data["error"]))
+                yield {"type": "error", "content": f"Provider API Error: {err_msg}"}
+                yield {"type": "done", "usage": {}}
+                break
+
+            # 🟢 الحماية من غياب الـ choices
+            choices = data.get("choices")
+            if not choices:
+                continue
+            #------------
             choice = data["choices"][0]
 
             finish = choice.get("finish_reason")

@@ -91,7 +91,8 @@ async def download_pdf(
 
     from app.common.pdf import generate_pdf, markdown_to_html
 
-    title = handoff.title or "MedAgent Handoff Summary"
+    # title = handoff.title or "MedAgent Handoff Summary"
+    title = f"MedAgent Handoff - ID: {str(handoff.id)[:8]}" or handoff.title
     html = markdown_to_html(handoff.summary_markdown, title=title)
 
     try:

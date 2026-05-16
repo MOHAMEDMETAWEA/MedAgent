@@ -26,7 +26,7 @@ def _create_vision_provider():
     """Build a VisionProvider from settings. Returns None if no provider is configured.
 
     Resolution order:
-      1. VISION_PROVIDER setting → openrouter | openai | groq | gemini | disabled
+      1. VISION_PROVIDER setting → groq | openrouter | openai |  gemini | disabled
       2. Falls back to OpenRouter if LLM_API_KEY exists
       3. Falls back to OpenAI if OPENAI_API_KEY exists
     """
@@ -37,7 +37,14 @@ def _create_vision_provider():
 
     if explicit == "disabled":
         return None
-
+#---------------------------
+    if explicit == "groq" and os.environ.get("GROQ_API_KEY"):
+        return VisionProvider(
+            base_url=os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
+            api_key=os.environ.get("GROQ_API_KEY", ""),
+            model=model,
+        )
+#------------------------------
     if explicit == "openai" or (not explicit and os.environ.get("OPENAI_API_KEY")):
         api_key = os.environ.get("OPENAI_API_KEY", "")
         if api_key:

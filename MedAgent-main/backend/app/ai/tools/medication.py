@@ -9,29 +9,44 @@ from pydantic import BaseModel, Field
 from app.ai.agent.base import Tool
 
 
+# class MedicationInput(BaseModel):
+#     """Input schema for medication interaction check."""
+
+#     current_medications: list[str] = Field(
+#         ...,
+#         min_length=1,
+#         description="List of current medications the patient is taking (brand or generic names)",
+#     )
+#     new_medication: str = Field(
+#         ...,
+#         # min_length=1, 
+#         default="", # 🟢 خلينا الديفولت فاضي وشيلنا min_length  
+#         description="New medication being considered",
+#     )
+#     allergies: list[str] = Field(
+#         default=[],
+#         description="Known drug allergies",
+#     )
+#     language: str = Field(
+#         default="en",
+#         pattern="^(ar|en)$",
+#         description="Output language",
+#     )
 class MedicationInput(BaseModel):
     """Input schema for medication interaction check."""
 
     current_medications: list[str] = Field(
-        ...,
-        min_length=1,
-        description="List of current medications the patient is taking (brand or generic names)",
+        description="List of current medications the patient is taking (e.g., ['Aspirin', 'Ibuprofen'])."
     )
     new_medication: str = Field(
-        ...,
-        min_length=1,
-        description="New medication being considered",
+        description="New medication being considered. IMPORTANT: Pass an empty string '' if only checking current medications against each other."
     )
     allergies: list[str] = Field(
-        default=[],
-        description="Known drug allergies",
+        description="Known drug allergies. IMPORTANT: Pass an empty list [] if none."
     )
     language: str = Field(
-        default="en",
-        pattern="^(ar|en)$",
-        description="Output language",
+        description="Output language, strictly 'ar' or 'en'."
     )
-
 
 class MedicationChecker:
     """Checks drug-drug interactions, allergies, and dose warnings."""

@@ -16,9 +16,9 @@ async def send_email(
     text_body: str | None = None,
 ) -> bool:
     """Send an email via SMTP (aiosmtplib). Falls back to console log in dev."""
-    if settings.ENV == "local":
-        _log_to_console(to, subject, html_body)
-        return True
+    # if settings.ENV == "local":
+    #     _log_to_console(to, subject, html_body)
+    #     return True
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
