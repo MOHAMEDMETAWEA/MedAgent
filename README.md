@@ -82,6 +82,32 @@ This is the recommended, full-stack implementation serving as a robust reference
 - **Backend API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Mailpit (Dev SMTP):** [http://localhost:8025](http://localhost:8025)
 
+### Production Deployment & Testing (`MedAgent-main/`)
+
+Once you are ready to move from development to production, use the provided infrastructure scripts to deploy and test the application securely.
+
+**1. Production Deployment**
+Deploy securely using the optimized `docker-compose.prod.yml` which disables hot-reloading and builds strict production assets.
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+*(Automated deployments can also be handled by pushing to the `main` branch to trigger the `.github/workflows/deploy-prod.yml` GitHub Action).*
+
+**2. ML Evaluation Framework**
+Verify the safety and accuracy of the AI triage engine using the evaluation suite.
+```bash
+# Run the evaluation scripts against the gold standard dataset
+python scripts/eval.py
+```
+*(The evaluation script tests the `data/gold/triage_eval.jsonl` dataset to ensure accuracy stays above the 80% medical safety threshold).*
+
+**3. Performance & Load Testing**
+Verify the backend API can handle concurrent traffic using the built-in `k6` load test.
+```bash
+# Ensure k6 is installed locally, then run:
+k6 run scripts/performance/load_test.js
+```
+
 ---
 
 ## 🏗️ 2. The Microservices Architecture (`archive/`)

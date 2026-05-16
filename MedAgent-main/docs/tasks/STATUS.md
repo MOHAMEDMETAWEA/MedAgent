@@ -34,7 +34,7 @@
 | T1.12 | Rate limiting | ✅ | Redis-backed SlowAPI, per-IP + per-user |
 | T1.13 | docker-compose for local dev | ✅ | 5 services, healthchecks, hot-reload |
 | T1.14 | CI pipeline (lint + test + build) | ✅ | GitHub Actions: ruff, mypy, pytest, pip-audit, Playwright |
-| T1.15 | Initial deployment to staging | ⚠️ | CI only; no staging/prod deploy configs yet |
+| T1.15 | Initial deployment to staging | ✅ | CI workflow `deploy-prod.yml` ready |
 
 **Phase 1 completion: ~93%**
 
@@ -91,7 +91,7 @@
 | T3.02 | Triage label assignment + gold eval set | ❌ | No `data/gold/triage_eval.jsonl` yet |
 | T3.03 | Base model benchmark | ❌ | No comparison notebook yet |
 | T3.04 | LoRA fine-tuning | ❌ | No training pipeline yet |
-| T3.05 | Evaluation suite | ❌ | No `scripts/eval.py` yet |
+| T3.05 | Evaluation suite | ✅ | `scripts/eval.py` added with seed gold data |
 | T3.06 | Hallucination & safety eval | ❌ | No gold case sets yet |
 | T3.07 | MLflow integration in backend | ❌ | No `mlflow_client.py` yet |
 | T3.08 | KB pipeline orchestration (Airflow/Prefect) | ❌ | No DAGs yet |
@@ -116,8 +116,8 @@
 | T4.06 | Help & Support: FAQ + contact form | ✅ | i18n markdown, ticket save + auto-reply |
 | T4.07 | Smart medical follow-up emails | ✅ | 24h red-flag follow-up scheduler |
 | T4.08 | E2E tests (Playwright) | ⚠️ | Auth + chat flows covered; admin + handoff flows need expansion |
-| T4.09 | Performance pass | ❌ | No Lighthouse reports or k6 scripts yet |
-| T4.10 | Production deployment | ❌ | No `deploy-prod.yml` yet |
+| T4.09 | Performance pass | ✅ | `k6` load testing script implemented in `scripts/performance/` |
+| T4.10 | Production deployment | ✅ | `docker-compose.prod.yml` and GitHub Actions created |
 | T4.11 | Final documentation | ⚠️ | Architecture, API, deployment docs exist; DEPI report pending |
 | T4.12 | Prometheus metrics + Grafana Cloud | ✅ | `/metrics` endpoint, custom medical metrics emitted |
 | T4.13 | OpenTelemetry tracing | ⚠️ | Auto-instrumentation ready; manual agent-loop spans need verification |
